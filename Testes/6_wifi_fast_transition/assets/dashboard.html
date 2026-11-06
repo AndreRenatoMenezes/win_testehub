@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wi-Fi Fast Transition — Caminhada</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --good-ink: #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+      --good-ink: #0ca30c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 24px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  header .ssid { color: var(--ink-2); font-size: 16px; }
+  header .spacer { flex: 1; }
+  .fase { font-size: 14px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); }
+  .relogio { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); padding: 10px 18px; }
+  button.primario { background: var(--s1); color: #fff; border: none; font-size: 22px; padding: 18px 40px; font-weight: 600; }
+  main { padding: 16px 24px 24px; display: grid; gap: 16px; }
+  .cards { display: grid; grid-template-columns: 2fr 1fr 1.6fr 1.4fr; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+  .card .rot { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .ap-atual { display: flex; align-items: center; gap: 12px; }
+  .chip { width: 18px; height: 18px; border-radius: 4px; flex: none; }
+  .grande { font-size: 40px; font-weight: 700; line-height: 1.1; }
+  .medio { font-size: 15px; color: var(--ink-2); margin-top: 4px; overflow-wrap: anywhere; }
+  .contadores { display: flex; gap: 18px; }
+  .contadores div { display: flex; flex-direction: column; }
+  .contadores b { font-size: 36px; font-variant-numeric: tabular-nums; }
+  .contadores span { font-size: 13px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grafico h2 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+  .legenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--ink-2); margin-bottom: 6px; min-height: 18px; }
+  .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .legenda i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+  canvas { width: 100%; height: 260px; display: block; }
+  .feed { max-height: 260px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 13px; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+  td { padding: 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .rodape { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; }
+  #inicio { position: fixed; inset: 0; background: color-mix(in srgb, var(--page) 92%, transparent); display: none;
+            flex-direction: column; align-items: center; justify-content: center; gap: 18px; z-index: 5; text-align: center; padding: 24px; }
+  #inicio h2 { font-size: 30px; margin: 0; }
+  #inicio p { font-size: 18px; color: var(--ink-2); max-width: 760px; margin: 0; }
+  #flash { position: fixed; left: 50%; top: 90px; transform: translateX(-50%); padding: 18px 34px; border-radius: 14px;
+           font-size: 30px; font-weight: 700; color: #fff; display: none; z-index: 4; box-shadow: 0 10px 40px rgba(0,0,0,.35); text-align: center; }
+  #flash small { display: block; font-size: 17px; font-weight: 500; opacity: .95; margin-top: 4px; }
+  #fim { position: fixed; inset: 0; background: var(--page); display: none; flex-direction: column; align-items: center;
+         justify-content: center; gap: 16px; z-index: 6; text-align: center; padding: 24px; }
+  #fim h2 { font-size: 34px; margin: 0; }
+  #fim p { font-size: 18px; color: var(--ink-2); max-width: 760px; margin: 0; }
+  @media (max-width: 1100px) { .cards { grid-template-columns: 1fr 1fr; } .graficos { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Wi-Fi Fast Transition</h1>
+  <span class="ssid" id="ssid">—</span>
+  <span class="fase" id="fase">aguardando</span>
+  <span class="spacer"></span>
+  <span class="relogio" id="relogio" title="Tempo restante da caminhada">05:00</span>
+  <button id="btnEncerrar" title="Encerra a caminhada e gera o relatório">Encerrar agora</button>
+</header>
+
+<main>
+  <section class="cards">
+    <div class="card">
+      <div class="rot">AP atual</div>
+      <div class="ap-atual"><span class="chip" id="apChip"></span><span class="grande" id="apLabel">—</span></div>
+      <div class="medio" id="apInfo">—</div>
+    </div>
+    <div class="card">
+      <div class="rot">Sinal (RSSI)</div>
+      <div class="grande" id="rssi">—</div>
+      <div class="medio" id="qualidade">—</div>
+    </div>
+    <div class="card">
+      <div class="rot">Roamings</div>
+      <div class="contadores">
+        <div><b id="cFT">0</b><span><i class="dot" style="background:var(--good)"></i>✓ FT</span></div>
+        <div><b id="cNao">0</b><span><i class="dot" style="background:var(--critical)"></i>✕ Não FT</span></div>
+        <div><b id="cInd">0</b><span><i class="dot" style="background:var(--warning)"></i>? Indeterminado</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="rot">Latência agora</div>
+      <div class="medio" style="font-size:20px;color:var(--ink)"><span class="dot" style="background:var(--s1)"></span> Gateway: <b id="latGw">—</b></div>
+      <div class="medio" style="font-size:20px;color:var(--ink)"><span class="dot" style="background:var(--s2)"></span> Internet: <b id="latInet">—</b></div>
+    </div>
+  </section>
+
+  <section class="graficos">
+    <div class="card grafico">
+      <h2>RSSI do AP conectado (dBm) — últimos 90 s</h2>
+      <div class="legenda" id="legRssi"></div>
+      <canvas id="gRssi" aria-label="Gráfico de RSSI ao longo do tempo"></canvas>
+    </div>
+    <div class="card grafico">
+      <h2>Latência de ping (ms) — últimos 90 s</h2>
+      <div class="legenda">
+        <span><i style="background:var(--s1)"></i>Gateway</span>
+        <span><i style="background:var(--s2)"></i>Internet</span>
+        <span><i style="background:var(--critical);height:8px;width:3px"></i>Ping perdido</span>
+      </div>
+      <canvas id="gPing" aria-label="Gráfico de latência ao longo do tempo"></canvas>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="rot">Trocas de AP</div>
+    <div class="feed">
+      <table>
+        <thead><tr><th>#</th><th>Hora</th><th>De → Para</th><th>RSSI</th><th>Classificação</th><th>AKM</th><th>Troca</th><th>Interrupção gw</th></tr></thead>
+        <tbody id="feed"><tr><td colspan="8" style="color:var(--muted)">Nenhuma troca ainda. Caminhe em direção a outro AP.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="rodape"><span id="rodape">Conectando ao teste...</span><span>Hardware Test Hub — Módulo 6</span></div>
+</main>
+
+<div id="inicio">
+  <h2>Pronto para a caminhada</h2>
+  <p>Leve o notebook aberto e ande pelo escritório passando por áreas de APs diferentes. A cada troca de AP este painel mostra se ela usou Fast Transition (802.11r).</p>
+  <button class="primario" id="btnIniciar">Iniciar caminhada</button>
+  <p id="autoInicio"></p>
+</div>
+<div id="flash"></div>
+<div id="fim"><h2 id="fimTitulo">Processando...</h2><p id="fimTexto">Gerando relatório e evidências. Não feche esta janela.</p></div>
+
+<script>
+"use strict";
+const SERIES = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const corAp = idx => idx >= 0 && idx < 8 ? css(SERIES[idx]) : css("--muted");
+const STATUS = { "FT": ["--good", "✓"], "Não FT": ["--critical", "✕"], "Indeterminado": ["--warning", "?"] };
+const $ = id => document.getElementById(id);
+const fmtMs = v => v === null || v === undefined ? "—" : `${Math.round(v)} ms`;
+const fmtTempo = s => { s = Math.max(0, Math.ceil(s)); return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`; };
+
+let ultimoRoam = 0, flashAte = 0, flashN = 0, redirecionado = false, falhas = 0;
+
+$("btnIniciar").onclick = () => fetch("/api/iniciar", {method: "POST"});
+$("btnEncerrar").onclick = () => { if (confirm("Encerrar a caminhada agora e gerar o relatório?")) fetch("/api/encerrar", {method: "POST"}); };
+
+function prepararCanvas(cv) {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width*dpr) || cv.height !== Math.round(r.height*dpr)) {
+    cv.width = Math.round(r.width*dpr); cv.height = Math.round(r.height*dpr);
+  }
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,r.width,r.height);
+  return [ctx, r.width, r.height];
+}
+
+// Grafico de linhas generico: um eixo Y, grade recessiva, marcadores verticais de roaming.
+function desenhar(cv, o) {
+  const [ctx, W, H] = prepararCanvas(cv);
+  const m = {l: 46, r: 12, t: 22, b: 24};
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const x = t => m.l + (t - o.x0) / (o.x1 - o.x0) * pw;
+  const y = v => m.t + (1 - (v - o.y0) / (o.y1 - o.y0)) * ph;
+  ctx.font = "12px system-ui, Segoe UI, sans-serif";
+  ctx.lineWidth = 1; ctx.strokeStyle = css("--grid"); ctx.fillStyle = css("--muted");
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const v of o.yTicks) { const yy = Math.round(y(v)) + .5; ctx.beginPath(); ctx.moveTo(m.l, yy); ctx.lineTo(W - m.r, yy); ctx.stroke(); ctx.fillText(v, m.l - 6, yy); }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (let s = Math.max(0, Math.ceil(o.x0/15)*15); s <= o.x1; s += 15) ctx.fillText(fmtTempo(s), x(s), H - m.b + 6);
+  ctx.strokeStyle = css("--axis"); ctx.beginPath(); ctx.moveTo(m.l, m.t + ph + .5); ctx.lineTo(W - m.r, m.t + ph + .5); ctx.stroke();
+  ctx.save(); ctx.beginPath(); ctx.rect(m.l, m.t - 2, pw, ph + 4); ctx.clip();
+  for (const mk of o.marcadores || []) {
+    if (mk.t < o.x0) continue;
+    const xx = Math.round(x(mk.t)) + .5;
+    ctx.strokeStyle = mk.cor; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(xx, m.t); ctx.lineTo(xx, m.t + ph); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.lineCap = "round";
+  for (const s of o.series) {
+    ctx.strokeStyle = s.cor; ctx.beginPath(); let aberto = false;
+    for (const [t, v] of s.pontos) {
+      if (v === null || v === undefined) { aberto = false; continue; }
+      const vv = Math.max(o.y0, Math.min(o.y1, v));
+      if (!aberto) { ctx.moveTo(x(t), y(vv)); aberto = true; } else ctx.lineTo(x(t), y(vv));
+    }
+    ctx.stroke();
+  }
+  for (const p of o.perdas || []) { if (p[0] < o.x0) continue; ctx.fillStyle = p[1]; ctx.fillRect(x(p[0]) - 1.5, m.t + ph - 10, 3, 10); }
+  ctx.restore();
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.font = "600 12px system-ui, Segoe UI, sans-serif";
+  for (const mk of o.marcadores || []) { if (mk.t < o.x0) continue; ctx.fillStyle = css("--ink-2"); ctx.fillText(mk.rotulo, x(mk.t), m.t - 4); }
+}
+
+function render(e) {
+  $("ssid").textContent = e.ssid ? `SSID: ${e.ssid}` : "";
+  const fases = {aguardando: "aguardando início", caminhada: "caminhada em andamento", processando: "processando", concluido: "concluído"};
+  $("fase").textContent = fases[e.fase] || e.fase;
+  $("relogio").textContent = fmtTempo(e.fase === "aguardando" ? e.duracao_s : e.restante_s);
+  $("inicio").style.display = e.fase === "aguardando" ? "flex" : "none";
+  $("autoInicio").textContent = e.fase === "aguardando" ? `Início automático em ${Math.ceil(e.inicio_auto_s)} s.` : "";
+  $("btnEncerrar").disabled = e.fase !== "caminhada";
+
+  const c = e.conexao || {};
+  if (c.conectado) {
+    $("apChip").style.background = corAp(c.ap_idx);
+    $("apLabel").textContent = c.ap || "—";
+    $("apInfo").textContent = `${c.bssid} · canal ${c.canal ?? "?"} · ${c.banda ?? ""} · ${c.phy ?? ""} · AKM ${c.akm_nome ?? "lendo..."}`;
+    $("rssi").textContent = c.rssi !== null && c.rssi !== undefined ? `${c.rssi} dBm` : "—";
+    const q = c.rssi >= -60 ? "bom" : c.rssi >= -70 ? "razoável" : "fraco";
+    $("qualidade").textContent = `Qualidade ${c.qualidade}% · sinal ${q}`;
+  } else {
+    $("apChip").style.background = css("--muted");
+    $("apLabel").textContent = "Sem conexão";
+    $("apInfo").textContent = `Estado: ${c.estado ?? "desconhecido"}`;
+    $("rssi").textContent = "—"; $("qualidade").textContent = "—";
+  }
+  $("cFT").textContent = e.contadores["FT"]; $("cNao").textContent = e.contadores["Não FT"]; $("cInd").textContent = e.contadores["Indeterminado"];
+  const ultimo = l => { for (let i = l.length - 1; i >= 0; i--) if (l[i][1] !== null) return l[i][1]; return null; };
+  const ult = (l) => l.length ? l[l.length-1] : null;
+  const gw = e.pings.gateway || [], inet = e.pings.internet || [];
+  $("latGw").textContent = e.gateway ? (ult(gw) && ult(gw)[1] === null ? "perdido" : fmtMs(ultimo(gw))) : "sem gateway";
+  $("latInet").textContent = ult(inet) && ult(inet)[1] === null ? "sem resposta" : fmtMs(ultimo(inet));
+
+  // Graficos
+  const x1 = Math.max(e.t, 10), x0 = x1 - 90;
+  const marc = e.roamings.map(r => ({t: r.t, cor: css(STATUS[r.classificacao][0]), rotulo: `${STATUS[r.classificacao][1]} ${r.classificacao}`}));
+  const porAp = {};
+  let anterior = null;
+  for (const [t, v, idx] of e.amostras) {
+    if (idx < 0) { anterior = null; continue; }
+    (porAp[idx] = porAp[idx] || []);
+    if (anterior && anterior[2] !== idx) porAp[idx].push([anterior[0], anterior[1]]); // liga a troca
+    if (anterior && anterior[2] !== idx) porAp[anterior[2]].push([t, null]);
+    porAp[idx].push([t, v]); anterior = [t, v, idx];
+  }
+  const series = Object.keys(porAp).map(k => ({cor: corAp(+k), pontos: porAp[k]}));
+  desenhar($("gRssi"), {x0, x1, y0: -90, y1: -30, yTicks: [-90, -80, -70, -60, -50, -40, -30], series, marcadores: marc});
+  $("legRssi").innerHTML = e.aps.filter(a => Object.keys(porAp).includes(String(a.idx)))
+    .map(a => `<span><i style="background:${corAp(a.idx)}"></i>${a.label} ${a.bssid.slice(-8)}</span>`).join("")
+    + `<span><i style="background:${css("--good")};height:8px;width:2px"></i>roaming (✓ FT · ✕ Não FT · ? indeterminado)</span>`;
+  const todos = [...gw, ...inet].filter(p => p[0] >= x0 && p[1] !== null).map(p => p[1]);
+  const maxLat = Math.max(20, ...todos);
+  const topo = maxLat <= 50 ? 50 : maxLat <= 100 ? 100 : maxLat <= 250 ? 250 : maxLat <= 500 ? 500 : 1000;
+  const ticks = [0, topo/4, topo/2, 3*topo/4, topo];
+  const perdas = [...gw.filter(p => p[1] === null).map(p => [p[0], css("--critical")]), ...inet.filter(p => p[1] === null).map(p => [p[0], css("--critical")])];
+  desenhar($("gPing"), {x0, x1, y0: 0, y1: topo, yTicks: ticks, marcadores: marc, perdas,
+    series: [{cor: css("--s1"), pontos: gw}, {cor: css("--s2"), pontos: inet}]});
+
+  // Feed
+  if (e.roamings.length) {
+    $("feed").innerHTML = e.roamings.slice().reverse().map(r => {
+      const [cv, ic] = STATUS[r.classificacao];
+      return `<tr><td>${r.n}</td><td>${r.hora.slice(0, 8)}</td><td>${r.ap_origem} → <b>${r.ap_destino}</b></td>
+        <td>${r.rssi_antes} → ${r.rssi_depois} dBm</td>
+        <td><span class="tag"><i class="dot" style="background:var(${cv})"></i>${ic} ${r.classificacao}${r.desconexao ? " (desconexão)" : ""}</span></td>
+        <td>${r.akm_nome}</td><td>${fmtMs(r.duracao_ms)}${r.reassociacao_ms != null ? ` <small>(ar ${fmtMs(r.reassociacao_ms)})</small>` : ""}${r.troca_demorada ? " !" : ""}</td><td>${fmtMs(r.interrupcao_gateway_ms)}</td></tr>`;
+    }).join("");
+  }
+
+  // Destaque a cada roaming novo (e atualiza a classificacao enquanto visivel)
+  const n = e.roamings.length;
+  if (n > ultimoRoam && e.fase === "caminhada") { flashN = n; flashAte = Date.now() + 5000; }
+  ultimoRoam = n;
+  const fl = $("flash");
+  if (Date.now() < flashAte && flashN) {
+    const r = e.roamings[flashN - 1], [cv, ic] = STATUS[r.classificacao];
+    fl.style.background = css(cv); fl.style.color = r.classificacao === "Indeterminado" ? "#0b0b0b" : "#fff";
+    fl.innerHTML = `${ic} ROAMING ${r.classificacao === "Indeterminado" ? "— lendo AKM..." : r.classificacao}<small>${r.ap_origem} → ${r.ap_destino} · ${r.rssi_antes} → ${r.rssi_depois} dBm · troca ${fmtMs(r.duracao_ms)}${r.reassociacao_ms != null ? ` (reassociação ${fmtMs(r.reassociacao_ms)})` : ""}</small>`;
+    fl.style.display = "block";
+  } else fl.style.display = "none";
+
+  // Fim
+  if (e.fase === "processando" || e.fase === "concluido") {
+    $("fim").style.display = "flex";
+    if (e.fase === "concluido") {
+      $("fimTitulo").textContent = e.resultado === "PASS" ? "✓ PASS — Fast Transition confirmado" : "✕ FAIL";
+      $("fimTitulo").style.color = e.resultado === "PASS" ? css("--good-ink") : css("--critical");
+      $("fimTexto").textContent = `${e.motivo || ""} Abrindo o relatório...`;
+      if (e.relatorio && !redirecionado) { redirecionado = true; setTimeout(() => location.href = "/relatorio", 3000); }
+    }
+  }
+  $("rodape").textContent = `Atualizado ${new Date().toLocaleTimeString("pt-BR")} · gateway ${e.gateway || "—"} · internet ${e.internet}`;
+}
+
+async function ciclo() {
+  try {
+    const r = await fetch("/api/estado", {cache: "no-store"});
+    render(await r.json()); falhas = 0;
+  } catch (err) {
+    falhas++;
+    if (!redirecionado) $("rodape").textContent = falhas > 3 ? "Teste encerrado ou sem comunicação com o hub." : "Reconectando...";
+  }
+  if (!redirecionado || falhas === 0) setTimeout(ciclo, 1000);
+}
+ciclo();
+</script>
+</body>
+</html>

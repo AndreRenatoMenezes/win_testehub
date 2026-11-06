@@ -1,0 +1,49 @@
+# ---------------------------------------------------------------------------
+# Saidas do hub (geradas a cada execucao)
+# ---------------------------------------------------------------------------
+Execucoes/
+Resultados/
+
+# ---------------------------------------------------------------------------
+# Ambiente Python
+# ---------------------------------------------------------------------------
+.venv/
+__pycache__/
+*.py[cod]
+
+# ---------------------------------------------------------------------------
+# Configuracao local e dados internos -- NUNCA versionar
+# (veja README > "Arquivos nao versionados")
+# ---------------------------------------------------------------------------
+# URL do speedtest interno e outros valores do ambiente
+config.local.json
+# Perfis WPA: listam os processos dos agentes monitorados
+*.wpaProfile
+
+# ---------------------------------------------------------------------------
+# Binarios de terceiros sem redistribuicao permitida / desnecessarios
+# ---------------------------------------------------------------------------
+msedgedriver.exe
+chromedriver.exe
+*.pdb
+
+# ---------------------------------------------------------------------------
+# Saidas de execucao avulsa dos testes (fora do hub)
+# ---------------------------------------------------------------------------
+Testes/**/Traces_*/
+Testes/**/*.log
+Testes/**/*.csv
+Testes/**/*.png
+*.etl
+
+# ---------------------------------------------------------------------------
+# Sistema operacional / Google Drive / editores
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.tmp.drivedownload/
+.tmp.driveupload/
+~$*
+.vscode/
+.idea/

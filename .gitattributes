@@ -1,0 +1,19 @@
+# Normaliza finais de linha no repositorio (LF) e converte na copia de trabalho.
+* text=auto
+
+# Scripts Windows: sempre CRLF na copia de trabalho
+# (o cmd.exe interpreta mal rotulos/goto em .bat com LF).
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.psd1  text eol=crlf
+
+# Binarios
+*.exe   binary
+*.dll   binary
+*.pdb   binary
+*.etl   binary
+*.zip   binary
+*.png   binary
+*.jpg   binary

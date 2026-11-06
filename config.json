@@ -1,0 +1,13 @@
+{
+    "SkipSetup": false,
+    "Paths": {
+        "SetupRoot": "Setup",
+        "TestsRoot": "Testes",
+        "ResultadosDir": "Resultados",
+        "ExecucoesDir": "Execucoes"
+    },
+    "Settings": {
+        "PythonVenvName": ".venv",
+        "HtmlReportTitle": "Hardware Test Hub - Relatório Final"
+    }
+}
