@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conteudo-sensivel:
+    name: Conteúdo sensível
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Bloqueia arquivos internos e binários não redistribuíveis
+        run: |
+          blocked=$(git ls-files -- '*.wpaProfile' 'config.local.json' '*msedgedriver.exe' '*chromedriver.exe' '*.pdb' '*.etl')
+          if [ -n "$blocked" ]; then
+            echo "::error::Arquivos que não devem ser versionados (veja README > Arquivos não versionados):"
+            echo "$blocked"
+            exit 1
+          fi
+          echo "Nenhum arquivo bloqueado versionado."
+
+      - name: Bloqueia endereços IPv4 fixos
+        shell: python
+        run: |
+          # Permitidos: loopback, 0.0.0.0 e o DNS público usado como alvo de ping.
+          # IPs internos devem ir para config.local.json (não versionado).
+          import ipaddress, re, subprocess, sys
+
+          PERMITIDOS = {"127.0.0.1", "0.0.0.0", "8.8.8.8"}
+          PADRAO = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?![\d.])")
+          globs = ["*.py", "*.ps1", "*.bat", "*.json", "*.md", "*.html", "*.yml"]
+          saida = subprocess.run(["git", "ls-files", "-z", "--", *globs],
+                                 capture_output=True, check=True).stdout
+          achados = 0
+          for caminho in filter(None, saida.decode().split("\0")):
+              with open(caminho, encoding="utf-8", errors="ignore") as f:
+                  for n, linha in enumerate(f, 1):
+                      for m in PADRAO.finditer(linha):
+                          ip = m.group(1)
+                          try:
+                              ipaddress.IPv4Address(ip)
+                          except ValueError:
+                              continue  # ex.: numero de versao
+                          if ip not in PERMITIDOS:
+                              print(f"::error file={caminho},line={n}::IPv4 fixo {ip}. Mova o valor para config.local.json.")
+                              achados += 1
+          if achados:
+              sys.exit(1)
+          print("Nenhum IPv4 fixo fora da lista permitida.")
+
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Instala Ruff
+        run: pip install ruff==0.17.4
+
+      - name: Ruff (erros de sintaxe e nomes indefinidos)
+        run: ruff check --select E9,F63,F7,F82 --target-version py312 --output-format github Testes/
+
+      - name: Compila todos os scripts
+        run: python -m compileall -q Testes/
+
+  powershell:
+    name: PowerShell
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sintaxe no Windows PowerShell 5.1 (runtime do hub)
+        shell: powershell
+        run: |
+          $falhas = 0
+          Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+            $erros = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$erros) | Out-Null
+            foreach ($e in $erros) {
+              Write-Host "::error file=$($_.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              $falhas++
+            }
+          }
+          if ($falhas -gt 0) { exit 1 }
+          Write-Host "Todos os scripts .ps1 foram analisados sem erro de sintaxe."
+
+      - name: PSScriptAnalyzer (severidade Error)
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          }
+          $resultado = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
+          $resultado | Format-Table RuleName, ScriptName, Line, Message -AutoSize -Wrap
+          if ($resultado) { exit 1 }
+          Write-Host "Nenhum problema de severidade Error."

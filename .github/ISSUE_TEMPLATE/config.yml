@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Manual de execução
+    url: https://github.com/AndreRenatoMenezes/win_testehub/blob/main/docs/manual-de-execucao.md
+    about: Pré-requisitos, passo a passo do operador e troubleshooting.

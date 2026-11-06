@@ -1,0 +1,71 @@
+name: Falha em teste ou no hub
+description: Um teste falhou de forma inesperada, o hub travou ou um relatório saiu errado.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de abrir, confira o [Troubleshooting do manual](https://github.com/AndreRenatoMenezes/win_testehub/blob/main/docs/manual-de-execucao.md#7-troubleshooting).
+
+        > **Este repositório é público.** Revise logs e prints antes de colar: remova IPs internos, hostnames, nomes de usuário e números de série.
+
+  - type: dropdown
+    id: modulo
+    attributes:
+      label: Onde ocorreu
+      options:
+        - Hub (hub.bat / hub.ps1)
+        - Setup (Setup/environment)
+        - 1 — CPU e Memória
+        - 1.1 — CPU e Memória (DLP/USB)
+        - 2 — Disco
+        - 2.1 — Disco (DLP/USB)
+        - 3 — Rede (speedtest interno)
+        - 3.1 — Rede (internet / fast.com)
+        - 4 — Boot e Shutdown
+        - 5 — Bateria
+        - 6 — Wi-Fi Fast Transition
+        - Relatórios ou documentação
+    validations:
+      required: true
+
+  - type: textarea
+    id: ocorrido
+    attributes:
+      label: O que aconteceu
+      description: Inclua a mensagem de erro ou o motivo de FAIL exibido no resumo.
+    validations:
+      required: true
+
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que era esperado
+
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. Cenário novo, setup ignorado (SkipSetup = true)
+        2. Seleciona apenas 2_teste_disco
+        3. ...
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows (versão e build)
+      placeholder: Windows 11 23H2, build 22631
+
+  - type: input
+    id: maquina
+    attributes:
+      label: Modelo da máquina
+      placeholder: Dell Latitude 5440
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Trecho do log
+      description: Do `run_*.log` (em `Execucoes/<cenário>/Logs`) ou do log do próprio teste.
+      render: text
