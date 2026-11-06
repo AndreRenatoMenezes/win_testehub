@@ -1,7 +1,7 @@
 # Metodologia de Testes — Hardware Test Hub
 
-**Versão:** 1.0  
-**Data:** 2026-04-15  
+**Versão:** 1.1  
+**Data:** 2026-11-06  
 **Público-alvo:** Equipe técnica, gestores, auditoria
 
 ---
@@ -49,8 +49,8 @@ O **Hardware Test Hub** é um framework de validação de hardware projetado par
 
 Este documento descreve o **procedimento padronizado** de cada teste. Para auditar uma execução:
 
-1. Identifique o **cenário** em `Traces/` (pasta com nome, hostname e data)
-2. Abra o `_relatorio.html` para ver o resumo de resultados
+1. Identifique o **cenário** em `Execucoes/` (pasta com nome, hostname e data)
+2. Abra o `Traces/_relatorio.html` do cenário para ver o resumo de resultados
 3. Compare os procedimentos descritos neste documento com as evidências coletadas
 4. Verifique a cadeia de custódia usando o `_state.json` (seção 10)
 
@@ -75,20 +75,20 @@ O hub opera em **duas fases sequenciais**:
 ├─────────────────────────────────────────────────────┤
 │                                                     │
 │  ┌─── Fase 1: Setup ────────────────────────────┐   │
-│  │ Preparação do ambiente (9 scripts)           │   │
+│  │ Preparação do ambiente (10 scripts)          │   │
 │  │ Pode ser ignorada via config.json            │   │
 │  └──────────────────────────────────────────────┘   │
 │                       │                             │
 │                       ▼                             │
 │  ┌─── Fase 2: Testes ───────────────────────────┐   │
-│  │ Módulos de teste (5 categorias)              │   │
+│  │ 6 módulos de teste + 2 variantes             │   │
 │  │ Seleção via menu checkbox interativo         │   │
 │  └──────────────────────────────────────────────┘   │
 │                       │                             │
 │                       ▼                             │
 │  ┌─── Saídas ───────────────────────────────────┐   │
-│  │ Logs/  → resultados por run                  │   │
-│  │ Traces/→ evidências por cenário              │   │
+│  │ Execucoes/  → logs, traces e estado          │   │
+│  │ Resultados/ → CSVs estruturados              │   │
 │  └──────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────┘
 ```
@@ -125,9 +125,9 @@ O hub injeta variáveis de ambiente antes de executar cada teste, definindo onde
 
 | Variável | Descrição | Exemplo |
 |----------|-----------|---------|
-| `HUB_EVIDENCE_DIR` | Pasta de evidências para o teste atual | `Traces/Cenario_PC01_2026-04-15/2_disco/` |
+| `HUB_EVIDENCE_DIR` | Pasta de evidências para o teste atual | `Execucoes/Cenario_PC01_2026-04-15/Traces/2_disco/` |
 | `HUB_TRACE_DIR` | Idêntica a `HUB_EVIDENCE_DIR` | (mesmo acima) |
-| `HUB_TRACE_ROOT` | Pasta raiz do cenário | `Traces/Cenario_PC01_2026-04-15/` |
+| `HUB_TRACE_ROOT` | Pasta `Traces` do cenário | `Execucoes/Cenario_PC01_2026-04-15/Traces/` |
 
 Os testes **nunca devem salvar arquivos na pasta raiz do projeto**. Toda evidência deve ser direcionada para `HUB_EVIDENCE_DIR`.
 
@@ -141,16 +141,18 @@ Padronizar a configuração da máquina de teste antes da execução dos módulo
 
 ### 3.2 Scripts de Preparação
 
-| # | Script | Descrição | Justificativa |
-|---|--------|-----------|---------------|
-| 1 | `captura_infos_pc` | Coleta informações do sistema (CPU, RAM, disco, bateria, SO) em CSV | Registro de identidade da máquina para rastreabilidade |
-| 2 | `opcoes_energia` | Configura plano de energia para alto desempenho | Evita throttling de CPU e suspensão durante testes |
-| 3 | `softwares_msStore` | Instala aplicativos da Microsoft Store | Garante ferramentas auxiliares necessárias |
-| 4 | `install_python` | Instala o runtime Python 3 | Pré-requisito para os scripts de teste em Python |
-| 5 | `install_py_dependencies` | Cria `.venv` e instala pacotes Python | Isola dependências e garante versões corretas |
-| 6 | `pausa_WinUpdate` | Pausa o Windows Update | Evita downloads e reinicializações durante testes |
-| 7 | `enable_diagnostics` | Habilita diagnósticos de performance do Windows | Necessário para o teste de boot/shutdown (Event Log) |
-| 8 | `AdicionarTecladoUSInt` | Adiciona layout de teclado US International | Padronização de ambiente |
+| Script | Descrição | Justificativa |
+|--------|-----------|---------------|
+| `1_captura_infos_pc` | Coleta informações do sistema (CPU, RAM, disco, bateria, SO) em `informacoes_maquina.csv` | Registro de identidade da máquina para rastreabilidade |
+| `2_opcoes_energia` | Aplica o plano **Equilibrado**, desativa a suspensão e o desligamento da tela (na tomada e na bateria) e define "nada a fazer" ao fechar a tampa | Evita suspensão durante os testes e mantém o mesmo plano em todas as máquinas |
+| `3_softwares_msStore` | Instala via winget o Windows ADK, o CrystalDiskMark e o CrystalDiskInfo | Garante as ferramentas auxiliares necessárias |
+| `4_install_python` | Instala o Python 3.12 oficial e remove o alias da Microsoft Store | Pré-requisito para os scripts de teste em Python |
+| `5_install_py_dependencies` | Cria `.venv` e instala pacotes Python | Isola dependências e garante versões corretas |
+| `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias | Evita downloads e reinicializações durante testes |
+| `8_enable_diagnostics` | Desativa a Inicialização Rápida e habilita os serviços DPS e SysMain e a política WDI de diagnóstico de boot | Necessário para o teste de boot/shutdown (eventos 100 e 200 no Event Log) |
+| `9_AdicionarTecladoUSInt` | Adiciona o layout de teclado EUA-Internacional ao idioma pt-BR | Padronização de ambiente |
+| `12_remover_appx_bloatware` | Remove aplicativos pré-instalados (Xbox, Copilot, Teams, Notícias, Solitaire, LinkedIn, WhatsApp, To Do) | Reduz processos em segundo plano que variam entre imagens |
+| `13_remover_onedrive` | Desinstala o OneDrive e bloqueia a reinstalação por política | Evita sincronização em segundo plano durante as medições |
 
 ### 3.3 Justificativa da Padronização `[Gestão]`
 
@@ -215,11 +217,33 @@ Uma falha neste teste indica que o processador ou a memória da máquina não co
 - **Driver ou firmware** — incompatibilidades de software afetando a performance
 - **Recurso insuficiente** — memória RAM insuficiente para a carga aplicada
 
-**Ação recomendada:** Investigar logs detalhados em `Logs/run_*.log` e verificar se o hardware apresenta defeitos.
+**Ação recomendada:** Investigar logs detalhados em `Execucoes/<cenário>/Logs/run_*.log` e verificar se o hardware apresenta defeitos.
 
 ### 4.7 Interrupção Segura
 
-O operador pode interromper o teste a qualquer momento pressionando `Ctrl+Q`. O teste será encerrado de forma controlada e registrará o status parcial.
+O operador pode interromper o teste a qualquer momento pressionando `Ctrl+Q`. O teste é encerrado de forma controlada: a captura WPR em andamento é cancelada, o log registra a interrupção e o resultado é **FAIL** (exit code 1).
+
+### 4.8 Variante DLP/USB `[Técnico]`
+
+O script `1-1_automacao_performance_dlp.py` mede o custo de CPU e memória do **agente de DLP** ao inspecionar cópias para um pendrive. Ele aparece no menu na mesma seção do Módulo 1 (**Cpu Memo**) e exige um pendrive montado em `E:\` (configurável em `USB_DRIVE`, no topo do script).
+
+| Etapa | Descrição | Duração |
+|-------|-----------|---------|
+| 1 | Gera, na pasta do script, um arquivo de 100 MB com nome e extensão que acionam o DLP (`relatorio_financeiro_confidencial.xlsx`) | uma vez |
+| 2 | Estabilização | 15 segundos |
+| 3 | **Captura WPR** (`Power.light` + `VirtualAllocation.light`) enquanto o arquivo é copiado repetidamente para o pendrive | 60 segundos |
+| 4 | Exportação WPA com o perfil `Agentes_SI_Profile.wpaProfile` | ~30s |
+| 5 | Cooldown inteligente (aguarda a CPU cair abaixo de 15%) | até 300 segundos |
+| 6 | Repetição dos passos 2–5 por **5 ciclos**, seguida da consolidação | — |
+
+Um bloqueio do DLP durante a cópia fica registrado como aviso no log e não interrompe o ciclo.
+
+**Evidências:** subpasta `1_cpu_memo/dlp_usb/`, separada das do Módulo 1, com os traces `Trace_DLP_*.etl`, os CSVs exportados, `Resultados_Consolidados/` e `cpu_memoria_dlp.csv`, que o hub copia para `Resultados/`.
+
+| Condição | Resultado |
+|----------|-----------|
+| Os 5 ciclos completados e consolidados sem erro | **PASS** (exit code 0) |
+| Falha ao iniciar ou salvar a captura WPR, interrupção (`Ctrl+Q`) ou erro inesperado | **FAIL** (exit code 1) |
 
 ---
 
@@ -298,6 +322,27 @@ Os valores de velocidade dependem do tipo de disco:
 
 Valores **significativamente abaixo** do esperado para o tipo de disco podem indicar: disco com defeito, driver desatualizado, superaquecimento, ou fragmentação excessiva (HDD).
 
+### 5.7 Variante DLP/USB `[Técnico]`
+
+O script `2-1_teste_disco_dlp.py` mede a velocidade de escrita e leitura num pendrive com o **agente de DLP** ativo, usando cópia nativa de arquivos (sem o DiskSPD). Ele aparece no menu na seção **Disco** e exige um pendrive montado em `E:\` (configurável em `USB_DRIVE`, no topo do script).
+
+| Etapa | Descrição |
+|-------|-----------|
+| 1 | Gera, na pasta do script, um arquivo de 2 GB (`planilha_teste_carga.xlsx`) |
+| 2 | **Escrita:** copia o arquivo do PC para o pendrive e mede a velocidade em MB/s |
+| 3 | **Leitura:** copia o arquivo de volta do pendrive para o PC e mede a velocidade em MB/s |
+| 4 | Intervalo de 30 segundos entre baterias |
+| 5 | Repetição dos passos 2–4 por **5 baterias** e geração dos CSVs |
+
+Se o DLP bloquear a escrita, apagar o arquivo do pendrive ou negar a leitura, a bateria registra 0,0 MB/s na operação afetada, e o log descreve o bloqueio.
+
+**Evidências:** `2_disco/` com `resultado_validacao_usb_*.csv`, `teste_usb_nativo_*.log` e `disco_usb.csv`, que o hub copia para `Resultados/`.
+
+| Condição | Resultado |
+|----------|-----------|
+| As 5 baterias completadas e os CSVs gerados | **PASS** (exit code 0) |
+| Pendrive não encontrado, interrupção (`Ctrl+Q`) ou erro inesperado | **FAIL** (exit code 1) |
+
 ---
 
 ## 6. Módulo 3 — Rede
@@ -338,7 +383,7 @@ As métricas são coletadas **5 vezes**, e todas as medições individuais são 
 
 Para cada aferição, é salvo:
 
-- **Screenshot** da página de resultado (`Evidencia_Afericao_N.png`)
+- **Screenshot** da página de resultado (`Evidencia_Afericao_N_<data-hora>.png`)
 - **Linha no CSV** com timestamp e valores medidos
 
 > ![Exemplo Evidência Rede](img/placeholder-evidencia-rede.png)  
@@ -751,64 +796,84 @@ Tempo de troca e perda de pacotes são registrados, mas não reprovam. Ping para
 
 ### 10.1 Estrutura de Armazenamento
 
-Toda execução gera evidências organizadas em dois níveis:
+Toda execução gera evidências organizadas por cenário, em duas pastas: `Execucoes/` (logs, evidências e estado) e `Resultados/` (CSVs estruturados).
 
 ```
-Traces/
+Execucoes/
 └── ImagemLimpa_DESKTOP-ABC_2026-04-15/     ← cenário
-    ├── _state.json                          ← estado e histórico
-    ├── _relatorio.html                      ← relatório consolidado
-    ├── _relatorio.csv
-    ├── _relatorio.json
-    ├── 1_cpu_memo/                          ← evidências do teste de CPU
-    │   ├── perfil_wpa.csv
-    │   └── log_ciclos.csv
-    ├── 2_disco/                             ← evidências do teste de disco
-    │   └── resultado_validacao_disco_*.csv
-    ├── 3_rede/                              ← evidências do teste de rede
-    │   ├── resultado_afericoes.csv
-    │   ├── Evidencia_Afericao_1.png
-    │   ├── Evidencia_Afericao_2.png
-    │   ├── Evidencia_Afericao_3.png
-    │   ├── Evidencia_Afericao_4.png
-    │   └── Evidencia_Afericao_5.png
-    ├── 3_rede_internet/                     ← evidências do teste de rede na internet
-    │   ├── teste_rede_internet_*.log
-    │   ├── resultado_afericoes_internet.csv
-    │   ├── rede_internet.csv
-    │   ├── Evidencia_Internet_Afericao_1_*.png
-    │   ├── ...
-    │   └── Evidencia_Internet_Afericao_5_*.png
-    ├── 4_boot_shutdown/                     ← evidências do teste de boot
-    │   └── BootShutdown_2026-04-15.csv
-    ├── 5_bateria/                           ← evidências do teste de bateria
-    │   ├── teste_bateria_*.log
-    │   ├── bateria_preflight.csv
-    │   ├── bateria_relatorio_antes.html
-    │   ├── bateria_relatorio_antes.xml
-    │   ├── bateria_amostras.csv
-    │   ├── bateria_top_processos.csv
-    │   ├── Trace_Bateria_Ociosa_*.etl
-    │   ├── Trace_Bateria_Escritorio_*.etl
-    │   ├── CSV_Ociosa_*/
-    │   ├── CSV_Escritorio_*/
-    │   ├── bateria_relatorio_depois.html
-    │   ├── bateria_srum.csv
-    │   ├── bateria_relatorio_energia.html
-    │   └── bateria.csv
-    ├── 6_wifi_fast_transition/              ← evidências do teste de Wi-Fi FT
-    │   ├── teste_wifi_ft_*.log
-    │   ├── wifi_ft_relatorio.html
-    │   ├── wifi_ft.csv
-    │   ├── wifi_ft_roamings.csv
-    │   ├── wifi_ft_amostras.csv
-    │   ├── wifi_ft_pings.csv
-    │   ├── wifi_ft_eventos_wlan.csv
-    │   ├── wifi_ft_compatibilidade.json
-    │   └── brutos/
-    └── _anterior/                           ← evidências de runs anteriores
-        ├── run1_2026-04-15 09-30-00/
-        └── run2_2026-04-15 14-00-00/
+    ├── Logs/                                ← uma entrada por run
+    │   ├── run_20260415_093000.log          ← saída completa de cada script
+    │   └── run_20260415_093000.{html,csv,json}
+    └── Traces/
+        ├── _state.json                          ← estado e histórico
+        ├── _relatorio.html                      ← relatório consolidado
+        ├── _relatorio.csv
+        ├── _relatorio.json
+        ├── informacoes_maquina.csv              ← inventário do setup 1
+        ├── 1_cpu_memo/                          ← evidências do teste de CPU
+        │   ├── automacao_*.log
+        │   ├── Trace_*_Run1.etl … Trace_*_Run5.etl
+        │   ├── CSV_*_Run1/ … CSV_*_Run5/        ← exportação WPA de cada ciclo
+        │   ├── Resultados_Consolidados/         ← Relatorio_Resumo.csv e .html
+        │   ├── cpu_memoria.csv
+        │   └── dlp_usb/                         ← variante 1-1 (mesma estrutura, com cpu_memoria_dlp.csv)
+        ├── 2_disco/                             ← evidências do teste de disco
+        │   ├── resultado_validacao_disco_*.csv
+        │   ├── disco.csv
+        │   └── resultado_validacao_usb_*.csv, teste_usb_nativo_*.log, disco_usb.csv  ← variante 2-1
+        ├── 3_rede/                              ← evidências do teste de rede
+        │   ├── teste_rede_*.log
+        │   ├── resultado_afericoes.csv
+        │   ├── rede.csv
+        │   ├── Evidencia_Afericao_1_*.png
+        │   ├── ...
+        │   └── Evidencia_Afericao_5_*.png
+        ├── 3_rede_internet/                     ← evidências do teste de rede na internet
+        │   ├── teste_rede_internet_*.log
+        │   ├── resultado_afericoes_internet.csv
+        │   ├── rede_internet.csv
+        │   ├── Evidencia_Internet_Afericao_1_*.png
+        │   ├── ...
+        │   └── Evidencia_Internet_Afericao_5_*.png
+        ├── 4_boot_shutdown/                     ← evidências do teste de boot
+        │   ├── BootShutdown_<data>.csv
+        │   └── boot_shutdown.csv
+        ├── 5_bateria/                           ← evidências do teste de bateria
+        │   ├── teste_bateria_*.log
+        │   ├── bateria_preflight.csv
+        │   ├── bateria_relatorio_antes.html
+        │   ├── bateria_relatorio_antes.xml
+        │   ├── bateria_amostras.csv
+        │   ├── bateria_top_processos.csv
+        │   ├── Trace_Bateria_Ociosa_*.etl
+        │   ├── Trace_Bateria_Escritorio_*.etl
+        │   ├── CSV_Ociosa_*/
+        │   ├── CSV_Escritorio_*/
+        │   ├── bateria_relatorio_depois.html
+        │   ├── bateria_srum.csv
+        │   ├── bateria_relatorio_energia.html
+        │   └── bateria.csv
+        ├── 6_wifi_fast_transition/              ← evidências do teste de Wi-Fi FT
+        │   ├── teste_wifi_ft_*.log
+        │   ├── wifi_ft_relatorio.html
+        │   ├── wifi_ft.csv
+        │   ├── wifi_ft_roamings.csv
+        │   ├── wifi_ft_amostras.csv
+        │   ├── wifi_ft_pings.csv
+        │   ├── wifi_ft_eventos_wlan.csv
+        │   ├── wifi_ft_compatibilidade.json
+        │   └── brutos/
+        └── <pasta do teste>/_anterior/           ← evidências substituídas em reexecuções
+            ├── run1_2026-04-15T09-30-00/
+            └── run2_2026-04-15T14-00-00/
+
+Resultados/
+└── ImagemLimpa_DESKTOP-ABC_2026-04-15/
+    ├── maquina.csv                          ← modelo, série, CPU, RAM, disco, SO
+    ├── cenario.csv                          ← status consolidado de cada teste
+    └── cpu_memoria.csv, disco.csv, rede.csv, rede_internet.csv,
+        boot_shutdown.csv, bateria.csv, wifi_ft.csv,
+        cpu_memoria_dlp.csv, disco_usb.csv   ← CSVs temáticos (variantes, quando executadas)
 ```
 
 > ![Estrutura de Pastas](img/placeholder-estrutura-traces.png)  
@@ -817,10 +882,12 @@ Traces/
 ### 10.2 Ciclo de Vida das Evidências
 
 1. **Primeira execução:** Evidências são salvas diretamente nas subpastas do cenário
-2. **Re-execução:** Evidências anteriores são movidas para `_anterior/run{N}_{timestamp}/` e novas evidências são geradas
+2. **Re-execução:** Evidências anteriores são movidas para `<pasta do teste>/_anterior/run{N}_{data-hora}/` e novas evidências são geradas
 3. **Consolidação:** O relatório `_relatorio.*` é atualizado com os resultados de todas as runs
 
 **Nenhuma evidência é apagada.** O histórico completo de todas as tentativas é preservado.
+
+> **Nota:** a pasta de evidências é a da categoria, compartilhada pelos scripts da mesma pasta. Reexecutar um teste também move para `_anterior/` as evidências atuais dos outros testes da mesma pasta (por exemplo, o Módulo 1 e a variante 1-1).
 
 ### 10.3 O Arquivo _state.json `[Técnico]`
 
@@ -861,7 +928,7 @@ Para auditar uma execução e validar a integridade dos resultados:
 | **3. Resultados** | PASS/FAIL de cada teste | `_relatorio.html` ou `_state.json` |
 | **4. Evidências** | Dados brutos que suportam o resultado | Subpastas do cenário (CSVs, screenshots, logs) |
 | **5. Histórico** | Re-execuções e tentativas anteriores | `_anterior/` e múltiplas entries em `runs[]` |
-| **6. Ambiente** | Configuração da máquina no momento do teste | `1_cpu_memo/` → CSV de informações do PC (gerado pelo setup) |
+| **6. Ambiente** | Configuração da máquina no momento do teste | `Traces/informacoes_maquina.csv` (gerado pelo setup 1) e `Resultados/<cenário>/maquina.csv` (gerado pelo hub) |
 
 ---
 
@@ -869,13 +936,10 @@ Para auditar uma execução e validar a integridade dos resultados:
 
 ### 11.1 Relatório HTML
 
-Relatório visual com tabela formatada, badges de status coloridos e resumo estatístico. Ideal para apresentação e compartilhamento.
+Relatório visual com tabela formatada, badges de status coloridos e resumo estatístico. Ideal para apresentação e compartilhamento. Há dois:
 
-**Conteúdo:**
-- Cabeçalho com nome do cenário, máquina, data
-- Resumo: total de testes, PASS, FAIL, ERR
-- Tabela com cada teste: nome, status (badge colorido), duração, evidências
-- Para testes FAIL: snippet das últimas linhas de erro
+- **`Traces/_relatorio.html` (consolidado do cenário):** nome do cenário, máquina, datas de criação e da última execução, total de runs e estatísticas (PASS, FAIL, ERROR). Tabela com o último resultado de cada teste: nome, status, duração, run e pasta de evidências.
+- **`Logs/run_*.html` (uma execução):** máquina, usuário, início e tempo total. Tabela com cada script da run: fase, nome, tipo, status, duração e número de evidências. Para os que não passaram, mostra as últimas linhas de erro.
 
 > ![Exemplo Relatório HTML](img/placeholder-relatorio-html-exemplo.png)  
 > *Insira aqui: screenshot de um relatório HTML real*
@@ -884,19 +948,21 @@ Relatório visual com tabela formatada, badges de status coloridos e resumo esta
 
 Dados tabulares com uma linha por teste. Ideal para importação em Excel ou ferramentas de BI.
 
-**Colunas:**
+**Colunas do `Logs/run_*.csv`:**
 
 | Coluna | Descrição |
 |--------|-----------|
 | Timestamp | Data e hora da execução |
 | Kind | `setup` ou `test` |
 | Name | Nome do script |
-| Type | Extensão (`.ps1` ou `.py`) |
-| Status | `PASS`, `FAIL` ou `ERR` |
+| Type | Extensão, sem o ponto (`ps1` ou `py`) |
+| Status | `PASS`, `FAIL` ou `ERROR` |
 | Duration_s | Duração em segundos |
 | ExitCode | Código de saída do processo |
 | TraceCount | Quantidade de arquivos de evidência |
 | TraceDir | Caminho da pasta de evidências |
+
+O consolidado `Traces/_relatorio.csv` tem as colunas `Nome`, `Status`, `Duracao_s`, `Run`, `Reexecucao` e `Pasta`, com o último resultado de cada teste. Em `Resultados/<cenário>/`, o `cenario.csv` traz o mesmo status consolidado com o nome do cenário, o hostname e a data de cada run, e o `maquina.csv` traz o inventário da máquina.
 
 ### 11.3 Relatório JSON
 
@@ -924,6 +990,7 @@ Dados estruturados com metadados completos. Ideal para integração com APIs e s
 | Apresentar resultado a stakeholders | **HTML** (`_relatorio.html`) |
 | Alimentar planilha de acompanhamento | **CSV** (`_relatorio.csv`) |
 | Integrar com sistema de gestão de ativos | **JSON** (`_relatorio.json`) |
+| Alimentar BI com métricas de cada módulo | **CSV** (`Resultados/<cenário>/*.csv`) |
 | Investigar causa de falha | **LOG** (`Logs/run_*.log`) |
 | Auditoria de processo | **JSON** (`_state.json`) + evidências |
 

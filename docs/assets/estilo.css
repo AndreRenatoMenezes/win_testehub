@@ -1,0 +1,342 @@
+/* Estilo dos documentos HTML gerados por docs/gerar_html.py.
+   Extraido dos HTML originais do Hardware Test Hub. */
+
+:root {
+    --verde-tech: #1EBD53;
+    --verde-tech-light: #e8f9ee;
+    --verde-tech-dark: #17943f;
+    --grafite: #1A1C1E;
+    --cinza-neutro: #687076;
+    --branco: #FFFFFF;
+    --cinza-gelo: #F4F6F8;
+    --vermelho: #E53E3E;
+    --vermelho-light: #FEF2F2;
+    --amarelo: #D69E2E;
+    --amarelo-light: #FEFCE8;
+    --azul: #3182CE;
+    --azul-light: #EBF8FF;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--grafite);
+    background-color: var(--cinza-gelo);
+}
+
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+}
+
+/* Header */
+.doc-header {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 40px;
+    margin-bottom: 32px;
+    border-left: 4px solid var(--verde-tech);
+}
+
+.doc-header h1 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    color: var(--grafite);
+    margin-bottom: 8px;
+}
+
+.doc-header .subtitle {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--verde-tech);
+    margin-bottom: 16px;
+}
+
+.doc-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--cinza-neutro);
+}
+
+.doc-meta span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* TOC */
+.toc {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 32px 40px;
+    margin-bottom: 32px;
+}
+
+.toc h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--grafite);
+    margin-bottom: 16px;
+}
+
+.toc ol {
+    padding-left: 20px;
+}
+
+.toc li {
+    margin-bottom: 6px;
+}
+
+.toc a {
+    color: var(--verde-tech);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.toc a:hover {
+    text-decoration: underline;
+}
+
+/* Sections */
+.section {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 32px 40px;
+    margin-bottom: 24px;
+}
+
+h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--grafite);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--cinza-gelo);
+}
+
+h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--grafite);
+    margin-top: 24px;
+    margin-bottom: 12px;
+}
+
+p {
+    margin-bottom: 14px;
+    color: var(--grafite);
+}
+
+/* Tags */
+.tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.tag-tecnico {
+    background: var(--azul-light);
+    color: var(--azul);
+}
+
+.tag-gestao {
+    background: var(--amarelo-light);
+    color: var(--amarelo);
+}
+
+.tag-operador {
+    background: var(--verde-tech-light);
+    color: var(--verde-tech);
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+}
+
+thead th {
+    background: var(--cinza-gelo);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--cinza-neutro);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid #E2E8F0;
+}
+
+tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #EDF2F7;
+    vertical-align: top;
+}
+
+tbody tr:hover {
+    background: var(--cinza-gelo);
+}
+
+/* Code blocks */
+code {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    background: var(--cinza-gelo);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--grafite);
+}
+
+pre {
+    background: #1a1c1e;
+    color: #e2e8f0;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+
+/* Callouts */
+.callout {
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin: 16px 0;
+    font-size: 14px;
+}
+
+.callout-info {
+    background: var(--azul-light);
+    border-left: 4px solid var(--azul);
+}
+
+.callout-warning {
+    background: var(--amarelo-light);
+    border-left: 4px solid var(--amarelo);
+}
+
+.callout-success {
+    background: var(--verde-tech-light);
+    border-left: 4px solid var(--verde-tech);
+}
+
+.callout strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+/* Image placeholders */
+.img-placeholder {
+    background: var(--cinza-gelo);
+    border: 2px dashed #CBD5E0;
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    margin: 16px 0;
+    color: var(--cinza-neutro);
+    font-size: 13px;
+}
+
+.img-placeholder .icon {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+/* Status badges */
+.badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 12px;
+}
+
+.badge-pass {
+    background: var(--verde-tech-light);
+    color: var(--verde-tech);
+}
+
+.badge-fail {
+    background: var(--vermelho-light);
+    color: var(--vermelho);
+}
+
+.badge-pending {
+    background: var(--cinza-gelo);
+    color: var(--cinza-neutro);
+}
+
+/* Keyboard keys */
+kbd {
+    display: inline-block;
+    background: var(--cinza-gelo);
+    border: 1px solid #CBD5E0;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* Lists */
+ul, ol {
+    margin: 12px 0;
+    padding-left: 24px;
+}
+
+li {
+    margin-bottom: 6px;
+}
+
+/* Print */
+
+.callout-danger { background: var(--vermelho-light); border-left: 4px solid var(--vermelho); }
+
+.badge-warning { background: var(--amarelo-light); color: var(--amarelo); }
+
+.badge-normal { background: var(--verde-tech-light); color: var(--verde-tech); }
+
+@media print {
+    body { background: white; }
+    .container { padding: 0; }
+    .section, .doc-header, .toc {
+        box-shadow: none;
+        border: 1px solid #eee;
+        break-inside: avoid;
+    }
+}

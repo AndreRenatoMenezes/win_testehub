@@ -1,1064 +1,2439 @@
 <!DOCTYPE html>
+<!-- Gerado a partir de metodologia-de-testes.md por docs/gerar_html.py. Não edite à mão. -->
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metodologia de Testes - Hardware Test Hub</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --verde-tech: #1EBD53;
-            --verde-tech-light: #e8f9ee;
-            --verde-tech-dark: #17943f;
-            --grafite: #1A1C1E;
-            --cinza-neutro: #687076;
-            --branco: #FFFFFF;
-            --cinza-gelo: #F4F6F8;
-            --vermelho: #E53E3E;
-            --vermelho-light: #FEF2F2;
-            --amarelo: #D69E2E;
-            --amarelo-light: #FEFCE8;
-            --azul: #3182CE;
-            --azul-light: #EBF8FF;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metodologia de Testes - Hardware Test Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* Estilo dos documentos HTML gerados por docs/gerar_html.py.
+   Extraido dos HTML originais do Hardware Test Hub. */
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+    --verde-tech: #1EBD53;
+    --verde-tech-light: #e8f9ee;
+    --verde-tech-dark: #17943f;
+    --grafite: #1A1C1E;
+    --cinza-neutro: #687076;
+    --branco: #FFFFFF;
+    --cinza-gelo: #F4F6F8;
+    --vermelho: #E53E3E;
+    --vermelho-light: #FEF2F2;
+    --amarelo: #D69E2E;
+    --amarelo-light: #FEFCE8;
+    --azul: #3182CE;
+    --azul-light: #EBF8FF;
+}
 
-        body {
-            font-family: 'Inter', sans-serif;
-            font-weight: 400;
-            font-size: 15px;
-            line-height: 1.7;
-            color: var(--grafite);
-            background-color: var(--cinza-gelo);
-        }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-        .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+body {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--grafite);
+    background-color: var(--cinza-gelo);
+}
 
-        /* Header */
-        .doc-header {
-            background: var(--branco);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            padding: 40px;
-            margin-bottom: 32px;
-            border-left: 4px solid var(--verde-tech);
-        }
-        .doc-header h1 {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 700;
-            font-size: 28px;
-            color: var(--grafite);
-            margin-bottom: 8px;
-        }
-        .doc-header .subtitle {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 16px;
-            color: var(--verde-tech);
-            margin-bottom: 16px;
-        }
-        .doc-meta {
-            display: flex;
-            gap: 24px;
-            flex-wrap: wrap;
-            font-size: 13px;
-            color: var(--cinza-neutro);
-        }
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+}
 
-        /* TOC */
-        .toc {
-            background: var(--branco);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            padding: 32px 40px;
-            margin-bottom: 32px;
-        }
-        .toc h2 {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 18px;
-            color: var(--grafite);
-            margin-bottom: 16px;
-        }
-        .toc ol { padding-left: 20px; }
-        .toc li { margin-bottom: 6px; }
-        .toc a { color: var(--verde-tech); text-decoration: none; font-weight: 500; }
-        .toc a:hover { text-decoration: underline; }
+/* Header */
+.doc-header {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 40px;
+    margin-bottom: 32px;
+    border-left: 4px solid var(--verde-tech);
+}
 
-        /* Sections */
-        .section {
-            background: var(--branco);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            padding: 32px 40px;
-            margin-bottom: 24px;
-        }
+.doc-header h1 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    color: var(--grafite);
+    margin-bottom: 8px;
+}
 
-        h2 {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 700;
-            font-size: 22px;
-            color: var(--grafite);
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid var(--cinza-gelo);
-        }
-        h3 {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 17px;
-            color: var(--grafite);
-            margin-top: 24px;
-            margin-bottom: 12px;
-        }
-        p { margin-bottom: 14px; }
+.doc-header .subtitle {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--verde-tech);
+    margin-bottom: 16px;
+}
 
-        /* Tags */
-        .tag {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 500;
-            padding: 2px 8px;
-            border-radius: 4px;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
-        .tag-tecnico { background: var(--azul-light); color: var(--azul); }
-        .tag-gestao { background: var(--amarelo-light); color: var(--amarelo); }
+.doc-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--cinza-neutro);
+}
 
-        /* Tables */
-        table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
-        thead th {
-            background: var(--cinza-gelo);
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--cinza-neutro);
-            padding: 10px 14px;
-            text-align: left;
-            border-bottom: 2px solid #E2E8F0;
-        }
-        tbody td {
-            padding: 10px 14px;
-            border-bottom: 1px solid #EDF2F7;
-            vertical-align: top;
-        }
-        tbody tr:hover { background: var(--cinza-gelo); }
+.doc-meta span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
 
-        /* Code */
-        code {
-            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-            font-size: 13px;
-            background: var(--cinza-gelo);
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-        pre {
-            background: #1a1c1e;
-            color: #e2e8f0;
-            padding: 20px;
-            border-radius: 8px;
-            overflow-x: auto;
-            margin: 16px 0;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-        pre code { background: none; padding: 0; color: inherit; }
+/* TOC */
+.toc {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 32px 40px;
+    margin-bottom: 32px;
+}
 
-        /* Callouts */
-        .callout {
-            padding: 16px 20px;
-            border-radius: 6px;
-            margin: 16px 0;
-            font-size: 14px;
-        }
-        .callout-info { background: var(--azul-light); border-left: 4px solid var(--azul); }
-        .callout-warning { background: var(--amarelo-light); border-left: 4px solid var(--amarelo); }
-        .callout-success { background: var(--verde-tech-light); border-left: 4px solid var(--verde-tech); }
-        .callout-danger { background: var(--vermelho-light); border-left: 4px solid var(--vermelho); }
-        .callout strong { display: block; margin-bottom: 4px; }
+.toc h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--grafite);
+    margin-bottom: 16px;
+}
 
-        /* Image placeholders */
-        .img-placeholder {
-            background: var(--cinza-gelo);
-            border: 2px dashed #CBD5E0;
-            border-radius: 8px;
-            padding: 40px 20px;
-            text-align: center;
-            margin: 16px 0;
-            color: var(--cinza-neutro);
-            font-size: 13px;
-        }
-        .img-placeholder .icon { font-size: 32px; display: block; margin-bottom: 8px; }
+.toc ol {
+    padding-left: 20px;
+}
 
-        /* Badges */
-        .badge {
-            display: inline-block;
-            font-size: 12px;
-            font-weight: 500;
-            padding: 3px 10px;
-            border-radius: 12px;
-        }
-        .badge-pass { background: var(--verde-tech-light); color: var(--verde-tech); }
-        .badge-fail { background: var(--vermelho-light); color: var(--vermelho); }
-        .badge-warning { background: var(--amarelo-light); color: var(--amarelo); }
-        .badge-normal { background: var(--verde-tech-light); color: var(--verde-tech); }
+.toc li {
+    margin-bottom: 6px;
+}
 
-        /* Module header */
-        .module-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid var(--cinza-gelo);
-        }
-        .module-header h2 { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
-        .module-number {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            background: var(--verde-tech);
-            color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 700;
-            font-size: 16px;
-            flex-shrink: 0;
-        }
+.toc a {
+    color: var(--verde-tech);
+    text-decoration: none;
+    font-weight: 500;
+}
 
-        /* Cycle diagram */
-        .cycle-diagram {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin: 16px 0;
-        }
-        .cycle-box {
-            display: flex;
-            border-radius: 6px;
-            overflow: hidden;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        .cycle-box .load {
-            background: var(--vermelho-light);
-            color: var(--vermelho);
-            padding: 8px 12px;
-        }
-        .cycle-box .cool {
-            background: var(--azul-light);
-            color: var(--azul);
-            padding: 8px 12px;
-        }
-        .cycle-label {
-            font-size: 11px;
-            color: var(--cinza-neutro);
-            text-align: center;
-            margin-top: 4px;
-        }
+.toc a:hover {
+    text-decoration: underline;
+}
 
-        /* Threshold bar */
-        .threshold-bar {
-            display: flex;
-            height: 32px;
-            border-radius: 6px;
-            overflow: hidden;
-            margin: 12px 0;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        .threshold-bar .normal {
-            background: var(--verde-tech-light);
-            color: var(--verde-tech);
-            flex: 3;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .threshold-bar .warning {
-            background: var(--amarelo-light);
-            color: var(--amarelo);
-            flex: 3;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .threshold-bar .critical {
-            background: var(--vermelho-light);
-            color: var(--vermelho);
-            flex: 4;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+/* Sections */
+.section {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 32px 40px;
+    margin-bottom: 24px;
+}
 
-        /* Lists */
-        ul, ol { margin: 12px 0; padding-left: 24px; }
-        li { margin-bottom: 6px; }
+h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--grafite);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--cinza-gelo);
+}
 
-        /* Fill-in placeholder */
-        .fill-in {
-            display: inline-block;
-            border-bottom: 2px dashed var(--cinza-neutro);
-            min-width: 80px;
-            color: var(--cinza-neutro);
-            font-style: italic;
-            padding: 0 4px;
-        }
+h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--grafite);
+    margin-top: 24px;
+    margin-bottom: 12px;
+}
 
-        @media print {
-            body { background: white; }
-            .container { padding: 0; }
-            .section, .doc-header, .toc {
-                box-shadow: none;
-                border: 1px solid #eee;
-                break-inside: avoid;
-            }
-        }
-    </style>
+p {
+    margin-bottom: 14px;
+    color: var(--grafite);
+}
+
+/* Tags */
+.tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.tag-tecnico {
+    background: var(--azul-light);
+    color: var(--azul);
+}
+
+.tag-gestao {
+    background: var(--amarelo-light);
+    color: var(--amarelo);
+}
+
+.tag-operador {
+    background: var(--verde-tech-light);
+    color: var(--verde-tech);
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+}
+
+thead th {
+    background: var(--cinza-gelo);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--cinza-neutro);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid #E2E8F0;
+}
+
+tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #EDF2F7;
+    vertical-align: top;
+}
+
+tbody tr:hover {
+    background: var(--cinza-gelo);
+}
+
+/* Code blocks */
+code {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    background: var(--cinza-gelo);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--grafite);
+}
+
+pre {
+    background: #1a1c1e;
+    color: #e2e8f0;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+
+/* Callouts */
+.callout {
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin: 16px 0;
+    font-size: 14px;
+}
+
+.callout-info {
+    background: var(--azul-light);
+    border-left: 4px solid var(--azul);
+}
+
+.callout-warning {
+    background: var(--amarelo-light);
+    border-left: 4px solid var(--amarelo);
+}
+
+.callout-success {
+    background: var(--verde-tech-light);
+    border-left: 4px solid var(--verde-tech);
+}
+
+.callout strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+/* Image placeholders */
+.img-placeholder {
+    background: var(--cinza-gelo);
+    border: 2px dashed #CBD5E0;
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    margin: 16px 0;
+    color: var(--cinza-neutro);
+    font-size: 13px;
+}
+
+.img-placeholder .icon {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+/* Status badges */
+.badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 12px;
+}
+
+.badge-pass {
+    background: var(--verde-tech-light);
+    color: var(--verde-tech);
+}
+
+.badge-fail {
+    background: var(--vermelho-light);
+    color: var(--vermelho);
+}
+
+.badge-pending {
+    background: var(--cinza-gelo);
+    color: var(--cinza-neutro);
+}
+
+/* Keyboard keys */
+kbd {
+    display: inline-block;
+    background: var(--cinza-gelo);
+    border: 1px solid #CBD5E0;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* Lists */
+ul, ol {
+    margin: 12px 0;
+    padding-left: 24px;
+}
+
+li {
+    margin-bottom: 6px;
+}
+
+/* Print */
+
+.callout-danger { background: var(--vermelho-light); border-left: 4px solid var(--vermelho); }
+
+.badge-warning { background: var(--amarelo-light); color: var(--amarelo); }
+
+.badge-normal { background: var(--verde-tech-light); color: var(--verde-tech); }
+
+@media print {
+    body { background: white; }
+    .container { padding: 0; }
+    .section, .doc-header, .toc {
+        box-shadow: none;
+        border: 1px solid #eee;
+        break-inside: avoid;
+    }
+}
+</style>
 </head>
 <body>
-    <div class="container">
+<div class="container">
 
-        <!-- Header -->
-        <div class="doc-header">
-            <h1>Metodologia de Testes</h1>
-            <div class="subtitle">Hardware Test Hub</div>
-            <div class="doc-meta">
-                <span>Versao 1.0</span>
-                <span>|</span>
-                <span>15 de abril de 2026</span>
-                <span>|</span>
-                <span>Equipe Tecnica, Gestores, Auditoria</span>
-            </div>
-        </div>
+<div class="doc-header">
+<h1>Metodologia de Testes</h1>
+<div class="subtitle">Hardware Test Hub</div>
+<div class="doc-meta"><span>Versão 1.1</span> <span>|</span> <span>6 de novembro de 2026</span> <span>|</span> <span>Equipe técnica, gestores, auditoria</span></div>
+</div>
 
-        <!-- TOC -->
-        <div class="toc">
-            <h2>Sumario</h2>
-            <ol>
-                <li><a href="#introducao">Introducao</a></li>
-                <li><a href="#arquitetura">Arquitetura do Framework</a></li>
-                <li><a href="#setup">Fase de Setup &mdash; Preparacao do Ambiente</a></li>
-                <li><a href="#cpu">Modulo 1 &mdash; CPU e Memoria</a></li>
-                <li><a href="#disco">Modulo 2 &mdash; Disco</a></li>
-                <li><a href="#rede">Modulo 3 &mdash; Rede</a></li>
-                <li><a href="#boot">Modulo 4 &mdash; Boot e Shutdown</a></li>
-                <li><a href="#rastreabilidade">Rastreabilidade e Evidencias</a></li>
-                <li><a href="#relatorios">Formatos de Relatorio</a></li>
-                <li><a href="#glossario">Glossario</a></li>
-            </ol>
-        </div>
+<div class="toc">
+<h2>Sumário</h2>
+<ol>
+<li><a href="#1-introdução">Introdução</a></li>
+<li><a href="#2-arquitetura-do-framework">Arquitetura do Framework</a></li>
+<li><a href="#3-fase-de-setup--preparação-do-ambiente">Fase de Setup — Preparação do Ambiente</a></li>
+<li><a href="#4-módulo-1--cpu-e-memória">Módulo 1 — CPU e Memória</a></li>
+<li><a href="#5-módulo-2--disco">Módulo 2 — Disco</a></li>
+<li><a href="#6-módulo-3--rede">Módulo 3 — Rede</a></li>
+<li><a href="#7-módulo-4--boot-e-shutdown">Módulo 4 — Boot e Shutdown</a></li>
+<li><a href="#8-módulo-5--bateria">Módulo 5 — Bateria</a></li>
+<li><a href="#9-módulo-6--wi-fi-fast-transition-80211r">Módulo 6 — Wi-Fi Fast Transition (802.11r)</a></li>
+<li><a href="#10-rastreabilidade-e-evidências">Rastreabilidade e Evidências</a></li>
+<li><a href="#11-formatos-de-relatório">Formatos de Relatório</a></li>
+<li><a href="#12-glossário">Glossário</a></li>
+</ol>
+</div>
 
-        <!-- 1. Introducao -->
-        <div class="section" id="introducao">
-            <h2>1. Introducao</h2>
+<div class="section">
+<h2 id="1-introdução">1. Introdução</h2>
+<h3 id="11-objetivo">1.1 Objetivo</h3>
+<p>O <strong>Hardware Test Hub</strong> é um framework de validação de hardware projetado para avaliar o desempenho e a estabilidade dos principais componentes de uma máquina Windows: processador, memória, disco, rede, ciclo de boot/shutdown, consumo de bateria e roaming Wi-Fi com Fast Transition (802.11r). Os testes simulam cenários de uso intensivo e coletam métricas objetivas para determinar se o equipamento atende aos padrões operacionais esperados.</p>
+<h3 id="12-escopo">1.2 Escopo</h3>
+<p><strong>O que é testado:</strong>
+- Desempenho de CPU e memória sob estresse sustentado
+- Velocidade de leitura e escrita do disco principal
+- Velocidade de conexão de rede (download, upload, latência, jitter)
+- Tempo de inicialização (boot) e desligamento (shutdown) do Windows
+- Consumo de energia na bateria (máquina ociosa e sob carga de escritório) e autonomia projetada
+- Roaming Wi-Fi entre APs com Fast Transition (802.11r) e compatibilidade de adaptador, driver e BIOS</p>
+<p><strong>O que NÃO é testado:</strong>
+- Periféricos (teclado, mouse, webcam, impressora)
+- GPU / desempenho gráfico
+- Saúde da bateria, ciclos de carga e descarga completa (a saúde é registrada pelo setup <code>1_captura_infos_pc</code>)
+- Conformidade de software (licenciamento, versões)</p>
+<h3 id="13-como-usar-este-documento-para-auditoria-gestão">1.3 Como Usar Este Documento para Auditoria <span class="tag tag-gestao">Gestão</span></h3>
+<p>Este documento descreve o <strong>procedimento padronizado</strong> de cada teste. Para auditar uma execução:</p>
+<ol>
+<li>Identifique o <strong>cenário</strong> em <code>Execucoes/</code> (pasta com nome, hostname e data)</li>
+<li>Abra o <code>Traces/_relatorio.html</code> do cenário para ver o resumo de resultados</li>
+<li>Compare os procedimentos descritos neste documento com as evidências coletadas</li>
+<li>Verifique a cadeia de custódia usando o <code>_state.json</code> (seção 10)</li>
+</ol>
+</div>
 
-            <h3>1.1 Objetivo</h3>
-            <p>O <strong>Hardware Test Hub</strong> e um framework de validacao de hardware projetado para avaliar o desempenho e a estabilidade dos principais componentes de uma maquina Windows: processador, memoria, disco, rede e ciclo de boot/shutdown. Os testes simulam cenarios de uso intensivo e coletam metricas objetivas para determinar se o equipamento atende aos padroes operacionais esperados.</p>
+<div class="section">
+<h2 id="2-arquitetura-do-framework">2. Arquitetura do Framework</h2>
+<h3 id="21-fluxo-de-execução">2.1 Fluxo de Execução</h3>
+<p>O hub opera em <strong>duas fases sequenciais</strong>:</p>
+<pre><code>┌─────────────────────────────────────────────────────┐
+│                    hub.bat                           │
+│              (elevação UAC → Admin)                  │
+└──────────────────────┬──────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│                    hub.ps1                           │
+│              (orquestrador principal)                │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  ┌─── Fase 1: Setup ────────────────────────────┐   │
+│  │ Preparação do ambiente (10 scripts)          │   │
+│  │ Pode ser ignorada via config.json            │   │
+│  └──────────────────────────────────────────────┘   │
+│                       │                             │
+│                       ▼                             │
+│  ┌─── Fase 2: Testes ───────────────────────────┐   │
+│  │ 6 módulos de teste + 2 variantes             │   │
+│  │ Seleção via menu checkbox interativo         │   │
+│  └──────────────────────────────────────────────┘   │
+│                       │                             │
+│                       ▼                             │
+│  ┌─── Saídas ───────────────────────────────────┐   │
+│  │ Execucoes/  → logs, traces e estado          │   │
+│  │ Resultados/ → CSVs estruturados              │   │
+│  └──────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+</code></pre>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> diagrama visual do fluxo de execução do framework<br><em>Salvar como: img/placeholder-diagrama-arquitetura.png</em></div>
+<h3 id="22-sistema-de-cenários">2.2 Sistema de Cenários</h3>
+<p>Cada sessão de testes pertence a um <strong>cenário</strong> — uma unidade lógica que agrupa execuções (runs) e suas evidências. Cenários permitem:</p>
+<ul>
+<li>Testar uma máquina ao longo de vários dias</li>
+<li>Re-executar testes falhos sem perder evidências anteriores</li>
+<li>Gerar relatórios consolidados de todo o ciclo de validação</li>
+</ul>
+<p>O cenário é identificado pelo formato: <code>{NomeDoCenario}_{Hostname}_{Data}</code></p>
+<h3 id="23-contrato-de-exit-codes-técnico">2.3 Contrato de Exit Codes <span class="tag tag-tecnico">Técnico</span></h3>
+<p>O orquestrador (<code>hub.ps1</code>) determina o resultado de cada teste com base no <strong>exit code</strong> do processo:</p>
+<table>
+<thead>
+<tr>
+<th>Exit Code</th>
+<th>Status</th>
+<th>Regra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td><span class="badge badge-pass">PASS</span></td>
+<td>O teste concluiu com sucesso e todas as verificações passaram</td>
+</tr>
+<tr>
+<td><code>≠ 0</code></td>
+<td><span class="badge badge-fail">FAIL</span></td>
+<td>O teste encontrou uma falha, erro ou não completou corretamente</td>
+</tr>
+</tbody>
+</table>
+<p>Todos os scripts de teste são obrigados a retornar exit codes explícitos:
+- <strong>Python:</strong> <code>sys.exit(0)</code> para sucesso, <code>sys.exit(1)</code> para falha
+- <strong>PowerShell:</strong> <code>exit 0</code> para sucesso, <code>exit 1</code> para falha</p>
+<h3 id="24-variáveis-de-ambiente-injetadas-técnico">2.4 Variáveis de Ambiente Injetadas <span class="tag tag-tecnico">Técnico</span></h3>
+<p>O hub injeta variáveis de ambiente antes de executar cada teste, definindo onde salvar evidências:</p>
+<table>
+<thead>
+<tr>
+<th>Variável</th>
+<th>Descrição</th>
+<th>Exemplo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HUB_EVIDENCE_DIR</code></td>
+<td>Pasta de evidências para o teste atual</td>
+<td><code>Execucoes/Cenario_PC01_2026-04-15/Traces/2_disco/</code></td>
+</tr>
+<tr>
+<td><code>HUB_TRACE_DIR</code></td>
+<td>Idêntica a <code>HUB_EVIDENCE_DIR</code></td>
+<td>(mesmo acima)</td>
+</tr>
+<tr>
+<td><code>HUB_TRACE_ROOT</code></td>
+<td>Pasta <code>Traces</code> do cenário</td>
+<td><code>Execucoes/Cenario_PC01_2026-04-15/Traces/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Os testes <strong>nunca devem salvar arquivos na pasta raiz do projeto</strong>. Toda evidência deve ser direcionada para <code>HUB_EVIDENCE_DIR</code>.</p>
+</div>
 
-            <h3>1.2 Escopo</h3>
-            <table>
-                <thead>
-                    <tr><th>O que e testado</th><th>O que NAO e testado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Desempenho de CPU e memoria sob estresse</td><td>Perifericos (teclado, mouse, webcam)</td></tr>
-                    <tr><td>Velocidade de leitura/escrita do disco</td><td>GPU / desempenho grafico</td></tr>
-                    <tr><td>Velocidade de rede (download, upload, latencia)</td><td>Bateria (autonomia / ciclos de carga)</td></tr>
-                    <tr><td>Tempo de boot e shutdown do Windows</td><td>Conformidade de software (licenciamento)</td></tr>
-                </tbody>
-            </table>
+<div class="section">
+<h2 id="3-fase-de-setup--preparação-do-ambiente">3. Fase de Setup — Preparação do Ambiente</h2>
+<h3 id="31-objetivo">3.1 Objetivo</h3>
+<p>Padronizar a configuração da máquina de teste antes da execução dos módulos de diagnóstico. Isso garante que todos os equipamentos são testados em condições equivalentes, eliminando variáveis de configuração que poderiam influenciar os resultados.</p>
+<h3 id="32-scripts-de-preparação">3.2 Scripts de Preparação</h3>
+<table>
+<thead>
+<tr>
+<th>Script</th>
+<th>Descrição</th>
+<th>Justificativa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>1_captura_infos_pc</code></td>
+<td>Coleta informações do sistema (CPU, RAM, disco, bateria, SO) em <code>informacoes_maquina.csv</code></td>
+<td>Registro de identidade da máquina para rastreabilidade</td>
+</tr>
+<tr>
+<td><code>2_opcoes_energia</code></td>
+<td>Aplica o plano <strong>Equilibrado</strong>, desativa a suspensão e o desligamento da tela (na tomada e na bateria) e define "nada a fazer" ao fechar a tampa</td>
+<td>Evita suspensão durante os testes e mantém o mesmo plano em todas as máquinas</td>
+</tr>
+<tr>
+<td><code>3_softwares_msStore</code></td>
+<td>Instala via winget o Windows ADK, o CrystalDiskMark e o CrystalDiskInfo</td>
+<td>Garante as ferramentas auxiliares necessárias</td>
+</tr>
+<tr>
+<td><code>4_install_python</code></td>
+<td>Instala o Python 3.12 oficial e remove o alias da Microsoft Store</td>
+<td>Pré-requisito para os scripts de teste em Python</td>
+</tr>
+<tr>
+<td><code>5_install_py_dependencies</code></td>
+<td>Cria <code>.venv</code> e instala pacotes Python</td>
+<td>Isola dependências e garante versões corretas</td>
+</tr>
+<tr>
+<td><code>6_pausa_WinUpdate</code></td>
+<td>Pausa o Windows Update por 35 dias</td>
+<td>Evita downloads e reinicializações durante testes</td>
+</tr>
+<tr>
+<td><code>8_enable_diagnostics</code></td>
+<td>Desativa a Inicialização Rápida e habilita os serviços DPS e SysMain e a política WDI de diagnóstico de boot</td>
+<td>Necessário para o teste de boot/shutdown (eventos 100 e 200 no Event Log)</td>
+</tr>
+<tr>
+<td><code>9_AdicionarTecladoUSInt</code></td>
+<td>Adiciona o layout de teclado EUA-Internacional ao idioma pt-BR</td>
+<td>Padronização de ambiente</td>
+</tr>
+<tr>
+<td><code>12_remover_appx_bloatware</code></td>
+<td>Remove aplicativos pré-instalados (Xbox, Copilot, Teams, Notícias, Solitaire, LinkedIn, WhatsApp, To Do)</td>
+<td>Reduz processos em segundo plano que variam entre imagens</td>
+</tr>
+<tr>
+<td><code>13_remover_onedrive</code></td>
+<td>Desinstala o OneDrive e bloqueia a reinstalação por política</td>
+<td>Evita sincronização em segundo plano durante as medições</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-justificativa-da-padronização-gestão">3.3 Justificativa da Padronização <span class="tag tag-gestao">Gestão</span></h3>
+<p>A Fase de Setup é essencial para a <strong>comparabilidade dos resultados</strong>. Sem ela, diferenças de configuração entre máquinas (plano de energia, atualizações em andamento, falta de dependências) poderiam gerar variações nos resultados que não refletem o desempenho real do hardware. A padronização garante que diferenças nos resultados entre máquinas são atribuíveis ao hardware, não à configuração de software.</p>
+</div>
 
-            <h3>1.3 Como Usar Este Documento para Auditoria <span class="tag tag-gestao">Gestao</span></h3>
-            <p>Para auditar uma execucao:</p>
-            <ol>
-                <li>Identifique o <strong>cenario</strong> em <code>Traces/</code> (pasta com nome, hostname e data)</li>
-                <li>Abra o <code>_relatorio.html</code> para ver o resumo de resultados</li>
-                <li>Compare os procedimentos descritos neste documento com as evidencias coletadas</li>
-                <li>Verifique a cadeia de custodia usando o <code>_state.json</code> (secao 8)</li>
-            </ol>
-        </div>
+<div class="section">
+<h2 id="4-módulo-1--cpu-e-memória">4. Módulo 1 — CPU e Memória</h2>
+<h3 id="41-objetivo">4.1 Objetivo</h3>
+<p>Avaliar o desempenho e a estabilidade do processador e da memória sob carga sustentada, simulando um cenário de uso intensivo prolongado.</p>
+<h3 id="42-ferramenta-utilizada">4.2 Ferramenta Utilizada</h3>
+<ul>
+<li><strong>Microsoft Edge</strong> via Selenium WebDriver — para gerar carga de CPU através de workloads web</li>
+<li><strong>Windows Performance Analyzer (WPA)</strong> — para perfilamento detalhado do comportamento do sistema durante a carga</li>
+<li><strong>psutil</strong> — para monitoramento de métricas de CPU em tempo real</li>
+</ul>
+<h3 id="43-procedimento">4.3 Procedimento</h3>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Descrição</th>
+<th>Duração</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Abertura do Microsoft Edge com 3 abas de workload</td>
+<td>~10s</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Início do ciclo de estresse</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Carga ativa</strong> — CPU sob estresse sustentado</td>
+<td>300 segundos (5 min)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Cooldown</strong> — aguarda CPU cair abaixo de 15%</td>
+<td>até 300 segundos (5 min)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Repetição dos passos 3-4 por <strong>5 ciclos</strong></td>
+<td>~50 min total</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Coleta de perfil WPA e geração de relatório</td>
+<td>~30s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Ciclo visual:</strong></p>
+<pre><code>Ciclo 1          Ciclo 2          Ciclo 3          Ciclo 4          Ciclo 5
+┌──────┬──────┐ ┌──────┬──────┐ ┌──────┬──────┐ ┌──────┬──────┐ ┌──────┬──────┐
+│Carga │Cool- │ │Carga │Cool- │ │Carga │Cool- │ │Carga │Cool- │ │Carga │Cool- │
+│ 5min │down  │ │ 5min │down  │ │ 5min │down  │ │ 5min │down  │ │ 5min │down  │
+└──────┴──────┘ └──────┴──────┘ └──────┴──────┘ └──────┴──────┘ └──────┴──────┘
+</code></pre>
+<h3 id="44-métricas-coletadas">4.4 Métricas Coletadas</h3>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Fonte</th>
+<th>Formato</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Perfil de desempenho WPA</td>
+<td>Windows Performance Analyzer</td>
+<td><code>.wpaProfile</code></td>
+</tr>
+<tr>
+<td>Tempos de cada ciclo (carga + cooldown)</td>
+<td>Script Python</td>
+<td>CSV</td>
+</tr>
+<tr>
+<td>Uso de CPU ao longo do teste</td>
+<td>psutil</td>
+<td>Log textual</td>
+</tr>
+</tbody>
+</table>
+<h3 id="45-critério-de-aprovação">4.5 Critério de Aprovação</h3>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Todos os 5 ciclos completados sem erro</td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Qualquer ciclo falha, crash ou timeout</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="46-o-que-um-fail-significa-gestão">4.6 O que um FAIL Significa <span class="tag tag-gestao">Gestão</span></h3>
+<p>Uma falha neste teste indica que o processador ou a memória da máquina não conseguiram sustentar carga contínua por 5 ciclos de estresse. Possíveis causas:</p>
+<ul>
+<li><strong>Superaquecimento</strong> — o processador ativou proteção térmica (thermal throttling)</li>
+<li><strong>Instabilidade de memória</strong> — erros de memória causaram crash no processo</li>
+<li><strong>Driver ou firmware</strong> — incompatibilidades de software afetando a performance</li>
+<li><strong>Recurso insuficiente</strong> — memória RAM insuficiente para a carga aplicada</li>
+</ul>
+<p><strong>Ação recomendada:</strong> Investigar logs detalhados em <code>Execucoes/&lt;cenário&gt;/Logs/run_*.log</code> e verificar se o hardware apresenta defeitos.</p>
+<h3 id="47-interrupção-segura">4.7 Interrupção Segura</h3>
+<p>O operador pode interromper o teste a qualquer momento pressionando <code>Ctrl+Q</code>. O teste é encerrado de forma controlada: a captura WPR em andamento é cancelada, o log registra a interrupção e o resultado é <strong>FAIL</strong> (exit code 1).</p>
+<h3 id="48-variante-dlpusb-técnico">4.8 Variante DLP/USB <span class="tag tag-tecnico">Técnico</span></h3>
+<p>O script <code>1-1_automacao_performance_dlp.py</code> mede o custo de CPU e memória do <strong>agente de DLP</strong> ao inspecionar cópias para um pendrive. Ele aparece no menu na mesma seção do Módulo 1 (<strong>Cpu Memo</strong>) e exige um pendrive montado em <code>E:\</code> (configurável em <code>USB_DRIVE</code>, no topo do script).</p>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Descrição</th>
+<th>Duração</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Gera, na pasta do script, um arquivo de 100 MB com nome e extensão que acionam o DLP (<code>relatorio_financeiro_confidencial.xlsx</code>)</td>
+<td>uma vez</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Estabilização</td>
+<td>15 segundos</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Captura WPR</strong> (<code>Power.light</code> + <code>VirtualAllocation.light</code>) enquanto o arquivo é copiado repetidamente para o pendrive</td>
+<td>60 segundos</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Exportação WPA com o perfil <code>Agentes_SI_Profile.wpaProfile</code></td>
+<td>~30s</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Cooldown inteligente (aguarda a CPU cair abaixo de 15%)</td>
+<td>até 300 segundos</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Repetição dos passos 2–5 por <strong>5 ciclos</strong>, seguida da consolidação</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Um bloqueio do DLP durante a cópia fica registrado como aviso no log e não interrompe o ciclo.</p>
+<p><strong>Evidências:</strong> subpasta <code>1_cpu_memo/dlp_usb/</code>, separada das do Módulo 1, com os traces <code>Trace_DLP_*.etl</code>, os CSVs exportados, <code>Resultados_Consolidados/</code> e <code>cpu_memoria_dlp.csv</code>, que o hub copia para <code>Resultados/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Os 5 ciclos completados e consolidados sem erro</td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Falha ao iniciar ou salvar a captura WPR, interrupção (<code>Ctrl+Q</code>) ou erro inesperado</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+</div>
 
-        <!-- 2. Arquitetura -->
-        <div class="section" id="arquitetura">
-            <h2>2. Arquitetura do Framework</h2>
+<div class="section">
+<h2 id="5-módulo-2--disco">5. Módulo 2 — Disco</h2>
+<h3 id="51-objetivo">5.1 Objetivo</h3>
+<p>Medir a velocidade de leitura e escrita sustentada do disco principal, avaliando o desempenho de I/O sob operações sequenciais com blocos grandes.</p>
+<h3 id="52-ferramenta-utilizada">5.2 Ferramenta Utilizada</h3>
+<ul>
+<li><strong>Microsoft DiskSPD</strong> (<code>diskspd.exe</code>) — ferramenta oficial da Microsoft para benchmarking de disco</li>
+<li><strong>psutil</strong> — para identificação do disco principal</li>
+</ul>
+<h3 id="53-procedimento">5.3 Procedimento</h3>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Descrição</th>
+<th>Duração</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Identificação do disco principal e espaço disponível</td>
+<td>~2s</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Início da bateria de testes</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Leitura sequencial</strong> — blocos de 1 MB em arquivo de 8 GB</td>
+<td>10 segundos</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Escrita sequencial</strong> — blocos de 1 MB em arquivo de 8 GB</td>
+<td>10 segundos</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Intervalo</strong> entre baterias</td>
+<td>60 segundos</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Repetição dos passos 3-5 por <strong>10 baterias</strong></td>
+<td>~25 min total</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Cálculo de médias e geração de CSV</td>
+<td>~5s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Parâmetros do DiskSPD:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parâmetro</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tamanho do bloco</td>
+<td>1 MB</td>
+</tr>
+<tr>
+<td>Tamanho do arquivo de teste</td>
+<td>8 GB</td>
+</tr>
+<tr>
+<td>Duração por operação</td>
+<td>10 segundos</td>
+</tr>
+<tr>
+<td>Tipo de I/O</td>
+<td>Sequencial</td>
+</tr>
+<tr>
+<td>Número de baterias</td>
+<td>10</td>
+</tr>
+<tr>
+<td>Intervalo entre baterias</td>
+<td>60 segundos</td>
+</tr>
+</tbody>
+</table>
+<h3 id="54-métricas-coletadas">5.4 Métricas Coletadas</h3>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Unidade</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Velocidade de leitura (por bateria)</td>
+<td>MB/s</td>
+<td>Throughput de leitura sequencial</td>
+</tr>
+<tr>
+<td>Velocidade de escrita (por bateria)</td>
+<td>MB/s</td>
+<td>Throughput de escrita sequencial</td>
+</tr>
+<tr>
+<td>Média de leitura</td>
+<td>MB/s</td>
+<td>Média aritmética das 10 baterias</td>
+</tr>
+<tr>
+<td>Média de escrita</td>
+<td>MB/s</td>
+<td>Média aritmética das 10 baterias</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exemplo de saída CSV:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Bateria</th>
+<th>Leitura (MB/s)</th>
+<th>Escrita (MB/s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>520.3</td>
+<td>480.1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>518.7</td>
+<td>478.5</td>
+</tr>
+<tr>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr>
+<td>10</td>
+<td>521.0</td>
+<td>479.8</td>
+</tr>
+<tr>
+<td><strong>Média</strong></td>
+<td><strong>519.5</strong></td>
+<td><strong>479.2</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot de um CSV real gerado pelo teste de disco<br><em>Salvar como: img/placeholder-csv-disco.png</em></div>
+<h3 id="55-critério-de-aprovação">5.5 Critério de Aprovação</h3>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Todas as 10 baterias completadas e CSV gerado</td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Falha em qualquer bateria ou CSV não gerado</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="56-como-interpretar-os-valores-gestão">5.6 Como Interpretar os Valores <span class="tag tag-gestao">Gestão</span></h3>
+<p>Os valores de velocidade dependem do tipo de disco:</p>
+<table>
+<thead>
+<tr>
+<th>Tipo de disco</th>
+<th>Leitura esperada</th>
+<th>Escrita esperada</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HDD (7200 RPM)</td>
+<td>100–200 MB/s</td>
+<td>80–160 MB/s</td>
+</tr>
+<tr>
+<td>SSD SATA</td>
+<td>400–550 MB/s</td>
+<td>300–520 MB/s</td>
+</tr>
+<tr>
+<td>SSD NVMe</td>
+<td>1500–7000 MB/s</td>
+<td>1000–5000 MB/s</td>
+</tr>
+</tbody>
+</table>
+<p>Valores <strong>significativamente abaixo</strong> do esperado para o tipo de disco podem indicar: disco com defeito, driver desatualizado, superaquecimento, ou fragmentação excessiva (HDD).</p>
+<h3 id="57-variante-dlpusb-técnico">5.7 Variante DLP/USB <span class="tag tag-tecnico">Técnico</span></h3>
+<p>O script <code>2-1_teste_disco_dlp.py</code> mede a velocidade de escrita e leitura num pendrive com o <strong>agente de DLP</strong> ativo, usando cópia nativa de arquivos (sem o DiskSPD). Ele aparece no menu na seção <strong>Disco</strong> e exige um pendrive montado em <code>E:\</code> (configurável em <code>USB_DRIVE</code>, no topo do script).</p>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Gera, na pasta do script, um arquivo de 2 GB (<code>planilha_teste_carga.xlsx</code>)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Escrita:</strong> copia o arquivo do PC para o pendrive e mede a velocidade em MB/s</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Leitura:</strong> copia o arquivo de volta do pendrive para o PC e mede a velocidade em MB/s</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Intervalo de 30 segundos entre baterias</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Repetição dos passos 2–4 por <strong>5 baterias</strong> e geração dos CSVs</td>
+</tr>
+</tbody>
+</table>
+<p>Se o DLP bloquear a escrita, apagar o arquivo do pendrive ou negar a leitura, a bateria registra 0,0 MB/s na operação afetada, e o log descreve o bloqueio.</p>
+<p><strong>Evidências:</strong> <code>2_disco/</code> com <code>resultado_validacao_usb_*.csv</code>, <code>teste_usb_nativo_*.log</code> e <code>disco_usb.csv</code>, que o hub copia para <code>Resultados/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>As 5 baterias completadas e os CSVs gerados</td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Pendrive não encontrado, interrupção (<code>Ctrl+Q</code>) ou erro inesperado</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+</div>
 
-            <h3>2.1 Fluxo de Execucao</h3>
-            <p>O hub opera em <strong>duas fases sequenciais</strong>:</p>
+<div class="section">
+<h2 id="6-módulo-3--rede">6. Módulo 3 — Rede</h2>
+<h3 id="61-objetivo">6.1 Objetivo</h3>
+<p>Aferir a velocidade de conexão de rede da máquina, medindo download, upload, latência (ping) e variação de latência (jitter) através de múltiplas aferições.</p>
+<h3 id="62-ferramenta-utilizada">6.2 Ferramenta Utilizada</h3>
+<ul>
+<li><strong>Microsoft Edge</strong> via Selenium WebDriver — para acessar o servidor de speedtest</li>
+<li><strong>Servidor de speedtest interno</strong> (URL em <code>config.local.json</code> → <code>SpeedtestUrl</code>, não versionada) — ponto de medição padronizado</li>
+</ul>
+<h3 id="63-procedimento">6.3 Procedimento</h3>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Descrição</th>
+<th>Duração</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Abertura do Microsoft Edge via Selenium</td>
+<td>~5s</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Navegação para o servidor de speedtest</td>
+<td>~3s</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Aferição</strong> — clica em "Start" e aguarda conclusão</td>
+<td>~60 segundos</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Captura de screenshot como evidência</td>
+<td>~2s</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Extração de métricas via regex do texto da página</td>
+<td>~1s</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Repetição dos passos 3-5 por <strong>5 aferições</strong></td>
+<td>~6 min total</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Geração de CSV consolidado</td>
+<td>~2s</td>
+</tr>
+</tbody>
+</table>
+<h3 id="64-métricas-coletadas">6.4 Métricas Coletadas</h3>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Unidade</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Download</td>
+<td>Mbps</td>
+<td>Velocidade de download</td>
+</tr>
+<tr>
+<td>Upload</td>
+<td>Mbps</td>
+<td>Velocidade de upload</td>
+</tr>
+<tr>
+<td>Ping</td>
+<td>ms</td>
+<td>Latência de ida e volta</td>
+</tr>
+<tr>
+<td>Jitter</td>
+<td>ms</td>
+<td>Variação da latência entre pacotes</td>
+</tr>
+</tbody>
+</table>
+<p>As métricas são coletadas <strong>5 vezes</strong>, e todas as medições individuais são registradas no CSV.</p>
+<h3 id="65-evidências-geradas">6.5 Evidências Geradas</h3>
+<p>Para cada aferição, é salvo:</p>
+<ul>
+<li><strong>Screenshot</strong> da página de resultado (<code>Evidencia_Afericao_N_&lt;data-hora&gt;.png</code>)</li>
+<li><strong>Linha no CSV</strong> com timestamp e valores medidos</li>
+</ul>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot de uma das evidências de aferição de rede<br><em>Salvar como: img/placeholder-evidencia-rede.png</em></div>
+<h3 id="66-critério-de-aprovação">6.6 Critério de Aprovação</h3>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5 aferições capturadas com sucesso e CSV gerado</td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Edge não encontrado ou aferições incompletas</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="67-referência-de-valores-aceitáveis-gestão">6.7 Referência de Valores Aceitáveis <span class="tag tag-gestao">Gestão</span></h3>
+<div class="callout callout-info"><strong>Nota</strong>A tabela abaixo deve ser preenchida pela equipe conforme os padrões da organização.</div>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Mínimo aceitável</th>
+<th>Ideal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Download</td>
+<td>___ Mbps</td>
+<td>___ Mbps</td>
+</tr>
+<tr>
+<td>Upload</td>
+<td>___ Mbps</td>
+<td>___ Mbps</td>
+</tr>
+<tr>
+<td>Ping</td>
+<td>___ ms (máximo)</td>
+<td>___ ms</td>
+</tr>
+<tr>
+<td>Jitter</td>
+<td>___ ms (máximo)</td>
+<td>___ ms</td>
+</tr>
+</tbody>
+</table>
+<h3 id="68-teste-complementar--speedtest-na-internet-fastcom">6.8 Teste Complementar — Speedtest na Internet (fast.com)</h3>
+<h4 id="objetivo-e-motivação">Objetivo e motivação</h4>
+<p>O teste das seções 6.1–6.7 mede contra um servidor de speedtest <strong>interno</strong>. Em máquinas com agente <strong>zero trust</strong>, o tráfego para destinos internos pode não ser inspecionado nem roteado pelo agente (bypass da rede corporativa ou túnel distinto), enquanto o tráfego para a internet passa pelo proxy/túnel e pela inspeção SSL do agente. O teste complementar mede a velocidade num speedtest <strong>público da internet</strong>, pelo mesmo caminho do tráfego real do usuário, para capturar o impacto do agente na navegação.</p>
+<p>O script é <code>Testes/3_rede_internet/3-1_teste_rede_internet.py</code>. Ele aparece no menu do hub na seção <strong>Rede Internet</strong>, logo após <strong>Rede</strong>, e tem PASS/FAIL próprio (um bloqueio na internet não reprova o teste interno, e vice-versa).</p>
+<h4 id="ferramenta-utilizada">Ferramenta Utilizada</h4>
+<ul>
+<li><strong>Microsoft Edge</strong> via Selenium WebDriver — driver obtido automaticamente pelo Selenium Manager</li>
+<li><strong>fast.com</strong> (Netflix) — speedtest público e gratuito, sem anúncios, que inicia a medição sozinho e usa servidores de borda da Netflix próximos ao cliente (ex.: Rio de Janeiro e Barueri)</li>
+<li>Erros de certificado <strong>não</strong> são ignorados: a inspeção SSL do agente atua como atuaria para o usuário</li>
+</ul>
+<div class="callout callout-info"><strong>Nota</strong>o <code>speed.cloudflare.com</code> foi avaliado e descartado porque exige verificação antirrobô ("Confirme que é humano") antes de iniciar a medição, o que impede a execução desassistida.</div>
+<h4 id="procedimento">Procedimento</h4>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Descrição</th>
+<th>Duração</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Abertura do Microsoft Edge via Selenium</td>
+<td>~5s</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Acesso a <code>https://fast.com/</code> — a medição inicia automaticamente</td>
+<td>~2s</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Aferição</strong> — aguarda a conclusão de download, latência e upload (sem espera fixa; limite de 120 s)</td>
+<td>~20–45 segundos</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Leitura das métricas na página e captura de screenshot</td>
+<td>~2s</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Repetição dos passos 2-4 por <strong>5 aferições</strong></td>
+<td>~3 min total</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Geração dos CSVs</td>
+<td>~1s</td>
+</tr>
+</tbody>
+</table>
+<h4 id="métricas-coletadas">Métricas Coletadas</h4>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Unidade</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Download</td>
+<td>Mbps</td>
+<td>Velocidade de download</td>
+</tr>
+<tr>
+<td>Upload</td>
+<td>Mbps</td>
+<td>Velocidade de upload</td>
+</tr>
+<tr>
+<td>Ping</td>
+<td>ms</td>
+<td>Latência sem carga ("Não carregados" no fast.com)</td>
+</tr>
+<tr>
+<td>Latência sob carga</td>
+<td>ms</td>
+<td>Latência medida durante a transferência ("Carregada") — indica formação de fila (bufferbloat)</td>
+</tr>
+<tr>
+<td>Local do cliente</td>
+<td>texto</td>
+<td>Localização de saída vista pelo serviço</td>
+</tr>
+<tr>
+<td>IP de saída</td>
+<td>texto</td>
+<td>IP público pelo qual o tráfego saiu para a internet</td>
+</tr>
+<tr>
+<td>Servidores</td>
+<td>texto</td>
+<td>Localização dos servidores de medição usados</td>
+</tr>
+</tbody>
+</table>
+<p>O fast.com não reporta jitter nem perda de pacotes.</p>
+<h4 id="evidências-geradas">Evidências Geradas</h4>
+<p>Na pasta <code>3_rede_internet/</code> do cenário:</p>
+<ul>
+<li><code>teste_rede_internet_&lt;data_hora&gt;.log</code> — log completo da execução</li>
+<li><code>resultado_afericoes_internet.csv</code> — uma linha por aferição (separador <code>;</code>, decimal com vírgula): <code>Afericao;Data_Hora;Download;Upload;Ping;Latencia_Carga;Local_Cliente;IP_Saida;Servidores;Status;Print</code></li>
+<li><code>rede_internet.csv</code> — CSV temático (<code>Metrica,Valor,Unidade</code>) com aferições executadas/válidas, médias, mínimos e máximos, local, IP de saída e servidores; é copiado para <code>Resultados/</code></li>
+<li><code>Evidencia_Internet_Afericao_N_&lt;data_hora&gt;.png</code> — screenshot de cada aferição</li>
+<li><code>Evidencia_Internet_Bloqueio_&lt;data_hora&gt;.png</code> — somente quando o site está inacessível ou bloqueado</li>
+</ul>
+<h4 id="critério-de-aprovação">Critério de Aprovação</h4>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5 aferições com Download, Upload e Ping capturados e CSVs gerados</td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Site inacessível ou bloqueado (política do agente zero trust/proxy, sem internet) — falha rápida, com screenshot da tela exibida</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Menos de 5 aferições válidas (timeout ou valores ausentes)</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Edge não encontrado ou driver do Edge não obtido</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="como-interpretar-gestão">Como Interpretar <span class="tag tag-gestao">Gestão</span></h4>
+<ul>
+<li>Compare o <code>rede_internet.csv</code> do cenário <strong>baseline</strong> (sem agente) com o do cenário <strong>com agente</strong>, executados na mesma rede e na mesma janela de horário.</li>
+<li><strong>Local do cliente</strong> e <strong>IP de saída</strong> mostram por onde o tráfego saiu. Com o agente zero trust ativo, espera-se ver o IP/local do nó de saída do provedor do agente; se continuarem iguais aos do baseline, o tráfego provavelmente não passou pelo agente.</li>
+<li>O fast.com mede até a borda de conteúdo da Netflix mais próxima (muitas vezes dentro do próprio provedor de internet). O resultado representa a navegação cotidiana, não o trânsito internacional.</li>
+</ul>
+</div>
 
-            <div style="background: var(--cinza-gelo); border-radius: 8px; padding: 24px; margin: 16px 0;">
-                <div style="text-align: center; margin-bottom: 16px;">
-                    <div style="display: inline-block; background: var(--grafite); color: white; padding: 10px 24px; border-radius: 6px; font-family: 'Montserrat', sans-serif; font-weight: 600;">hub.bat &rarr; Elevacao UAC &rarr; hub.ps1</div>
-                </div>
-                <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 200px; background: var(--azul-light); border-radius: 6px; padding: 16px; border-left: 4px solid var(--azul);">
-                        <strong style="color: var(--azul); font-family: 'Montserrat', sans-serif;">Fase 1: Setup</strong><br>
-                        <span style="font-size: 13px;">9 scripts de preparacao do ambiente. Pode ser ignorada via <code>config.json</code>.</span>
-                    </div>
-                    <div style="flex: 1; min-width: 200px; background: var(--verde-tech-light); border-radius: 6px; padding: 16px; border-left: 4px solid var(--verde-tech);">
-                        <strong style="color: var(--verde-tech); font-family: 'Montserrat', sans-serif;">Fase 2: Testes</strong><br>
-                        <span style="font-size: 13px;">4 modulos de diagnostico. Selecao via menu checkbox interativo.</span>
-                    </div>
-                </div>
-                <div style="text-align: center; margin-top: 16px;">
-                    <span style="font-size: 20px;">&darr;</span>
-                </div>
-                <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px;">
-                    <div style="background: white; border-radius: 6px; padding: 10px 16px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
-                        <strong>Logs/</strong> &mdash; resultados por run
-                    </div>
-                    <div style="background: white; border-radius: 6px; padding: 10px 16px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
-                        <strong>Traces/</strong> &mdash; evidencias por cenario
-                    </div>
-                </div>
-            </div>
+<div class="section">
+<h2 id="7-módulo-4--boot-e-shutdown">7. Módulo 4 — Boot e Shutdown</h2>
+<h3 id="71-objetivo">7.1 Objetivo</h3>
+<p>Avaliar o tempo de inicialização e desligamento do Windows através de múltiplos ciclos de reinicialização, identificando degradações e gargalos no processo de boot.</p>
+<h3 id="72-ferramenta-utilizada">7.2 Ferramenta Utilizada</h3>
+<ul>
+<li><strong>Agendador de Tarefas do Windows</strong> (Task Scheduler) — para automatizar reinicializações</li>
+<li><strong>Event Log de Diagnósticos do Windows</strong> (<code>Microsoft-Windows-Diagnostics-Performance/Operational</code>) — fonte de métricas de boot/shutdown</li>
+<li><strong>PowerShell</strong> (<code>boot_shutdown_duration.ps1</code>) — para análise dos eventos</li>
+</ul>
+<h3 id="73-procedimento">7.3 Procedimento</h3>
+<p>Este teste opera em <strong>duas etapas</strong> com reinicializações automáticas:</p>
+<h4 id="etapa-1--ciclos-de-reinicialização-automático">Etapa 1 — Ciclos de Reinicialização (automático)</h4>
+<table>
+<thead>
+<tr>
+<th>Ciclo</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Cria tarefa agendada no Task Scheduler, agenda shutdown em 5 min</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Máquina reinicia → script executa automaticamente via ONLOGON, aguarda 5 min, reinicia</td>
+</tr>
+<tr>
+<td>3</td>
+<td>(repete)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>(repete)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>(repete)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Último ciclo → executa análise dos eventos e limpa tarefa agendada</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tempo total estimado:</strong> ~30-40 minutos (5 ciclos × ~6-7 min cada)</p>
+<div class="callout callout-warning"><strong>Importante</strong>Durante os ciclos de reinicialização, <b>a máquina reinicia automaticamente 5 vezes</b>. Não interrompa o processo. O hub retoma automaticamente após cada reinicialização.</div>
+<h4 id="etapa-2--análise-de-eventos">Etapa 2 — Análise de Eventos</h4>
+<p>Após os 5 ciclos, o script <code>boot_shutdown_duration.ps1</code> consulta o Event Log dos últimos 3 dias e coleta:</p>
+<table>
+<thead>
+<tr>
+<th>Evento</th>
+<th>ID</th>
+<th>O que mede</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Boot completo</td>
+<td>100</td>
+<td><code>MainPathBootTime</code> e <code>BootPostBootTime</code></td>
+</tr>
+<tr>
+<td>Shutdown completo</td>
+<td>200</td>
+<td>Tempo total de desligamento</td>
+</tr>
+<tr>
+<td>Degradação de boot</td>
+<td>101-110</td>
+<td>Drivers, serviços e apps que atrasaram o boot</td>
+</tr>
+<tr>
+<td>Atraso no shutdown</td>
+<td>201-203</td>
+<td>Processos que atrasaram o desligamento</td>
+</tr>
+</tbody>
+</table>
+<h3 id="74-métricas-coletadas">7.4 Métricas Coletadas</h3>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Unidade</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MainPathBootTime</td>
+<td>milissegundos</td>
+<td>Tempo do caminho principal de boot</td>
+</tr>
+<tr>
+<td>BootPostBootTime</td>
+<td>milissegundos</td>
+<td>Tempo de atividades pós-boot</td>
+</tr>
+<tr>
+<td>ShutdownDuration</td>
+<td>milissegundos</td>
+<td>Tempo total de desligamento</td>
+</tr>
+<tr>
+<td>Eventos de degradação</td>
+<td>texto</td>
+<td>Detalhamento de causas de lentidão</td>
+</tr>
+</tbody>
+</table>
+<h3 id="75-critérios-de-avaliação">7.5 Critérios de Avaliação</h3>
+<p>O teste utiliza <strong>limiares progressivos</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Normal</th>
+<th>Aviso (Warning)</th>
+<th>Crítico</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tempo de boot</td>
+<td>&lt; 30s</td>
+<td>30s – 60s</td>
+<td>&gt; 60s</td>
+</tr>
+<tr>
+<td>Tempo de shutdown</td>
+<td>&lt; 20s</td>
+<td>20s – 60s</td>
+<td>&gt; 60s</td>
+</tr>
+</tbody>
+</table>
+<h3 id="76-critério-de-aprovação">7.6 Critério de Aprovação</h3>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nenhum evento <strong>crítico</strong> nos boots do dia atual</td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Pelo menos um evento crítico encontrado</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><strong>Nota</strong>Eventos de "aviso" (warning) são registrados no relatório mas <b>não causam FAIL</b>. Apenas eventos críticos reprovam o teste.</div>
+<h3 id="77-impacto-de-degradação-de-boot-gestão">7.7 Impacto de Degradação de Boot <span class="tag tag-gestao">Gestão</span></h3>
+<p>Tempos de boot elevados afetam diretamente a produtividade:</p>
+<table>
+<thead>
+<tr>
+<th>Cenário</th>
+<th>Impacto estimado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Boot &gt; 60s em 100 máquinas, 1 reinício/dia</td>
+<td>~1.7 horas/dia perdidas pela operação</td>
+</tr>
+<tr>
+<td>Boot &gt; 60s com 5 reinícios/semana</td>
+<td>~8.3 horas/semana por 100 máquinas</td>
+</tr>
+</tbody>
+</table>
+<p>Causas comuns de degradação:
+- <strong>Drivers desatualizados</strong> — frequentemente o maior contribuinte
+- <strong>Serviços de terceiros</strong> — antivírus, agentes de monitoramento
+- <strong>Aplicativos no startup</strong> — programas configurados para iniciar com o Windows
+- <strong>Disco lento</strong> — HDD degradado ou SSD com firmware desatualizado</p>
+</div>
 
-            <div class="img-placeholder">
-                <span class="icon">&#128202;</span>
-                <strong>Insira aqui:</strong> diagrama visual do fluxo de execucao do framework<br>
-                <em>Salvar como: img/placeholder-diagrama-arquitetura.png</em>
-            </div>
+<div class="section">
+<h2 id="8-módulo-5--bateria">8. Módulo 5 — Bateria</h2>
+<h3 id="81-objetivo">8.1 Objetivo</h3>
+<p>Medir o consumo de energia do notebook na bateria em duas fases padronizadas — <strong>60 minutos ociosa</strong>, com a tela ligada, e <strong>60 minutos sob carga de escritório</strong> — para comparar o cenário <strong>baseline</strong> (sem agente) com o cenário <strong>com agente de segurança</strong> na mesma máquina. Antes de medir, o teste padroniza a máquina sozinho (<strong>pré-voo</strong>), relê cada ajuste e registra o valor antes e depois como evidência.</p>
+<p>O script é <code>Testes/5_bateria/5_teste_bateria.py</code>. Ele aparece no menu do hub na seção <strong>Bateria</strong>, logo após <strong>Boot Shutdown</strong>, e precisa de um operador para desconectar o carregador. O teste substitui o procedimento manual anterior (<code>cpu_stress_controller_pro.exe</code> com 60% de CPU por 120 minutos e a linha de comando do <code>Comando_Bateria.txt</code>); os resultados novos <strong>não são comparáveis</strong> com as medições antigas.</p>
+<h3 id="82-ferramentas-utilizadas">8.2 Ferramentas Utilizadas</h3>
+<ul>
+<li><strong>WMI de bateria</strong> (<code>root\wmi</code>): <code>BatteryStatus</code> (energia restante em mWh, taxa de descarga, tensão), <code>BatteryFullChargedCapacity</code> e <code>BatteryCycleCount</code>, lidos por um único processo PowerShell que fica aberto durante o teste — a leitura custa poucos milissegundos por amostra e não pesa na fase ociosa</li>
+<li><strong>API do Windows</strong>: <code>GetSystemPowerStatus</code> (fonte de alimentação, % de carga e estado da Economia de energia) e <code>powrprof</code> (modo de energia)</li>
+<li><strong>powercfg</strong>: plano e configurações de energia da bateria, relatório de bateria (<code>/batteryreport</code>, antes e depois), SRUM (<code>/srumutil</code>) e relatório de energia (<code>/energy</code>)</li>
+<li><strong>Windows Performance Recorder</strong> (<code>wpr.exe</code>, perfil <code>Power.light</code>) — um trace por fase — e <strong>WPA Exporter</strong> (<code>wpaexporter.exe</code>) com o perfil <code>Agentes_SI_Bateria_Profile.wpaProfile</code>, o mesmo do procedimento anterior</li>
+<li><strong>Microsoft Edge</strong> com Google Docs, Google Sheets e um PDF — a mesma simulação de uso do Módulo 1, de forma contínua</li>
+<li><strong>psutil</strong> — top 10 processos por CPU</li>
+</ul>
+<h3 id="83-pré-voo-de-padronização">8.3 Pré-voo de Padronização</h3>
+<p>O pré-voo roda <strong>na tomada</strong>, antes de pedir a desconexão do carregador. Cada item vira uma linha do <code>bateria_preflight.csv</code> com <code>Esperado</code>, <code>Antes</code>, <code>Acao</code>, <code>Depois</code>, <code>Situacao</code> (<code>ok</code>, <code>ajustado</code>, <code>não aplicável</code> ou <code>falhou</code>) e <code>Observacao</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Grupo</th>
+<th>Item</th>
+<th>Esperado</th>
+<th>Como é tratado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Conferidos</td>
+<td>Bateria presente</td>
+<td>sim</td>
+<td>Sem bateria (desktop ou bateria não reconhecida): falha em segundos, sem alterar nada</td>
+</tr>
+<tr>
+<td>Conferidos</td>
+<td>Carga inicial</td>
+<td>≥ 95%</td>
+<td>Abaixo do mínimo: informa a carga atual e pede para carregar</td>
+</tr>
+<tr>
+<td>Conferidos</td>
+<td>Ferramentas de captura</td>
+<td><code>wpr.exe</code> e <code>wpaexporter.exe</code> no PATH</td>
+<td>Perfil WPA ausente gera só aviso (a exportação CSV é ignorada)</td>
+</tr>
+<tr>
+<td>Conferidos</td>
+<td>Conexão de rede</td>
+<td>com acesso à internet</td>
+<td>Registra <code>tipo \| rede \| sinal</code>; SSID ou sinal indisponíveis não reprovam</td>
+</tr>
+<tr>
+<td>Conferidos</td>
+<td>Monitor externo</td>
+<td>nenhum</td>
+<td>Também pega a tampa fechada com monitor externo</td>
+</tr>
+<tr>
+<td>Conferidos</td>
+<td>Edge e conta Google</td>
+<td>prontos</td>
+<td>Boas-vindas do Edge ou login do Google: janela pede o login (até 3 vezes), como no Módulo 1. Usa as páginas de lista do Docs/Sheets, sem criar documentos</td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Plano de energia</td>
+<td>Equilibrado</td>
+<td>O mesmo plano do setup <code>2_opcoes_energia</code></td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Modo de energia na bateria</td>
+<td>Melhor desempenho</td>
+<td>Sem a API do modo na bateria (Windows antigo): aplicado e conferido já na bateria</td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Economia de energia</td>
+<td>desligada, limite 0%</td>
+<td>Limite 0% = não liga sozinha; ligada manualmente: <code>falhou</code> (desligar nas Configurações)</td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Brilho na bateria</td>
+<td>50%</td>
+<td>Valor de bateria do plano</td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Esmaecimento da tela na bateria</td>
+<td>nunca</td>
+<td></td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Brilho adaptável na bateria</td>
+<td>desligado</td>
+<td><code>não aplicável</code> sem sensor de luz ambiente</td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Bluetooth</td>
+<td>desligado</td>
+<td><code>não aplicável</code> sem rádio Bluetooth</td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Suspensão na bateria</td>
+<td>nunca</td>
+<td></td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Hibernação na bateria</td>
+<td>nunca</td>
+<td></td>
+</tr>
+<tr>
+<td>Ajustados</td>
+<td>Desligar vídeo na bateria</td>
+<td>nunca</td>
+<td></td>
+</tr>
+<tr>
+<td>Físicos</td>
+<td>Carregador desconectado</td>
+<td>desconectado</td>
+<td>Detectado automaticamente</td>
+</tr>
+<tr>
+<td>Físicos</td>
+<td>Periféricos e dock desconectados</td>
+<td>sim</td>
+<td>Confirmado pelo operador</td>
+</tr>
+<tr>
+<td>Físicos</td>
+<td>Luz do teclado apagada</td>
+<td>sim</td>
+<td>Confirmado pelo operador</td>
+</tr>
+<tr>
+<td>Na bateria</td>
+<td>Brilho efetivo</td>
+<td>50%</td>
+<td>Conferido na estabilização; se o driver não aplicou, é reaplicado uma vez</td>
+</tr>
+<tr>
+<td>Na bateria</td>
+<td>Modo de energia efetivo</td>
+<td>Melhor desempenho</td>
+<td>Conferido na estabilização</td>
+</tr>
+<tr>
+<td>Na bateria</td>
+<td>Economia de energia efetiva</td>
+<td>desligada</td>
+<td>Conferida na estabilização</td>
+</tr>
+</tbody>
+</table>
+<p>Regras:</p>
+<ul>
+<li>Os itens <strong>ajustados</strong> são aplicados, relidos e registrados; todo ajuste é <strong>restaurado</strong> ao final, por qualquer caminho de saída.</li>
+<li>O teste <strong>não contorna política corporativa</strong>: item bloqueado por GPO ou pelo sistema fica <code>falhou</code> com "bloqueado por política".</li>
+<li>Algum item <code>falhou</code>: o teste <strong>não mede</strong>, restaura o que já tinha alterado, lista os pendentes numa janela e sai com exit 1.</li>
+<li>Recurso inexistente na máquina (sem Bluetooth, sem sensor de luz, configuração ausente no plano) é <code>não aplicável</code> e não reprova.</li>
+</ul>
+<h3 id="84-procedimento">8.4 Procedimento</h3>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Descrição</th>
+<th>Duração</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Checagens rápidas: bateria, carga, ferramentas e perfil WPA</td>
+<td>segundos</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Rede com internet e ausência de monitor externo</td>
+<td>~5 s</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Prontidão do Edge e da conta Google (na tomada)</td>
+<td>~30 s (+ login, se pedido)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Ajustes de energia, brilho e Bluetooth; grava <code>bateria_preflight.csv</code></td>
+<td>~15 s</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Relatório de bateria "antes" (HTML e XML)</td>
+<td>~5 s</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Aviso único</strong>: desconectar o carregador e confirmar o checklist físico</td>
+<td>até 10 min</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Estabilização</strong> na bateria, fora da medição, com a conferência de brilho, modo e Economia</td>
+<td>5 min</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Fase ociosa</strong>: tela ligada, nenhum aplicativo aberto pelo teste, nenhuma entrada simulada; trace WPR</td>
+<td>60 min</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Transição: salva o trace, confere se a sessão está bloqueada e abre o Edge com documento, planilha e PDF</td>
+<td>~1–5 min</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>Fase de escritório</strong>: simulação contínua do Módulo 1, sem ciclos nem cooldown; trace WPR</td>
+<td>60 min</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Encerramento: salva o trace, amostra final, fecha o Edge, relatório de bateria "depois" e aviso de que o carregador pode ser reconectado</td>
+<td>~1–5 min</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Pós-medição: exportação WPA dos traces, SRUM, relatório de energia (60 s de observação), <code>bateria.csv</code> e restauração</td>
+<td>~5–20 min</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tempo total estimado:</strong> ~2h20–2h40.</p>
+<p>Durante toda a medição:</p>
+<ul>
+<li>A tela fica ligada e a sessão não é bloqueada por inatividade, sem simular teclado ou mouse (<code>SetThreadExecutionState</code>).</li>
+<li>Uma <strong>amostra</strong> da bateria é gravada a cada 60 s e o <strong>top 10 processos</strong> a cada 5 min.</li>
+<li>Uma <strong>vigia</strong> a cada 5 s encerra a medição de forma controlada se o carregador for reconectado, se a carga chegar a <strong>7%</strong> (proteção de bateria) ou se o operador pressionar Ctrl+Q.</li>
+<li>O overlay mostra fase, carga e minutos restantes, atualizado só a cada amostra para não gerar atividade de tela na fase ociosa.</li>
+</ul>
+<h3 id="85-métricas-coletadas">8.5 Métricas Coletadas</h3>
+<p>As métricas de cada fase saem de duas amostras-marco tiradas nos limites exatos da fase (<code>inicio_fase</code> e <code>fim_fase</code>). A <strong>energia em mWh é a medida principal</strong>; o percentual de carga é complementar.</p>
+<table>
+<thead>
+<tr>
+<th>Métrica (<code>bateria.csv</code>)</th>
+<th>Unidade</th>
+<th>Como é calculada</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Ociosa_Duracao_Medida</code> / <code>Escritorio_Duracao_Medida</code></td>
+<td>min</td>
+<td>Tempo entre os dois marcos da fase</td>
+</tr>
+<tr>
+<td><code>Ociosa_Energia_Consumida</code> / <code>Escritorio_Energia_Consumida</code></td>
+<td>mWh</td>
+<td>Energia restante no início − energia restante no fim</td>
+</tr>
+<tr>
+<td><code>Ociosa_Taxa_Media_Descarga</code> / <code>Escritorio_Taxa_Media_Descarga</code></td>
+<td>W</td>
+<td>Energia consumida ÷ duração</td>
+</tr>
+<tr>
+<td><code>Ociosa_Queda_Carga</code> / <code>Escritorio_Queda_Carga</code></td>
+<td>pp</td>
+<td>% de carga no início − % no fim</td>
+</tr>
+<tr>
+<td><code>Ociosa_Queda_Carga_Hora</code> / <code>Escritorio_Queda_Carga_Hora</code></td>
+<td>pp/h</td>
+<td>Queda de carga ÷ duração</td>
+</tr>
+<tr>
+<td><code>Ociosa_Autonomia_Projetada</code> / <code>Escritorio_Autonomia_Projetada</code></td>
+<td>h</td>
+<td>Capacidade de carga cheia ÷ taxa média de descarga</td>
+</tr>
+<tr>
+<td><code>Energia_Estimada</code></td>
+<td>texto</td>
+<td><code>sim</code> quando a bateria não informa mWh (ou informa capacidade em unidade relativa): a energia é estimada pela queda de % × capacidade de carga cheia</td>
+</tr>
+<tr>
+<td><code>Carga_Bateria_Inicial</code> / <code>Carga_Bateria_Final</code></td>
+<td>%</td>
+<td>Carga no início da fase ociosa e na amostra final</td>
+</tr>
+<tr>
+<td><code>Capacidade_Carga_Cheia</code> / <code>Capacidade_Projeto</code></td>
+<td>mWh</td>
+<td>WMI de bateria; a capacidade de projeto vem do relatório de bateria quando o WMI não a informa</td>
+</tr>
+<tr>
+<td><code>Ciclos_Carga</code></td>
+<td>un</td>
+<td>Ciclos de carga informados pela bateria</td>
+</tr>
+<tr>
+<td><code>Plano_Energia</code></td>
+<td>texto</td>
+<td>Plano após o pré-voo</td>
+</tr>
+<tr>
+<td><code>Modo_Energia</code> / <code>Brilho</code></td>
+<td>texto / %</td>
+<td>Valor predominante nas amostras das fases medidas</td>
+</tr>
+<tr>
+<td><code>Bluetooth</code></td>
+<td>texto</td>
+<td><code>desligado</code> ou <code>ausente</code></td>
+</tr>
+<tr>
+<td><code>Desvios_Padronizacao</code></td>
+<td>un</td>
+<td>Amostras das fases medidas com brilho ≠ 50%, modo ≠ Melhor desempenho ou Economia ligada</td>
+</tr>
+<tr>
+<td><code>Versao_Teste</code>, <code>Coleta_Valida</code>, <code>Motivo_Encerramento</code></td>
+<td>texto</td>
+<td>Versão do teste, <code>sim</code>/<code>nao</code> e o motivo do fim da medição</td>
+</tr>
+</tbody>
+</table>
+<p><code>Motivo_Encerramento</code>: <code>concluido</code>, <code>protecao_bateria</code>, <code>carregador_reconectado</code>, <code>parada_segura</code>, <code>sessao_bloqueada</code>, <code>login_exigido</code>, <code>padronizacao_na_bateria</code> ou <code>erro</code>. Fase sem dados = <code>N/A</code>. Formato: separador <code>,</code>, decimal com ponto e 2 casas.</p>
+<h3 id="86-evidências-geradas">8.6 Evidências Geradas</h3>
+<p>Na pasta <code>5_bateria/</code> do cenário:</p>
+<ul>
+<li><code>teste_bateria_&lt;data_hora&gt;.log</code> — log completo da execução</li>
+<li><code>bateria_preflight.csv</code> — uma linha por item do pré-voo (separador <code>;</code>): <code>Item;Esperado;Antes;Acao;Depois;Situacao;Observacao</code>. A coluna <code>Antes</code> permite restaurar a máquina à mão se o processo for encerrado à força</li>
+<li><code>bateria_relatorio_antes.html</code> / <code>bateria_relatorio_antes.xml</code> e <code>bateria_relatorio_depois.html</code> — relatório de bateria do Windows antes e depois da medição</li>
+<li><code>bateria_amostras.csv</code> — uma amostra a cada 60 s e os marcos de cada fase (separador <code>;</code>, decimal com vírgula): <code>Data_Hora;Fase;Tipo;Decorrido_Fase_s;Carga_Pct;Energia_Restante_mWh;Taxa_Descarga_mW;Tensao_mV;Fonte;Brilho_Pct;Modo_Energia;Economia_Energia;Desvio</code>. <code>Fase</code> = <code>estabilizacao</code>, <code>ociosa</code>, <code>transicao</code>, <code>escritorio</code> ou <code>encerramento</code>; <code>Tipo</code> = <code>periodica</code>, <code>inicio_fase</code> ou <code>fim_fase</code></li>
+<li><code>bateria_top_processos.csv</code> — top 10 processos por CPU a cada 5 min: <code>Data_Hora;Fase;Posicao;Processo;PID;CPU_Pct;Memoria_MB</code>. <code>CPU_Pct</code> é a média do processo na janela de 5 min, em % da máquina</li>
+<li><code>Trace_Bateria_Ociosa_&lt;data_hora&gt;.etl</code> e <code>Trace_Bateria_Escritorio_&lt;data_hora&gt;.etl</code> — um trace de energia por fase (parcial, se a medição encerrou antes)</li>
+<li><code>CSV_Ociosa_&lt;data_hora&gt;/</code> e <code>CSV_Escritorio_&lt;data_hora&gt;/</code> — exportação dos traces pelo perfil WPA de bateria</li>
+<li><code>bateria_srum.csv</code> — relatório SRUM (<code>powercfg /srumutil</code>)</li>
+<li><code>bateria_relatorio_energia.html</code> — relatório de energia (<code>powercfg /energy</code>, 60 s)</li>
+<li><code>bateria.csv</code> — CSV temático (<code>Metrica,Valor,Unidade</code>), copiado para <code>Resultados/</code>. É gravado sempre que a medição começou, inclusive em encerramento antecipado</li>
+</ul>
+<p>Nada é gravado em <code>C:\BATERIA</code>, em <code>C:\Traces</code> nem na raiz do projeto.</p>
+<h3 id="87-critério-de-aprovação">8.7 Critério de Aprovação</h3>
+<p>O PASS/FAIL decide se a <strong>coleta é válida</strong>; não há limiar de autonomia ou consumo.</p>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pré-voo e conferência na bateria ok, fase ociosa completa, fase de escritório com pelo menos 30 min medidos (completa ou encerrada pela proteção de bateria depois desse mínimo), leitura de energia (medida ou estimada) nas duas fases, <code>bateria.csv</code> e <code>bateria_amostras.csv</code> gravados</td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Sem bateria, carga abaixo de 95%, ferramentas ausentes, item fora do padrão ou bloqueado por política, sem internet, monitor externo, Edge/Google não prontos — antes de pedir a desconexão</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Carregador não desconectado em 10 minutos</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Brilho, modo ou Economia fora do padrão já na bateria (<code>padronizacao_na_bateria</code>)</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Carregador reconectado durante a estabilização ou a medição</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Proteção de bateria (7%) na fase ociosa ou antes de 30 min da fase de escritório</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Sessão bloqueada no início da fase de escritório</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Login pedido ao abrir o Edge já na bateria (<code>login_exigido</code>)</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Sem leitura de energia numa das fases (bateria sem mWh e sem capacidade de carga cheia)</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+<tr>
+<td>Parada segura (Ctrl+Q) ou erro inesperado</td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><strong>Nota</strong>desvios de padronização durante a medição e falhas nas evidências complementares (exportação CSV, SRUM, relatório de energia) <b>não reprovam</b>: ficam como aviso no log e, no caso dos desvios, em <code>Desvios_Padronizacao</code>.</div>
+<h3 id="88-como-interpretar-gestão">8.8 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
+<ul>
+<li>Compare o <code>bateria.csv</code> do cenário <strong>baseline</strong> com o do cenário <strong>com agente</strong>, executados na <strong>mesma máquina</strong>, na <strong>mesma rede</strong> e com a <strong>mesma versão do teste</strong> (<code>Versao_Teste</code>).</li>
+<li>A <strong>fase ociosa</strong> mostra o custo de fundo do agente — é onde 1–2 W de diferença aparecem com mais clareza. A <strong>fase de escritório</strong> representa o uso real.</li>
+<li>Use a <strong>taxa média de descarga (W)</strong> e a <strong>energia consumida (mWh)</strong> como medidas principais; a queda em % tem resolução de 1 ponto e é complementar.</li>
+<li>Só compare execuções com <code>Coleta_Valida = sim</code> e <code>Desvios_Padronizacao = 0</code>. <code>Energia_Estimada = sim</code> indica menor precisão.</li>
+<li>A <strong>autonomia projetada</strong> é uma extrapolação linear do consumo da fase, não uma descarga completa.</li>
+<li>O <code>bateria_top_processos.csv</code> e os traces <code>.etl</code> (no WPA) ajudam a atribuir a diferença de consumo a processos específicos.</li>
+<li>Os resultados <strong>não são comparáveis</strong> com as medições antigas de 60% de CPU por 120 minutos.</li>
+</ul>
+<h3 id="89-interrupção-segura">8.9 Interrupção Segura</h3>
+<p>Assim como no Módulo 1, o teste pode ser interrompido com <strong>Ctrl+Q</strong>. Fechar a janela do monitor do teste (pela barra de tarefas ou Alt+F4) e um Ctrl+C recebido pelo teste têm o mesmo efeito. A parada segura salva o trace parcial, grava o que já foi medido (<code>bateria.csv</code> com <code>Coleta_Valida = nao</code>), restaura as configurações alteradas, fecha o Edge e sai com exit code 1.</p>
+<p>Se o processo for encerrado à força (por exemplo, fechando a janela do hub), a restauração automática não roda: use a coluna <code>Antes</code> do <code>bateria_preflight.csv</code> para voltar brilho, Bluetooth e configurações de energia aos valores anteriores.</p>
+</div>
 
-            <h3>2.2 Sistema de Cenarios</h3>
-            <p>Cada sessao de testes pertence a um <strong>cenario</strong> &mdash; uma unidade logica que agrupa execucoes (runs) e suas evidencias. Cenarios permitem testar uma maquina ao longo de varios dias, re-executar testes falhos e gerar relatorios consolidados.</p>
-            <p>Formato de identificacao: <code>{NomeDoCenario}_{Hostname}_{Data}</code></p>
+<div class="section">
+<h2 id="9-módulo-6--wi-fi-fast-transition-80211r">9. Módulo 6 — Wi-Fi Fast Transition (802.11r)</h2>
+<h3 id="91-objetivo">9.1 Objetivo</h3>
+<p>Verificar se a máquina (adaptador Wi-Fi + driver + firmware/BIOS + Windows) faz <strong>roaming com Fast BSS Transition (802.11r)</strong> ao trocar de AP dentro da mesma rede. Sem FT, cada troca de AP passa por uma reautenticação completa (4-way handshake e, em redes 802.1X, o RADIUS), o que gera interrupções perceptíveis em chamadas de voz/vídeo e VPN. O teste também coleta tudo o que interfere nessa compatibilidade, para explicar um FAIL.</p>
+<h3 id="92-ferramentas-utilizadas">9.2 Ferramentas Utilizadas</h3>
+<ul>
+<li><strong>API nativa de WLAN do Windows (<code>wlanapi.dll</code>)</strong>, lida pelo script: BSSID, RSSI e qualidade a cada 250 ms; notificações de associação/roaming; cache de varredura com os <em>Information Elements</em> de cada AP.</li>
+<li><strong><code>netsh wlan show interfaces</code></strong>: AKM da associação atual (<code>akm = 00-0f-ac:NN</code>), relida a cada 2 s e logo após cada troca de AP.</li>
+<li><strong><code>netsh wlan show drivers</code> / <code>wirelesscapabilities</code></strong>: capacidades declaradas pelo driver (Transição Rápida, 802.11k, 802.11v, SAE, MFP).</li>
+<li><strong>Ping ICMP (<code>IcmpSendEcho</code>)</strong> a cada 200 ms para o gateway e para a internet (<code>8.8.8.8</code>).</li>
+<li><strong>Painel ao vivo</strong> no navegador (servidor local em <code>127.0.0.1</code>), sem dependência de internet.</li>
+</ul>
+<p>O teste <strong>não altera nenhuma configuração</strong> do sistema, do adaptador ou da rede, e não força varreduras Wi-Fi.</p>
+<h3 id="93-procedimento">9.3 Procedimento</h3>
+<ol>
+<li><strong>Pré-voo:</strong> exige o Wi-Fi conectado — a rede conectada é a rede testada. Registra SSID, BSSID inicial, autenticação, cifra, AKM, banda, canal, RSSI e gateway.</li>
+<li><strong>Coleta de compatibilidade:</strong> adaptador e propriedades avançadas (Roaming Aggressiveness, banda preferida, MIMO Power Save...), driver (versão, data, fornecedor, INF), capacidades sem fio, BIOS, modelo, SO/build, plano e economia de energia do adaptador sem fio, adaptadores virtuais/VPN ativos e perfil WLAN (<strong>sem a senha</strong>).</li>
+<li><strong>Inventário de APs:</strong> para cada BSSID do SSID no cache de varredura, AKMs anunciadas (RSN IE), Mobility Domain/MDID (802.11r), 802.11k (RM) e 802.11v (BSS Transition).</li>
+<li><strong>Caminhada (5 min):</strong> o painel abre no navegador; o operador clica em <strong>Iniciar caminhada</strong> (ou o início é automático após 60 s) e anda pelo escritório passando por áreas de APs diferentes. O painel mostra AP atual, RSSI, gráficos de RSSI e latência, e destaca cada troca com a classificação.</li>
+<li><strong>Pós-processamento:</strong> exportação do log <code>WLAN-AutoConfig/Operational</code> do período, relatório WLAN do Windows (<code>wlanreport</code>), classificação de cada troca, CSVs e relatório HTML.</li>
+</ol>
+<h3 id="94-classificação-de-cada-troca-de-ap">9.4 Classificação de Cada Troca de AP</h3>
+<table>
+<thead>
+<tr>
+<th>Classificação</th>
+<th>Regra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>FT</strong></td>
+<td>Após a troca, a AKM conectada é de Fast Transition — FT-802.1X (<code>00-0f-ac:03</code>), FT-PSK (<code>:04</code>), FT-SAE (<code>:09</code>), FT-802.1X-SHA384 (<code>:0d</code>), FT-FILS (<code>:10</code>/<code>:11</code>), FT-PSK-SHA384 (<code>:13</code>), FT-SAE-EXT-KEY (<code>:19</code>) — <strong>e não houve desconexão</strong></td>
+</tr>
+<tr>
+<td><strong>Não FT</strong></td>
+<td>A AKM após a troca não é de FT (ex.: PSK, 802.1X, SAE), ou a troca passou por desconexão (reconexão completa)</td>
+</tr>
+<tr>
+<td><strong>Indeterminado</strong></td>
+<td>A AKM após a troca não pôde ser lida (driver não informa)</td>
+</tr>
+</tbody>
+</table>
+<p>O tempo de troca vem das notificações WLAN do Windows, quando disponíveis, e é dividido em duas fases:</p>
+<ul>
+<li><strong>Reassociação:</strong> início do roaming → autenticação no AP novo. É a troca pelo ar (autenticação FT e reassociação) e a parte comparável ao tempo de roaming mostrado pela controladora (WLC).</li>
+<li><strong>Conclusão no Windows:</strong> autenticação → roaming concluído (instalação de chaves, liberação da porta e aviso aos programas). A WLC não enxerga essa fase.</li>
+</ul>
+<p>Sem notificações, só o total pela amostragem (resolução de 250 ms). O início é procurado desde o fim do roaming anterior, porque tentativas demoradas começam segundos antes de o BSSID mudar; trocas acima de 1 s são sinalizadas como <strong>demoradas</strong>. Os carimbos usam relógio de alta resolução (&lt; 1 ms). A interrupção é o maior intervalo sem resposta do gateway em torno da troca.</p>
+<h3 id="95-métricas-coletadas">9.5 Métricas Coletadas</h3>
+<p>O <code>wifi_ft.csv</code> (formato <code>Metrica,Valor,Unidade</code>) traz: SSID, autenticação, cifra, AKM conectada, adaptador, versão/data/fornecedor do driver, firmware, BIOS, build do SO, suporte declarado a FT/802.11k/802.11v, APs vistos/com FT anunciado/utilizados, duração da caminhada, roamings (total, FT, não FT, indeterminados, com desconexão, demorados), tempo de troca total, de reassociação e de conclusão no Windows (média, mediana e máximo), interrupção média/máxima (gateway e internet), perda e latência média/p95 (gateway e internet), RSSI mínimo/médio/máximo e resultado.</p>
+<h3 id="96-evidências-geradas">9.6 Evidências Geradas</h3>
+<table>
+<thead>
+<tr>
+<th>Arquivo</th>
+<th>Conteúdo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wifi_ft_relatorio.html</code></td>
+<td>Relatório com gráficos (RSSI × tempo com marcadores de roaming, linha do tempo de APs, latência/perda, tempo de troca e interrupção por roaming), tabelas de roamings, achados de compatibilidade, APs e informações técnicas. Abre sem internet</td>
+</tr>
+<tr>
+<td><code>wifi_ft.csv</code></td>
+<td>CSV temático (copiado para <code>Resultados/</code>)</td>
+</tr>
+<tr>
+<td><code>wifi_ft_roamings.csv</code></td>
+<td>Uma linha por troca de AP</td>
+</tr>
+<tr>
+<td><code>wifi_ft_amostras.csv</code></td>
+<td>Série de 250 ms: BSSID, RSSI, qualidade, canal, taxas</td>
+</tr>
+<tr>
+<td><code>wifi_ft_pings.csv</code></td>
+<td>Todos os pings (gateway e internet)</td>
+</tr>
+<tr>
+<td><code>wifi_ft_eventos_wlan.csv</code></td>
+<td>Notificações WLAN (associação, roaming, desconexão)</td>
+</tr>
+<tr>
+<td><code>wifi_ft_compatibilidade.json</code></td>
+<td>Toda a coleta de compatibilidade e os achados</td>
+</tr>
+<tr>
+<td><code>brutos/</code></td>
+<td>Saídas de <code>netsh</code>/PowerShell/<code>powercfg</code>, log <code>WLAN-AutoConfig</code> (<code>.evtx</code> e <code>.txt</code>) e <code>wlan-report.html</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="97-critério-de-aprovação">9.7 Critério de Aprovação</h3>
+<table>
+<thead>
+<tr>
+<th>Resultado</th>
+<th>Condição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="badge badge-pass">PASS</span></td>
+<td>Pelo menos <strong>1</strong> troca de AP classificada como <strong>FT</strong></td>
+</tr>
+<tr>
+<td><span class="badge badge-fail">FAIL</span></td>
+<td>Wi-Fi desconectado no início; nenhuma troca de AP; apenas trocas Não FT; ou apenas trocas indeterminadas</td>
+</tr>
+</tbody>
+</table>
+<p>Tempo de troca e perda de pacotes são registrados, mas não reprovam. Ping para a internet bloqueado vira <code>N/A</code> e não reprova.</p>
+<h3 id="98-como-interpretar-gestão">9.8 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
+<ul>
+<li><strong>FAIL "nenhuma troca de AP":</strong> o operador não se afastou o suficiente do AP inicial, ou só há 1 AP do SSID no percurso. Não indica problema da máquina.</li>
+<li><strong>FAIL "nenhum com Fast Transition" com o achado "a rede usa PSK/802.1X/SAE":</strong> o 802.11r não está habilitado no SSID (configuração da controladora/AP), não é problema da máquina.</li>
+<li><strong>FAIL com a rede anunciando FT, mas a máquina conectando sem FT:</strong> suspeite do driver/adaptador (veja "Transição Rápida" nas capacidades e a idade do driver) ou de política do Windows.</li>
+<li><strong>Interrupções altas mesmo com FT:</strong> verifique economia de energia do adaptador, Roaming Aggressiveness, adaptadores virtuais/VPN e RSSI muito baixo antes da troca (o cliente esperou demais para trocar).</li>
+</ul>
+</div>
 
-            <h3>2.3 Contrato de Exit Codes <span class="tag tag-tecnico">Tecnico</span></h3>
-            <table>
-                <thead>
-                    <tr><th>Exit Code</th><th>Status</th><th>Regra</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><code>0</code></td><td><span class="badge badge-pass">PASS</span></td><td>Teste concluiu com sucesso e todas as verificacoes passaram</td></tr>
-                    <tr><td><code>&ne; 0</code></td><td><span class="badge badge-fail">FAIL</span></td><td>Teste encontrou falha, erro ou nao completou corretamente</td></tr>
-                </tbody>
-            </table>
-            <p>Implementacao: Python usa <code>sys.exit(0)</code> / <code>sys.exit(1)</code>. PowerShell usa <code>exit 0</code> / <code>exit 1</code>.</p>
+<div class="section">
+<h2 id="10-rastreabilidade-e-evidências">10. Rastreabilidade e Evidências</h2>
+<h3 id="101-estrutura-de-armazenamento">10.1 Estrutura de Armazenamento</h3>
+<p>Toda execução gera evidências organizadas por cenário, em duas pastas: <code>Execucoes/</code> (logs, evidências e estado) e <code>Resultados/</code> (CSVs estruturados).</p>
+<pre><code>Execucoes/
+└── ImagemLimpa_DESKTOP-ABC_2026-04-15/     ← cenário
+    ├── Logs/                                ← uma entrada por run
+    │   ├── run_20260415_093000.log          ← saída completa de cada script
+    │   └── run_20260415_093000.{html,csv,json}
+    └── Traces/
+        ├── _state.json                          ← estado e histórico
+        ├── _relatorio.html                      ← relatório consolidado
+        ├── _relatorio.csv
+        ├── _relatorio.json
+        ├── informacoes_maquina.csv              ← inventário do setup 1
+        ├── 1_cpu_memo/                          ← evidências do teste de CPU
+        │   ├── automacao_*.log
+        │   ├── Trace_*_Run1.etl … Trace_*_Run5.etl
+        │   ├── CSV_*_Run1/ … CSV_*_Run5/        ← exportação WPA de cada ciclo
+        │   ├── Resultados_Consolidados/         ← Relatorio_Resumo.csv e .html
+        │   ├── cpu_memoria.csv
+        │   └── dlp_usb/                         ← variante 1-1 (mesma estrutura, com cpu_memoria_dlp.csv)
+        ├── 2_disco/                             ← evidências do teste de disco
+        │   ├── resultado_validacao_disco_*.csv
+        │   ├── disco.csv
+        │   └── resultado_validacao_usb_*.csv, teste_usb_nativo_*.log, disco_usb.csv  ← variante 2-1
+        ├── 3_rede/                              ← evidências do teste de rede
+        │   ├── teste_rede_*.log
+        │   ├── resultado_afericoes.csv
+        │   ├── rede.csv
+        │   ├── Evidencia_Afericao_1_*.png
+        │   ├── ...
+        │   └── Evidencia_Afericao_5_*.png
+        ├── 3_rede_internet/                     ← evidências do teste de rede na internet
+        │   ├── teste_rede_internet_*.log
+        │   ├── resultado_afericoes_internet.csv
+        │   ├── rede_internet.csv
+        │   ├── Evidencia_Internet_Afericao_1_*.png
+        │   ├── ...
+        │   └── Evidencia_Internet_Afericao_5_*.png
+        ├── 4_boot_shutdown/                     ← evidências do teste de boot
+        │   ├── BootShutdown_&lt;data&gt;.csv
+        │   └── boot_shutdown.csv
+        ├── 5_bateria/                           ← evidências do teste de bateria
+        │   ├── teste_bateria_*.log
+        │   ├── bateria_preflight.csv
+        │   ├── bateria_relatorio_antes.html
+        │   ├── bateria_relatorio_antes.xml
+        │   ├── bateria_amostras.csv
+        │   ├── bateria_top_processos.csv
+        │   ├── Trace_Bateria_Ociosa_*.etl
+        │   ├── Trace_Bateria_Escritorio_*.etl
+        │   ├── CSV_Ociosa_*/
+        │   ├── CSV_Escritorio_*/
+        │   ├── bateria_relatorio_depois.html
+        │   ├── bateria_srum.csv
+        │   ├── bateria_relatorio_energia.html
+        │   └── bateria.csv
+        ├── 6_wifi_fast_transition/              ← evidências do teste de Wi-Fi FT
+        │   ├── teste_wifi_ft_*.log
+        │   ├── wifi_ft_relatorio.html
+        │   ├── wifi_ft.csv
+        │   ├── wifi_ft_roamings.csv
+        │   ├── wifi_ft_amostras.csv
+        │   ├── wifi_ft_pings.csv
+        │   ├── wifi_ft_eventos_wlan.csv
+        │   ├── wifi_ft_compatibilidade.json
+        │   └── brutos/
+        └── &lt;pasta do teste&gt;/_anterior/           ← evidências substituídas em reexecuções
+            ├── run1_2026-04-15T09-30-00/
+            └── run2_2026-04-15T14-00-00/
 
-            <h3>2.4 Variaveis de Ambiente Injetadas <span class="tag tag-tecnico">Tecnico</span></h3>
-            <table>
-                <thead>
-                    <tr><th>Variavel</th><th>Descricao</th><th>Exemplo</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><code>HUB_EVIDENCE_DIR</code></td><td>Pasta de evidencias do teste</td><td><code>Traces/Cenario_PC01/2_disco/</code></td></tr>
-                    <tr><td><code>HUB_TRACE_DIR</code></td><td>Identica a HUB_EVIDENCE_DIR</td><td>(mesmo acima)</td></tr>
-                    <tr><td><code>HUB_TRACE_ROOT</code></td><td>Pasta raiz do cenario</td><td><code>Traces/Cenario_PC01/</code></td></tr>
-                </tbody>
-            </table>
-
-            <div class="callout callout-warning">
-                <strong>Regra</strong>
-                Testes <strong>nunca devem salvar arquivos na pasta raiz do projeto</strong>. Toda evidencia deve ser direcionada para <code>HUB_EVIDENCE_DIR</code>.
-            </div>
-        </div>
-
-        <!-- 3. Setup -->
-        <div class="section" id="setup">
-            <h2>3. Fase de Setup &mdash; Preparacao do Ambiente</h2>
-
-            <h3>3.1 Objetivo</h3>
-            <p>Padronizar a configuracao da maquina antes dos testes, garantindo que todos os equipamentos sao testados em condicoes equivalentes.</p>
-
-            <h3>3.2 Scripts de Preparacao</h3>
-            <table>
-                <thead>
-                    <tr><th>#</th><th>Script</th><th>Descricao</th><th>Justificativa</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>1</td><td><code>captura_infos_pc</code></td><td>Coleta informacoes do sistema</td><td>Registro de identidade da maquina</td></tr>
-                    <tr><td>2</td><td><code>opcoes_energia</code></td><td>Plano de energia alto desempenho</td><td>Evita throttling e suspensao</td></tr>
-                    <tr><td>3</td><td><code>softwares_msStore</code></td><td>Apps da Microsoft Store</td><td>Ferramentas auxiliares</td></tr>
-                    <tr><td>4</td><td><code>install_python</code></td><td>Instala Python 3</td><td>Pre-requisito dos testes</td></tr>
-                    <tr><td>5</td><td><code>install_py_dependencies</code></td><td>Cria venv e instala pacotes</td><td>Isolamento de dependencias</td></tr>
-                    <tr><td>6</td><td><code>pausa_WinUpdate</code></td><td>Pausa Windows Update</td><td>Evita interferencia nos testes</td></tr>
-                    <tr><td>7</td><td><code>install_google_chrome</code></td><td>Instala Google Chrome</td><td>Necessario para teste de rede</td></tr>
-                    <tr><td>8</td><td><code>enable_diagnostics</code></td><td>Habilita diagnosticos do Windows</td><td>Necessario para teste de boot</td></tr>
-                    <tr><td>9</td><td><code>AdicionarTecladoUSInt</code></td><td>Layout US International</td><td>Padronizacao de ambiente</td></tr>
-                </tbody>
-            </table>
-
-            <h3>3.3 Justificativa da Padronizacao <span class="tag tag-gestao">Gestao</span></h3>
-            <div class="callout callout-info">
-                <strong>Por que padronizar?</strong>
-                Sem a Fase de Setup, diferencas de configuracao entre maquinas (plano de energia, atualizacoes em andamento, falta de dependencias) poderiam gerar variacoes nos resultados que nao refletem o desempenho real do hardware. A padronizacao garante que diferencas nos resultados sao atribuiveis ao hardware, nao a configuracao de software.
-            </div>
-        </div>
-
-        <!-- 4. CPU e Memoria -->
-        <div class="section" id="cpu">
-            <div class="module-header">
-                <div class="module-number">1</div>
-                <h2>Modulo 1 &mdash; CPU e Memoria</h2>
-            </div>
-
-            <h3>4.1 Objetivo</h3>
-            <p>Avaliar o desempenho e a estabilidade do processador e da memoria sob carga sustentada, simulando um cenario de uso intensivo prolongado.</p>
-
-            <h3>4.2 Ferramentas Utilizadas</h3>
-            <ul>
-                <li><strong>Microsoft Edge</strong> via Selenium WebDriver &mdash; geracao de carga de CPU</li>
-                <li><strong>Windows Performance Analyzer (WPA)</strong> &mdash; perfilamento do sistema</li>
-                <li><strong>psutil</strong> &mdash; monitoramento de metricas de CPU em tempo real</li>
-            </ul>
-
-            <h3>4.3 Procedimento</h3>
-            <table>
-                <thead>
-                    <tr><th>Etapa</th><th>Descricao</th><th>Duracao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>1</td><td>Abertura do Microsoft Edge com 3 abas de workload</td><td>~10s</td></tr>
-                    <tr><td>2</td><td><strong>Carga ativa</strong> &mdash; CPU sob estresse sustentado</td><td>300s (5 min)</td></tr>
-                    <tr><td>3</td><td><strong>Cooldown</strong> &mdash; aguarda CPU &lt; 15%</td><td>ate 300s (5 min)</td></tr>
-                    <tr><td>4</td><td>Repeticao por <strong>5 ciclos</strong></td><td>~50 min total</td></tr>
-                    <tr><td>5</td><td>Coleta de perfil WPA e geracao de relatorio</td><td>~30s</td></tr>
-                </tbody>
-            </table>
-
-            <h3>Diagrama de Ciclos</h3>
-            <div class="cycle-diagram">
-                <div>
-                    <div class="cycle-box">
-                        <div class="load">Carga 5min</div>
-                        <div class="cool">Cooldown</div>
-                    </div>
-                    <div class="cycle-label">Ciclo 1</div>
-                </div>
-                <div>
-                    <div class="cycle-box">
-                        <div class="load">Carga 5min</div>
-                        <div class="cool">Cooldown</div>
-                    </div>
-                    <div class="cycle-label">Ciclo 2</div>
-                </div>
-                <div>
-                    <div class="cycle-box">
-                        <div class="load">Carga 5min</div>
-                        <div class="cool">Cooldown</div>
-                    </div>
-                    <div class="cycle-label">Ciclo 3</div>
-                </div>
-                <div>
-                    <div class="cycle-box">
-                        <div class="load">Carga 5min</div>
-                        <div class="cool">Cooldown</div>
-                    </div>
-                    <div class="cycle-label">Ciclo 4</div>
-                </div>
-                <div>
-                    <div class="cycle-box">
-                        <div class="load">Carga 5min</div>
-                        <div class="cool">Cooldown</div>
-                    </div>
-                    <div class="cycle-label">Ciclo 5</div>
-                </div>
-            </div>
-
-            <h3>4.4 Metricas Coletadas</h3>
-            <table>
-                <thead>
-                    <tr><th>Metrica</th><th>Fonte</th><th>Formato</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Perfil de desempenho WPA</td><td>Windows Performance Analyzer</td><td><code>.wpaProfile</code></td></tr>
-                    <tr><td>Tempos de cada ciclo (carga + cooldown)</td><td>Script Python</td><td>CSV</td></tr>
-                    <tr><td>Uso de CPU ao longo do teste</td><td>psutil</td><td>Log textual</td></tr>
-                </tbody>
-            </table>
-
-            <h3>4.5 Criterio de Aprovacao</h3>
-            <table>
-                <thead>
-                    <tr><th>Condicao</th><th>Resultado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Todos os 5 ciclos completados sem erro</td><td><span class="badge badge-pass">PASS</span> (exit code 0)</td></tr>
-                    <tr><td>Qualquer ciclo falha, crash ou timeout</td><td><span class="badge badge-fail">FAIL</span> (exit code 1)</td></tr>
-                </tbody>
-            </table>
-
-            <h3>4.6 O que um FAIL Significa <span class="tag tag-gestao">Gestao</span></h3>
-            <div class="callout callout-danger">
-                <strong>Falha no teste de CPU/Memoria</strong>
-                Indica que o processador ou memoria nao conseguiram sustentar carga por 5 ciclos. Possiveis causas: superaquecimento (thermal throttling), instabilidade de memoria, incompatibilidade de driver/firmware, ou recurso insuficiente. <strong>Acao:</strong> Investigar logs em <code>Logs/run_*.log</code> e verificar hardware.
-            </div>
-
-            <div class="callout callout-info">
-                <strong>Interrupcao segura</strong>
-                O operador pode pressionar <strong>Ctrl+Q</strong> a qualquer momento para interromper o teste de forma controlada.
-            </div>
-        </div>
-
-        <!-- 5. Disco -->
-        <div class="section" id="disco">
-            <div class="module-header">
-                <div class="module-number">2</div>
-                <h2>Modulo 2 &mdash; Disco</h2>
-            </div>
-
-            <h3>5.1 Objetivo</h3>
-            <p>Medir a velocidade de leitura e escrita sustentada do disco principal, avaliando o desempenho de I/O sob operacoes sequenciais com blocos grandes.</p>
-
-            <h3>5.2 Ferramentas Utilizadas</h3>
-            <ul>
-                <li><strong>Microsoft DiskSPD</strong> (<code>diskspd.exe</code>) &mdash; benchmarking oficial de disco da Microsoft</li>
-                <li><strong>psutil</strong> &mdash; identificacao do disco principal</li>
-            </ul>
-
-            <h3>5.3 Procedimento</h3>
-            <table>
-                <thead>
-                    <tr><th>Etapa</th><th>Descricao</th><th>Duracao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>1</td><td>Identificacao do disco e espaco disponivel</td><td>~2s</td></tr>
-                    <tr><td>2</td><td><strong>Leitura sequencial</strong> &mdash; blocos de 1 MB, arquivo de 8 GB</td><td>10s</td></tr>
-                    <tr><td>3</td><td><strong>Escrita sequencial</strong> &mdash; blocos de 1 MB, arquivo de 8 GB</td><td>10s</td></tr>
-                    <tr><td>4</td><td>Intervalo entre baterias</td><td>60s</td></tr>
-                    <tr><td>5</td><td>Repeticao por <strong>10 baterias</strong></td><td>~25 min total</td></tr>
-                    <tr><td>6</td><td>Calculo de medias e geracao de CSV</td><td>~5s</td></tr>
-                </tbody>
-            </table>
-
-            <h3>Parametros do DiskSPD</h3>
-            <table>
-                <thead>
-                    <tr><th>Parametro</th><th>Valor</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Tamanho do bloco</td><td>1 MB</td></tr>
-                    <tr><td>Tamanho do arquivo de teste</td><td>8 GB</td></tr>
-                    <tr><td>Duracao por operacao</td><td>10 segundos</td></tr>
-                    <tr><td>Tipo de I/O</td><td>Sequencial</td></tr>
-                    <tr><td>Numero de baterias</td><td>10</td></tr>
-                    <tr><td>Intervalo entre baterias</td><td>60 segundos</td></tr>
-                </tbody>
-            </table>
-
-            <h3>5.4 Metricas Coletadas</h3>
-            <table>
-                <thead>
-                    <tr><th>Metrica</th><th>Unidade</th><th>Descricao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Velocidade de leitura (por bateria)</td><td>MB/s</td><td>Throughput de leitura sequencial</td></tr>
-                    <tr><td>Velocidade de escrita (por bateria)</td><td>MB/s</td><td>Throughput de escrita sequencial</td></tr>
-                    <tr><td>Media de leitura</td><td>MB/s</td><td>Media aritmetica das 10 baterias</td></tr>
-                    <tr><td>Media de escrita</td><td>MB/s</td><td>Media aritmetica das 10 baterias</td></tr>
-                </tbody>
-            </table>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128202;</span>
-                <strong>Insira aqui:</strong> screenshot de um CSV real gerado pelo teste de disco<br>
-                <em>Salvar como: img/placeholder-csv-disco.png</em>
-            </div>
-
-            <h3>5.5 Criterio de Aprovacao</h3>
-            <table>
-                <thead>
-                    <tr><th>Condicao</th><th>Resultado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>10 baterias completadas e CSV gerado</td><td><span class="badge badge-pass">PASS</span></td></tr>
-                    <tr><td>Falha em qualquer bateria ou CSV ausente</td><td><span class="badge badge-fail">FAIL</span></td></tr>
-                </tbody>
-            </table>
-
-            <h3>5.6 Como Interpretar os Valores <span class="tag tag-gestao">Gestao</span></h3>
-            <table>
-                <thead>
-                    <tr><th>Tipo de disco</th><th>Leitura esperada</th><th>Escrita esperada</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>HDD (7200 RPM)</td><td>100&ndash;200 MB/s</td><td>80&ndash;160 MB/s</td></tr>
-                    <tr><td>SSD SATA</td><td>400&ndash;550 MB/s</td><td>300&ndash;520 MB/s</td></tr>
-                    <tr><td>SSD NVMe</td><td>1500&ndash;7000 MB/s</td><td>1000&ndash;5000 MB/s</td></tr>
-                </tbody>
-            </table>
-            <p>Valores <strong>significativamente abaixo</strong> do esperado podem indicar: disco com defeito, driver desatualizado, superaquecimento, ou fragmentacao excessiva (HDD).</p>
-        </div>
-
-        <!-- 6. Rede -->
-        <div class="section" id="rede">
-            <div class="module-header">
-                <div class="module-number">3</div>
-                <h2>Modulo 3 &mdash; Rede</h2>
-            </div>
-
-            <h3>6.1 Objetivo</h3>
-            <p>Aferir a velocidade de conexao de rede da maquina, medindo download, upload, latencia (ping) e variacao de latencia (jitter) atraves de multiplas afericoes.</p>
-
-            <h3>6.2 Ferramentas Utilizadas</h3>
-            <ul>
-                <li><strong>Google Chrome</strong> via Selenium WebDriver &mdash; acesso ao servidor de speedtest</li>
-                <li><strong>Servidor de speedtest interno</strong> (URL em <code>config.local.json</code> &rarr; <code>SpeedtestUrl</code>, nao versionada) &mdash; ponto de medicao padronizado</li>
-            </ul>
-
-            <h3>6.3 Procedimento</h3>
-            <table>
-                <thead>
-                    <tr><th>Etapa</th><th>Descricao</th><th>Duracao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>1</td><td>Abertura do Chrome via Selenium</td><td>~5s</td></tr>
-                    <tr><td>2</td><td>Navegacao para o servidor de speedtest</td><td>~3s</td></tr>
-                    <tr><td>3</td><td><strong>Afericao</strong> &mdash; clica em "Start" e aguarda conclusao</td><td>~60s</td></tr>
-                    <tr><td>4</td><td>Captura de screenshot como evidencia</td><td>~2s</td></tr>
-                    <tr><td>5</td><td>Extracao de metricas via regex</td><td>~1s</td></tr>
-                    <tr><td>6</td><td>Repeticao por <strong>5 afericoes</strong></td><td>~6 min total</td></tr>
-                    <tr><td>7</td><td>Geracao de CSV consolidado</td><td>~2s</td></tr>
-                </tbody>
-            </table>
-
-            <h3>6.4 Metricas Coletadas</h3>
-            <table>
-                <thead>
-                    <tr><th>Metrica</th><th>Unidade</th><th>Descricao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Download</td><td>Mbps</td><td>Velocidade de download</td></tr>
-                    <tr><td>Upload</td><td>Mbps</td><td>Velocidade de upload</td></tr>
-                    <tr><td>Ping</td><td>ms</td><td>Latencia de ida e volta</td></tr>
-                    <tr><td>Jitter</td><td>ms</td><td>Variacao de latencia entre pacotes</td></tr>
-                </tbody>
-            </table>
-
-            <h3>6.5 Evidencias Geradas</h3>
-            <p>Para cada afericao:</p>
-            <ul>
-                <li><strong>Screenshot</strong> da pagina de resultado (<code>Evidencia_Afericao_N.png</code>)</li>
-                <li><strong>Linha no CSV</strong> com timestamp e valores medidos</li>
-            </ul>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128247;</span>
-                <strong>Insira aqui:</strong> screenshot de uma das evidencias de afericao de rede<br>
-                <em>Salvar como: img/placeholder-evidencia-rede.png</em>
-            </div>
-
-            <h3>6.6 Criterio de Aprovacao</h3>
-            <table>
-                <thead>
-                    <tr><th>Condicao</th><th>Resultado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>5 afericoes capturadas e CSV gerado</td><td><span class="badge badge-pass">PASS</span></td></tr>
-                    <tr><td>Chrome nao encontrado ou afericoes incompletas</td><td><span class="badge badge-fail">FAIL</span></td></tr>
-                </tbody>
-            </table>
-
-            <h3>6.7 Referencia de Valores Aceitaveis <span class="tag tag-gestao">Gestao</span></h3>
-            <div class="callout callout-warning">
-                <strong>A ser preenchido pela equipe</strong>
-                Defina os valores minimos aceitaveis conforme os padroes da organizacao.
-            </div>
-            <table>
-                <thead>
-                    <tr><th>Metrica</th><th>Minimo aceitavel</th><th>Ideal</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Download</td><td><span class="fill-in">___ Mbps</span></td><td><span class="fill-in">___ Mbps</span></td></tr>
-                    <tr><td>Upload</td><td><span class="fill-in">___ Mbps</span></td><td><span class="fill-in">___ Mbps</span></td></tr>
-                    <tr><td>Ping</td><td><span class="fill-in">___ ms (max)</span></td><td><span class="fill-in">___ ms</span></td></tr>
-                    <tr><td>Jitter</td><td><span class="fill-in">___ ms (max)</span></td><td><span class="fill-in">___ ms</span></td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- 7. Boot e Shutdown -->
-        <div class="section" id="boot">
-            <div class="module-header">
-                <div class="module-number">4</div>
-                <h2>Modulo 4 &mdash; Boot e Shutdown</h2>
-            </div>
-
-            <h3>7.1 Objetivo</h3>
-            <p>Avaliar o tempo de inicializacao e desligamento do Windows atraves de multiplos ciclos de reinicializacao, identificando degradacoes e gargalos no processo de boot.</p>
-
-            <h3>7.2 Ferramentas Utilizadas</h3>
-            <ul>
-                <li><strong>Agendador de Tarefas do Windows</strong> &mdash; automatizacao das reinicializacoes</li>
-                <li><strong>Event Log de Diagnosticos</strong> (<code>Microsoft-Windows-Diagnostics-Performance/Operational</code>)</li>
-                <li><strong>PowerShell</strong> (<code>boot_shutdown_duration.ps1</code>) &mdash; analise dos eventos</li>
-            </ul>
-
-            <h3>7.3 Procedimento</h3>
-
-            <h3 style="margin-top: 16px;">Etapa 1 &mdash; Ciclos de Reinicializacao (automatico)</h3>
-            <table>
-                <thead>
-                    <tr><th>Ciclo</th><th>Acao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>1</td><td>Cria tarefa agendada, agenda shutdown em 5 minutos</td></tr>
-                    <tr><td>2</td><td>Maquina reinicia &rarr; script executa via ONLOGON &rarr; aguarda 5 min &rarr; reinicia</td></tr>
-                    <tr><td>3</td><td>(repete)</td></tr>
-                    <tr><td>4</td><td>(repete)</td></tr>
-                    <tr><td>5</td><td>(repete)</td></tr>
-                    <tr><td>6</td><td>Ultimo ciclo &rarr; executa analise e limpa tarefa agendada</td></tr>
-                </tbody>
-            </table>
-            <p><strong>Tempo total estimado:</strong> ~30-40 minutos</p>
-
-            <div class="callout callout-danger">
-                <strong>Atencao</strong>
-                Durante os ciclos, a <strong>maquina reinicia automaticamente 5 vezes</strong>. Nao interrompa o processo. O hub retoma automaticamente apos cada reinicializacao.
-            </div>
-
-            <h3>Etapa 2 &mdash; Analise de Eventos</h3>
-            <table>
-                <thead>
-                    <tr><th>Evento</th><th>ID</th><th>O que mede</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Boot completo</td><td>100</td><td>MainPathBootTime e BootPostBootTime</td></tr>
-                    <tr><td>Shutdown completo</td><td>200</td><td>Tempo total de desligamento</td></tr>
-                    <tr><td>Degradacao de boot</td><td>101-110</td><td>Drivers, servicos e apps que atrasaram o boot</td></tr>
-                    <tr><td>Atraso no shutdown</td><td>201-203</td><td>Processos que atrasaram o desligamento</td></tr>
-                </tbody>
-            </table>
-
-            <h3>7.4 Metricas Coletadas</h3>
-            <table>
-                <thead>
-                    <tr><th>Metrica</th><th>Unidade</th><th>Descricao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>MainPathBootTime</td><td>milissegundos</td><td>Tempo do caminho principal de boot</td></tr>
-                    <tr><td>BootPostBootTime</td><td>milissegundos</td><td>Tempo de atividades pos-boot</td></tr>
-                    <tr><td>ShutdownDuration</td><td>milissegundos</td><td>Tempo total de desligamento</td></tr>
-                    <tr><td>Eventos de degradacao</td><td>texto</td><td>Causas de lentidao detalhadas</td></tr>
-                </tbody>
-            </table>
-
-            <h3>7.5 Criterios de Avaliacao</h3>
-            <p><strong>Boot:</strong></p>
-            <div class="threshold-bar">
-                <div class="normal">&lt; 30s Normal</div>
-                <div class="warning">30s&ndash;60s Aviso</div>
-                <div class="critical">&gt; 60s Critico</div>
-            </div>
-            <p><strong>Shutdown:</strong></p>
-            <div class="threshold-bar">
-                <div class="normal">&lt; 20s Normal</div>
-                <div class="warning">20s&ndash;60s Aviso</div>
-                <div class="critical">&gt; 60s Critico</div>
-            </div>
-
-            <h3>7.6 Criterio de Aprovacao</h3>
-            <table>
-                <thead>
-                    <tr><th>Condicao</th><th>Resultado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Nenhum evento <strong>critico</strong> nos boots do dia</td><td><span class="badge badge-pass">PASS</span></td></tr>
-                    <tr><td>Pelo menos um evento critico</td><td><span class="badge badge-fail">FAIL</span></td></tr>
-                </tbody>
-            </table>
-
-            <div class="callout callout-info">
-                <strong>Nota</strong>
-                Eventos de "aviso" (warning) sao registrados no relatorio mas <strong>nao causam FAIL</strong>. Apenas eventos criticos reprovam o teste.
-            </div>
-
-            <h3>7.7 Impacto de Degradacao <span class="tag tag-gestao">Gestao</span></h3>
-            <table>
-                <thead>
-                    <tr><th>Cenario</th><th>Impacto estimado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Boot &gt; 60s em 100 maquinas, 1 reinicio/dia</td><td>~1.7 horas/dia perdidas pela operacao</td></tr>
-                    <tr><td>Boot &gt; 60s com 5 reinicios/semana</td><td>~8.3 horas/semana por 100 maquinas</td></tr>
-                </tbody>
-            </table>
-            <p>Causas comuns: drivers desatualizados, servicos de terceiros (antivirus, agentes), aplicativos no startup, disco lento.</p>
-        </div>
-
-        <!-- 8. Rastreabilidade -->
-        <div class="section" id="rastreabilidade">
-            <h2>8. Rastreabilidade e Evidencias</h2>
-
-            <h3>8.1 Estrutura de Armazenamento</h3>
-            <pre><code>Traces/
-  ImagemLimpa_DESKTOP-ABC_2026-04-15/
-    _state.json              # Estado e historico
-    _relatorio.html/csv/json # Relatorios consolidados
-    1_cpu_memo/              # Evidencias CPU (perfil WPA, CSV)
-    2_disco/                 # Evidencias disco (CSV benchmark)
-    3_rede/                  # Evidencias rede (CSV + 5 screenshots)
-    4_boot_shutdown/         # Evidencias boot (CSV eventos)
-    _anterior/               # Runs anteriores preservadas
-      run1_2026-04-15 09-30-00/
-      run2_2026-04-15 14-00-00/</code></pre>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128193;</span>
-                <strong>Insira aqui:</strong> screenshot do Windows Explorer mostrando a estrutura de pastas de um cenario real<br>
-                <em>Salvar como: img/placeholder-estrutura-traces.png</em>
-            </div>
-
-            <h3>8.2 Ciclo de Vida das Evidencias</h3>
-            <ol>
-                <li><strong>Primeira execucao:</strong> Evidencias salvas nas subpastas do cenario</li>
-                <li><strong>Re-execucao:</strong> Evidencias anteriores movidas para <code>_anterior/</code> com timestamp</li>
-                <li><strong>Consolidacao:</strong> Relatorio <code>_relatorio.*</code> atualizado com todas as runs</li>
-            </ol>
-
-            <div class="callout callout-success">
-                <strong>Nenhuma evidencia e apagada</strong>
-                O historico completo de todas as tentativas e preservado em <code>_anterior/</code>.
-            </div>
-
-            <h3>8.3 O Arquivo _state.json <span class="tag tag-tecnico">Tecnico</span></h3>
-            <pre><code>{
-  "scenario": "ImagemLimpa",
-  "machine": "DESKTOP-ABC",
-  "createdAt": "2026-04-15T09:00:00",
-  "lastRunAt": "2026-04-15T14:00:00",
-  "runs": [
+Resultados/
+└── ImagemLimpa_DESKTOP-ABC_2026-04-15/
+    ├── maquina.csv                          ← modelo, série, CPU, RAM, disco, SO
+    ├── cenario.csv                          ← status consolidado de cada teste
+    └── cpu_memoria.csv, disco.csv, rede.csv, rede_internet.csv,
+        boot_shutdown.csv, bateria.csv, wifi_ft.csv,
+        cpu_memoria_dlp.csv, disco_usb.csv   ← CSVs temáticos (variantes, quando executadas)
+</code></pre>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot do Windows Explorer mostrando a estrutura de pastas de um cenário real<br><em>Salvar como: img/placeholder-estrutura-traces.png</em></div>
+<h3 id="102-ciclo-de-vida-das-evidências">10.2 Ciclo de Vida das Evidências</h3>
+<ol>
+<li><strong>Primeira execução:</strong> Evidências são salvas diretamente nas subpastas do cenário</li>
+<li><strong>Re-execução:</strong> Evidências anteriores são movidas para <code>&lt;pasta do teste&gt;/_anterior/run{N}_{data-hora}/</code> e novas evidências são geradas</li>
+<li><strong>Consolidação:</strong> O relatório <code>_relatorio.*</code> é atualizado com os resultados de todas as runs</li>
+</ol>
+<p><strong>Nenhuma evidência é apagada.</strong> O histórico completo de todas as tentativas é preservado.</p>
+<div class="callout callout-info"><strong>Nota</strong>a pasta de evidências é a da categoria, compartilhada pelos scripts da mesma pasta. Reexecutar um teste também move para <code>_anterior/</code> as evidências atuais dos outros testes da mesma pasta (por exemplo, o Módulo 1 e a variante 1-1).</div>
+<h3 id="103-o-arquivo-_statejson-técnico">10.3 O Arquivo _state.json <span class="tag tag-tecnico">Técnico</span></h3>
+<p>O <code>_state.json</code> é a fonte de verdade para o estado do cenário. Exemplo de estrutura:</p>
+<pre><code class="language-json">{
+  &quot;scenario&quot;: &quot;ImagemLimpa&quot;,
+  &quot;machine&quot;: &quot;DESKTOP-ABC&quot;,
+  &quot;createdAt&quot;: &quot;2026-04-15T09:00:00&quot;,
+  &quot;lastRunAt&quot;: &quot;2026-04-15T14:00:00&quot;,
+  &quot;runs&quot;: [
     {
-      "runId": 1,
-      "timestamp": "2026-04-15T09:00:00",
-      "tests": [
+      &quot;runId&quot;: 1,
+      &quot;timestamp&quot;: &quot;2026-04-15T09:00:00&quot;,
+      &quot;tests&quot;: [
         {
-          "name": "1_automacao_performance.py",
-          "folder": "1_cpu_memo",
-          "status": "PASS",
-          "exitCode": 0,
-          "duration": 361.5
+          &quot;name&quot;: &quot;1_automacao_performance.py&quot;,
+          &quot;folder&quot;: &quot;1_cpu_memo&quot;,
+          &quot;status&quot;: &quot;PASS&quot;,
+          &quot;exitCode&quot;: 0,
+          &quot;duration&quot;: 361.5
         }
       ]
     }
   ]
-}</code></pre>
+}
+</code></pre>
+<h3 id="104-cadeia-de-custódia-gestão">10.4 Cadeia de Custódia <span class="tag tag-gestao">Gestão</span></h3>
+<p>Para auditar uma execução e validar a integridade dos resultados:</p>
+<table>
+<thead>
+<tr>
+<th>Etapa de auditoria</th>
+<th>O que verificar</th>
+<th>Onde encontrar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1. Identificação</strong></td>
+<td>Máquina, data, operador</td>
+<td><code>_state.json</code> → <code>machine</code>, <code>createdAt</code></td>
+</tr>
+<tr>
+<td><strong>2. Escopo</strong></td>
+<td>Quais testes foram executados</td>
+<td><code>_state.json</code> → <code>runs[].tests[]</code></td>
+</tr>
+<tr>
+<td><strong>3. Resultados</strong></td>
+<td>PASS/FAIL de cada teste</td>
+<td><code>_relatorio.html</code> ou <code>_state.json</code></td>
+</tr>
+<tr>
+<td><strong>4. Evidências</strong></td>
+<td>Dados brutos que suportam o resultado</td>
+<td>Subpastas do cenário (CSVs, screenshots, logs)</td>
+</tr>
+<tr>
+<td><strong>5. Histórico</strong></td>
+<td>Re-execuções e tentativas anteriores</td>
+<td><code>_anterior/</code> e múltiplas entries em <code>runs[]</code></td>
+</tr>
+<tr>
+<td><strong>6. Ambiente</strong></td>
+<td>Configuração da máquina no momento do teste</td>
+<td><code>Traces/informacoes_maquina.csv</code> (gerado pelo setup 1) e <code>Resultados/&lt;cenário&gt;/maquina.csv</code> (gerado pelo hub)</td>
+</tr>
+</tbody>
+</table>
+</div>
 
-            <h3>8.4 Cadeia de Custodia <span class="tag tag-gestao">Gestao</span></h3>
-            <table>
-                <thead>
-                    <tr><th>Etapa de auditoria</th><th>O que verificar</th><th>Onde encontrar</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><strong>1. Identificacao</strong></td><td>Maquina, data, operador</td><td><code>_state.json</code> &rarr; machine, createdAt</td></tr>
-                    <tr><td><strong>2. Escopo</strong></td><td>Quais testes executados</td><td><code>_state.json</code> &rarr; runs[].tests[]</td></tr>
-                    <tr><td><strong>3. Resultados</strong></td><td>PASS/FAIL de cada teste</td><td><code>_relatorio.html</code> ou <code>_state.json</code></td></tr>
-                    <tr><td><strong>4. Evidencias</strong></td><td>Dados brutos do resultado</td><td>Subpastas do cenario (CSVs, screenshots)</td></tr>
-                    <tr><td><strong>5. Historico</strong></td><td>Re-execucoes e tentativas</td><td><code>_anterior/</code> e multiplas runs[]</td></tr>
-                    <tr><td><strong>6. Ambiente</strong></td><td>Configuracao da maquina</td><td>CSV de infos do PC (gerado pelo setup)</td></tr>
-                </tbody>
-            </table>
-        </div>
+<div class="section">
+<h2 id="11-formatos-de-relatório">11. Formatos de Relatório</h2>
+<h3 id="111-relatório-html">11.1 Relatório HTML</h3>
+<p>Relatório visual com tabela formatada, badges de status coloridos e resumo estatístico. Ideal para apresentação e compartilhamento. Há dois:</p>
+<ul>
+<li><strong><code>Traces/_relatorio.html</code> (consolidado do cenário):</strong> nome do cenário, máquina, datas de criação e da última execução, total de runs e estatísticas (PASS, FAIL, ERROR). Tabela com o último resultado de cada teste: nome, status, duração, run e pasta de evidências.</li>
+<li><strong><code>Logs/run_*.html</code> (uma execução):</strong> máquina, usuário, início e tempo total. Tabela com cada script da run: fase, nome, tipo, status, duração e número de evidências. Para os que não passaram, mostra as últimas linhas de erro.</li>
+</ul>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot de um relatório HTML real<br><em>Salvar como: img/placeholder-relatorio-html-exemplo.png</em></div>
+<h3 id="112-relatório-csv">11.2 Relatório CSV</h3>
+<p>Dados tabulares com uma linha por teste. Ideal para importação em Excel ou ferramentas de BI.</p>
+<p><strong>Colunas do <code>Logs/run_*.csv</code>:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Coluna</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Timestamp</td>
+<td>Data e hora da execução</td>
+</tr>
+<tr>
+<td>Kind</td>
+<td><code>setup</code> ou <code>test</code></td>
+</tr>
+<tr>
+<td>Name</td>
+<td>Nome do script</td>
+</tr>
+<tr>
+<td>Type</td>
+<td>Extensão, sem o ponto (<code>ps1</code> ou <code>py</code>)</td>
+</tr>
+<tr>
+<td>Status</td>
+<td><code>PASS</code>, <code>FAIL</code> ou <code>ERROR</code></td>
+</tr>
+<tr>
+<td>Duration_s</td>
+<td>Duração em segundos</td>
+</tr>
+<tr>
+<td>ExitCode</td>
+<td>Código de saída do processo</td>
+</tr>
+<tr>
+<td>TraceCount</td>
+<td>Quantidade de arquivos de evidência</td>
+</tr>
+<tr>
+<td>TraceDir</td>
+<td>Caminho da pasta de evidências</td>
+</tr>
+</tbody>
+</table>
+<p>O consolidado <code>Traces/_relatorio.csv</code> tem as colunas <code>Nome</code>, <code>Status</code>, <code>Duracao_s</code>, <code>Run</code>, <code>Reexecucao</code> e <code>Pasta</code>, com o último resultado de cada teste. Em <code>Resultados/&lt;cenário&gt;/</code>, o <code>cenario.csv</code> traz o mesmo status consolidado com o nome do cenário, o hostname e a data de cada run, e o <code>maquina.csv</code> traz o inventário da máquina.</p>
+<h3 id="113-relatório-json">11.3 Relatório JSON</h3>
+<p>Dados estruturados com metadados completos. Ideal para integração com APIs e sistemas de monitoramento.</p>
+<p><strong>Campos principais:</strong></p>
+<pre><code class="language-json">{
+  &quot;RunTimestamp&quot;: &quot;2026-04-15 09:00:00&quot;,
+  &quot;Host&quot;: &quot;DESKTOP-ABC&quot;,
+  &quot;TotalScripts&quot;: 4,
+  &quot;Pass&quot;: 3,
+  &quot;Fail&quot;: 1,
+  &quot;Error&quot;: 0,
+  &quot;TotalDuration&quot;: 5432.1,
+  &quot;Scripts&quot;: [ ... ]
+}
+</code></pre>
+<h3 id="114-qual-relatório-usar-gestão">11.4 Qual Relatório Usar <span class="tag tag-gestao">Gestão</span></h3>
+<table>
+<thead>
+<tr>
+<th>Necessidade</th>
+<th>Formato recomendado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Apresentar resultado a stakeholders</td>
+<td><strong>HTML</strong> (<code>_relatorio.html</code>)</td>
+</tr>
+<tr>
+<td>Alimentar planilha de acompanhamento</td>
+<td><strong>CSV</strong> (<code>_relatorio.csv</code>)</td>
+</tr>
+<tr>
+<td>Integrar com sistema de gestão de ativos</td>
+<td><strong>JSON</strong> (<code>_relatorio.json</code>)</td>
+</tr>
+<tr>
+<td>Alimentar BI com métricas de cada módulo</td>
+<td><strong>CSV</strong> (<code>Resultados/&lt;cenário&gt;/*.csv</code>)</td>
+</tr>
+<tr>
+<td>Investigar causa de falha</td>
+<td><strong>LOG</strong> (<code>Logs/run_*.log</code>)</td>
+</tr>
+<tr>
+<td>Auditoria de processo</td>
+<td><strong>JSON</strong> (<code>_state.json</code>) + evidências</td>
+</tr>
+</tbody>
+</table>
+</div>
 
-        <!-- 9. Relatorios -->
-        <div class="section" id="relatorios">
-            <h2>9. Formatos de Relatorio</h2>
+<div class="section">
+<h2 id="12-glossário">12. Glossário</h2>
+<table>
+<thead>
+<tr>
+<th>Termo</th>
+<th>Definição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Aferição</strong></td>
+<td>Uma medição individual dentro de um teste. Ex: cada uma das 5 medições de velocidade de rede</td>
+</tr>
+<tr>
+<td><strong>Autonomia projetada</strong></td>
+<td>Tempo que a bateria cheia duraria no ritmo de consumo medido numa fase: capacidade de carga cheia ÷ taxa média de descarga. É uma extrapolação linear, não uma descarga completa</td>
+</tr>
+<tr>
+<td><strong>Bateria (teste de disco)</strong></td>
+<td>Um ciclo completo de operações dentro de um teste. Ex: cada uma das 10 baterias de leitura/escrita do teste de disco</td>
+</tr>
+<tr>
+<td><strong>Bateria (Módulo 5)</strong></td>
+<td>O teste de consumo de energia na bateria do notebook (seção 8)</td>
+</tr>
+<tr>
+<td><strong>Cenário</strong></td>
+<td>Sessão de testes associada a uma máquina e data, agrupando runs e evidências</td>
+</tr>
+<tr>
+<td><strong>Cooldown</strong></td>
+<td>Período de espera entre ciclos de estresse para a CPU retornar ao estado ocioso</td>
+</tr>
+<tr>
+<td><strong>DiskSPD</strong></td>
+<td>Ferramenta de benchmarking de disco da Microsoft</td>
+</tr>
+<tr>
+<td><strong>Economia de energia</strong></td>
+<td>Recurso do Windows (antes "Economia de bateria") que reduz brilho e atividade em segundo plano; liga sozinho abaixo de um limite de carga. O teste o deixa desligado e sem acionamento automático</td>
+</tr>
+<tr>
+<td><strong>Evidência</strong></td>
+<td>Arquivo gerado por um teste que comprova o resultado (CSV, screenshot, log)</td>
+</tr>
+<tr>
+<td><strong>Exit Code</strong></td>
+<td>Código numérico retornado por um processo ao encerrar. <code>0</code> = sucesso, <code>≠ 0</code> = falha</td>
+</tr>
+<tr>
+<td><strong>Fase de escritório</strong></td>
+<td>Fase de 60 min do teste de bateria com a simulação de uso do Módulo 1 (documento, planilha e PDF no Edge), contínua</td>
+</tr>
+<tr>
+<td><strong>Fase ociosa</strong></td>
+<td>Fase de 60 min do teste de bateria com a tela ligada, sem aplicativos abertos pelo teste e sem entrada simulada; mede o consumo de fundo</td>
+</tr>
+<tr>
+<td><strong>Hub</strong></td>
+<td>O orquestrador (<code>hub.ps1</code>) que gerencia a execução dos testes</td>
+</tr>
+<tr>
+<td><strong>Jitter</strong></td>
+<td>Variação na latência de rede entre pacotes consecutivos</td>
+</tr>
+<tr>
+<td><strong>Modo de energia</strong></td>
+<td>Ajuste do Windows sobre o plano de energia (Melhor eficiência energética, Equilibrado, Melhor desempenho), configurado separadamente para a bateria</td>
+</tr>
+<tr>
+<td><strong>mWh</strong></td>
+<td>Miliwatt-hora: unidade da energia restante informada pela bateria; medida principal do teste de bateria</td>
+</tr>
+<tr>
+<td><strong>Overlay</strong></td>
+<td>Janela visual transparente exibida sobre a área de trabalho durante a execução de um teste</td>
+</tr>
+<tr>
+<td><strong>Ping</strong></td>
+<td>Tempo de ida e volta de um pacote de rede (latência)</td>
+</tr>
+<tr>
+<td><strong>Pré-voo</strong></td>
+<td>Etapa inicial do teste de bateria, na tomada: confere e ajusta o padrão da máquina e registra o antes/depois em <code>bateria_preflight.csv</code></td>
+</tr>
+<tr>
+<td><strong>Run</strong></td>
+<td>Uma execução do hub (uma sessão de testes). Um cenário pode ter múltiplas runs</td>
+</tr>
+<tr>
+<td><strong>Setup</strong></td>
+<td>Fase de preparação do ambiente (instalação de dependências e configurações)</td>
+</tr>
+<tr>
+<td><strong>State</strong></td>
+<td>Arquivo <code>_state.json</code> que rastreia o estado de um cenário</td>
+</tr>
+<tr>
+<td><strong>Throttling</strong></td>
+<td>Redução automática de desempenho do processador por superaquecimento</td>
+</tr>
+<tr>
+<td><strong>Throughput</strong></td>
+<td>Quantidade de dados transferidos por unidade de tempo (MB/s ou Mbps)</td>
+</tr>
+<tr>
+<td><strong>Trace</strong></td>
+<td>Conjunto de evidências de uma execução</td>
+</tr>
+<tr>
+<td><strong>WPA</strong></td>
+<td>Windows Performance Analyzer — ferramenta de análise de desempenho do Windows</td>
+</tr>
+</tbody>
+</table>
+</div>
 
-            <h3>9.1 Relatorio HTML</h3>
-            <p>Relatorio visual com tabela formatada, badges de status coloridos e resumo estatistico. Conteudo:</p>
-            <ul>
-                <li>Cabecalho com nome do cenario, maquina e data</li>
-                <li>Resumo: total de testes, PASS, FAIL, ERR</li>
-                <li>Tabela por teste: nome, status (badge), duracao, evidencias</li>
-                <li>Para testes FAIL: snippet das ultimas linhas de erro</li>
-            </ul>
+<div style="text-align: center; padding: 24px; color: var(--cinza-neutro); font-size: 12px;">
+<p>Hardware Test Hub &mdash; Metodologia de Testes v1.1 &mdash; Novembro de 2026</p>
+<p style="margin-top: 8px;">Gerado a partir de <code>docs/metodologia-de-testes.md</code>.</p>
+</div>
 
-            <div class="img-placeholder">
-                <span class="icon">&#128202;</span>
-                <strong>Insira aqui:</strong> screenshot de um relatorio HTML real<br>
-                <em>Salvar como: img/placeholder-relatorio-html-exemplo.png</em>
-            </div>
-
-            <h3>9.2 Relatorio CSV</h3>
-            <table>
-                <thead>
-                    <tr><th>Coluna</th><th>Descricao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Timestamp</td><td>Data e hora da execucao</td></tr>
-                    <tr><td>Kind</td><td><code>setup</code> ou <code>test</code></td></tr>
-                    <tr><td>Name</td><td>Nome do script</td></tr>
-                    <tr><td>Type</td><td>Extensao (<code>.ps1</code> ou <code>.py</code>)</td></tr>
-                    <tr><td>Status</td><td>PASS, FAIL ou ERR</td></tr>
-                    <tr><td>Duration_s</td><td>Duracao em segundos</td></tr>
-                    <tr><td>ExitCode</td><td>Codigo de saida do processo</td></tr>
-                    <tr><td>TraceCount</td><td>Quantidade de evidencias</td></tr>
-                    <tr><td>TraceDir</td><td>Caminho da pasta de evidencias</td></tr>
-                </tbody>
-            </table>
-
-            <h3>9.3 Relatorio JSON</h3>
-            <pre><code>{
-  "RunTimestamp": "2026-04-15 09:00:00",
-  "Host": "DESKTOP-ABC",
-  "TotalScripts": 4,
-  "Pass": 3,
-  "Fail": 1,
-  "Error": 0,
-  "TotalDuration": 5432.1,
-  "Scripts": [ ... ]
-}</code></pre>
-
-            <h3>9.4 Qual Relatorio Usar <span class="tag tag-gestao">Gestao</span></h3>
-            <table>
-                <thead>
-                    <tr><th>Necessidade</th><th>Formato recomendado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Apresentar resultado a stakeholders</td><td><strong>HTML</strong> (<code>_relatorio.html</code>)</td></tr>
-                    <tr><td>Alimentar planilha de acompanhamento</td><td><strong>CSV</strong> (<code>_relatorio.csv</code>)</td></tr>
-                    <tr><td>Integrar com sistema de gestao de ativos</td><td><strong>JSON</strong> (<code>_relatorio.json</code>)</td></tr>
-                    <tr><td>Investigar causa de falha</td><td><strong>LOG</strong> (<code>Logs/run_*.log</code>)</td></tr>
-                    <tr><td>Auditoria de processo</td><td><strong>JSON</strong> (<code>_state.json</code>) + evidencias</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- 10. Glossario -->
-        <div class="section" id="glossario">
-            <h2>10. Glossario</h2>
-            <table>
-                <thead>
-                    <tr><th>Termo</th><th>Definicao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><strong>Afericao</strong></td><td>Uma medicao individual dentro de um teste (ex: cada uma das 5 medicoes de velocidade de rede)</td></tr>
-                    <tr><td><strong>Bateria</strong></td><td>Um ciclo completo de operacoes dentro de um teste (ex: cada uma das 10 baterias de leitura/escrita)</td></tr>
-                    <tr><td><strong>Cenario</strong></td><td>Sessao de testes associada a uma maquina e data, agrupando runs e evidencias</td></tr>
-                    <tr><td><strong>Cooldown</strong></td><td>Periodo de espera entre ciclos de estresse para a CPU retornar ao estado ocioso</td></tr>
-                    <tr><td><strong>DiskSPD</strong></td><td>Ferramenta de benchmarking de disco da Microsoft</td></tr>
-                    <tr><td><strong>Evidencia</strong></td><td>Arquivo gerado por um teste que comprova o resultado (CSV, screenshot, log)</td></tr>
-                    <tr><td><strong>Exit Code</strong></td><td>Codigo numerico retornado por um processo. <code>0</code> = sucesso, <code>&ne; 0</code> = falha</td></tr>
-                    <tr><td><strong>Hub</strong></td><td>O orquestrador (<code>hub.ps1</code>) que gerencia a execucao dos testes</td></tr>
-                    <tr><td><strong>Jitter</strong></td><td>Variacao na latencia de rede entre pacotes consecutivos</td></tr>
-                    <tr><td><strong>Overlay</strong></td><td>Janela visual transparente exibida durante a execucao de um teste</td></tr>
-                    <tr><td><strong>Ping</strong></td><td>Tempo de ida e volta de um pacote de rede (latencia)</td></tr>
-                    <tr><td><strong>Run</strong></td><td>Uma execucao do hub. Um cenario pode ter multiplas runs</td></tr>
-                    <tr><td><strong>Setup</strong></td><td>Fase de preparacao do ambiente (instalacao e configuracoes)</td></tr>
-                    <tr><td><strong>State</strong></td><td>Arquivo <code>_state.json</code> que rastreia o estado de um cenario</td></tr>
-                    <tr><td><strong>Throttling</strong></td><td>Reducao automatica de desempenho do processador por superaquecimento</td></tr>
-                    <tr><td><strong>Throughput</strong></td><td>Quantidade de dados transferidos por unidade de tempo (MB/s ou Mbps)</td></tr>
-                    <tr><td><strong>Trace</strong></td><td>Conjunto de evidencias de uma execucao</td></tr>
-                    <tr><td><strong>WPA</strong></td><td>Windows Performance Analyzer &mdash; ferramenta de analise de desempenho do Windows</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Footer -->
-        <div style="text-align: center; padding: 24px; color: var(--cinza-neutro); font-size: 12px;">
-            <p><strong>Nota sobre imagens:</strong> Os placeholders devem ser substituidos por screenshots reais. Crie a pasta <code>docs/img/</code> e salve as imagens com os nomes indicados.</p>
-            <p style="margin-top: 12px;">Hardware Test Hub &mdash; Metodologia de Testes v1.0 &mdash; Abril 2026</p>
-        </div>
-
-    </div>
+</div>
 </body>
 </html>

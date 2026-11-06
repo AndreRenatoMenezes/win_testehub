@@ -84,6 +84,27 @@ Scripts `.ps1` rodam com `-NonInteractive`, e a saída de todos é capturada par
 - [ ] CSV temático registrado em `Copy-ThematicCSVs` (se houver)
 - [ ] Dependências Python novas adicionadas a `Setup/environment/5_install_py_dependencies.ps1`
 - [ ] Seção nova em `docs/metodologia-de-testes.md` (objetivo, procedimento, métricas e critério de aprovação) e passo a passo no `docs/manual-de-execucao.md`
+- [ ] HTML da documentação regenerado com `python docs/gerar_html.py`
+
+## Documentação
+
+Os `.md` de `docs/` são a fonte única. Os `.html` são gerados a partir deles pelo `docs/gerar_html.py`, com o estilo de `docs/assets/estilo.css`, e **não devem ser editados à mão**:
+
+```bash
+pip install markdown
+python docs/gerar_html.py          # regenera os HTML
+python docs/gerar_html.py --check  # o mesmo teste que o CI roda
+```
+
+Para destacar um texto, use as convenções que o gerador converte nos componentes visuais:
+
+| No Markdown | No HTML |
+|-------------|---------|
+| `> **Importante:** ...` ou `> **Atenção:** ...` | Caixa de alerta (amarela) |
+| `> **Nota:** ...` ou `> **Dica:** ...` | Caixa informativa (azul) |
+| `> ![Legenda](img/placeholder-x.png)` + `> *Insira aqui: ...*` | Espaço reservado para screenshot |
+| `` `[Técnico]` `` / `` `[Gestão]` `` num título | Etiqueta de público |
+| `**PASS**` / `**FAIL**` numa célula de tabela | Selo verde ou vermelho |
 
 ## Dados sensíveis
 

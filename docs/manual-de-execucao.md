@@ -1,7 +1,7 @@
 # Manual de Execução — Hardware Test Hub
 
-**Versão:** 1.0  
-**Data:** 2026-04-15  
+**Versão:** 1.1  
+**Data:** 2026-11-06  
 **Público-alvo:** Operadores de campo, equipe técnica, gestores
 
 ---
@@ -65,10 +65,11 @@ C:\TesteHub\
 ├── hub.bat              # Ponto de entrada
 ├── hub.ps1              # Orquestrador principal
 ├── config.json          # Configurações
-├── Setup\environment\   # Scripts de setup (9 scripts)
-├── Testes\              # Módulos de teste (5 categorias)
-├── Logs\                # Resultados por execução
-└── Traces\              # Evidências por cenário
+├── config.local.json    # Valores internos, como a URL do speedtest (não versionado)
+├── Setup\environment\   # Scripts de setup (10 scripts)
+├── Testes\              # Módulos de teste (6 módulos + 2 variantes DLP/USB)
+├── Execucoes\           # Logs, evidências e estado de cada cenário (criada pelo hub)
+└── Resultados\          # CSVs estruturados de cada cenário (criada pelo hub)
 ```
 
 > **Importante:** O hub espera estar em `C:\TesteHub`. Caso utilize outro caminho, ajuste a referência no `hub.bat`.
@@ -80,6 +81,8 @@ C:\TesteHub\
 ### 3.1 Copiar o Repositório
 
 Copie toda a pasta do projeto para `C:\TesteHub` na máquina de teste.
+
+Confira se a cópia inclui os arquivos internos que **não estão no repositório do GitHub**: o `config.local.json` (URL do speedtest interno) e os perfis `Agentes_SI_Profile.wpaProfile` (em `Testes\1_cpu_memo\`) e `Agentes_SI_Bateria_Profile.wpaProfile` (em `Testes\5_bateria\`). Sem os perfis, os módulos 1 e 5 rodam, mas pulam a exportação CSV dos traces.
 
 ### 3.2 Primeira Execução
 
@@ -95,18 +98,20 @@ Copie toda a pasta do projeto para `C:\TesteHub` na máquina de teste.
 
 Na primeira execução, a **Fase de Setup** será apresentada automaticamente. Ela prepara o ambiente da máquina:
 
-| # | Script | O que faz |
-|---|--------|-----------|
-| 1 | `captura_infos_pc` | Coleta informações do sistema (CPU, RAM, disco, bateria, SO) |
-| 2 | `opcoes_energia` | Configura plano de energia (evita suspensão durante testes) |
-| 3 | `softwares_msStore` | Instala aplicativos da Microsoft Store |
-| 4 | `install_python` | Instala o Python 3 |
-| 5 | `install_py_dependencies` | Cria ambiente virtual e instala pacotes Python |
-| 6 | `pausa_WinUpdate` | Pausa o Windows Update (evita interferência nos testes) |
-| 7 | `enable_diagnostics` | Habilita diagnósticos de performance do Windows |
-| 8 | `AdicionarTecladoUSInt` | Adiciona layout de teclado US International |
+| Script | O que faz |
+|--------|-----------|
+| `1_captura_infos_pc` | Coleta informações do sistema (CPU, RAM, disco, bateria, SO) |
+| `2_opcoes_energia` | Configura o plano de energia (evita suspensão durante os testes) |
+| `3_softwares_msStore` | Instala via winget o Windows ADK, o CrystalDiskMark e o CrystalDiskInfo |
+| `4_install_python` | Instala o Python 3.12 |
+| `5_install_py_dependencies` | Cria o ambiente virtual e instala os pacotes Python |
+| `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias (evita interferência nos testes) |
+| `8_enable_diagnostics` | Habilita os diagnósticos de boot/shutdown do Windows |
+| `9_AdicionarTecladoUSInt` | Adiciona o layout de teclado EUA-Internacional |
+| `12_remover_appx_bloatware` | Remove aplicativos pré-instalados (Xbox, Copilot, Teams, Notícias e outros) |
+| `13_remover_onedrive` | Desinstala o OneDrive e bloqueia a reinstalação |
 
-**Recomendação:** Na primeira execução, selecione **todos** os scripts de setup (tecla `A`). Em execuções subsequentes, o setup pode ser ignorado (veja seção 5).
+**Recomendação:** Na primeira execução, selecione **todos** os scripts de setup (tecla `A`). Em execuções subsequentes, o setup pode ser ignorado (veja a seção 3.4).
 
 > ![Menu de Setup](img/placeholder-menu-setup.png)  
 > *Insira aqui: screenshot do menu checkbox da Fase de Setup*
@@ -129,10 +134,11 @@ Isso faz o hub pular direto para a Fase de Testes nas próximas execuções.
 
 ### 4.1 Selecionar ou Criar um Cenário
 
-Ao iniciar, o hub exibe os últimos 5 cenários existentes (se houver) e oferece duas opções:
+Ao iniciar, o hub exibe os 5 cenários mais recentes (se houver) e oferece três opções:
 
 - **`[N]`** — Criar um novo cenário (será solicitado um nome, ex: `ImagemLimpa`)
 - **`[1-5]`** — Continuar um cenário existente
+- **`[E]`** — Exportar um cenário para ZIP: o hub compacta a pasta do cenário, confere se o ZIP tem o mesmo número de arquivos e só então remove a pasta original. Ao final de cada execução, o hub também pergunta se deseja exportar o cenário.
 
 O nome do cenário é combinado com o hostname e a data, resultando em algo como: `ImagemLimpa_DESKTOP-ABC_2026-04-15`
 
@@ -141,32 +147,36 @@ O nome do cenário é combinado com o hostname e a data, resultando em algo como
 
 ### 4.2 Navegar o Menu de Testes
 
-Após selecionar o cenário, o menu de testes é exibido. Os testes são organizados por categoria:
+Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupados pelo nome da pasta, sem o prefixo numérico, e os que nunca rodaram no cenário (**pendentes**) já vêm marcados:
 
 ```
--- CPU & Memoria --
-[ ] 1_automacao_performance.py    [PY]  pendente
--- Disco --
-[ ] 2_teste_disco.py              [PY]  pendente
--- Rede --
-[ ] 3_teste_rede.py               [PY]  pendente
--- Rede Internet --
-[ ] 3-1_teste_rede_internet.py    [PY]  pendente
--- Boot & Shutdown --
-[ ] 4_boot_shutdown_auto.py       [PY]  pendente
--- Bateria --
-[ ] 5_teste_bateria.py            [PY]  pendente
--- Wifi Fast Transition --
-[ ] 6_teste_fast_transition.py    [PY]  pendente
+-- Cpu Memo --------------------------------
+[X] 1_automacao_performance        [PY]   pendente
+[X] 1-1_automacao_performance_dlp  [PY]   pendente
+-- Disco -----------------------------------
+[X] 2_teste_disco                  [PY]   pendente
+[X] 2-1_teste_disco_dlp            [PY]   pendente
+-- Rede ------------------------------------
+[X] 3_teste_rede                   [PY]   pendente
+-- Rede Internet ---------------------------
+[X] 3-1_teste_rede_internet        [PY]   pendente
+-- Boot Shutdown ---------------------------
+[X] 4_boot_shutdown_auto           [PY]   pendente
+-- Bateria ---------------------------------
+[X] 5_teste_bateria                [PY]   pendente
+-- Wifi Fast Transition --------------------
+[X] 6_teste_fast_transition        [PY]   pendente
 ```
 
-Se o cenário já tem execuções anteriores, o status é mostrado:
+Desmarque com `Espaço` o que não for executar agora. Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), e as variantes DLP/USB (`1-1` e `2-1`) só fazem sentido com um pendrive em `E:\`.
+
+Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:
 
 ```
-[X] 1_automacao_performance.py    [PY]  PASS (361.5s)
-[ ] 2_teste_disco.py              [PY]  FAIL
-[ ] 3_teste_rede.py               [PY]  pendente
-[ ] 3-1_teste_rede_internet.py    [PY]  pendente
+[ ] 1_automacao_performance        [PY]   PASS  (361.5s)
+[ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
+[X] 3_teste_rede                   [PY]   pendente
+[X] 3-1_teste_rede_internet        [PY]   pendente
 ```
 
 > ![Menu de Testes](img/placeholder-menu-testes.png)  
@@ -179,11 +189,11 @@ Se o cenário já tem execuções anteriores, o status é mostrado:
 | `↑` `↓` | Navegar entre os itens |
 | `Espaço` | Marcar/desmarcar o item atual |
 | `A` | Selecionar/desselecionar **todos** |
-| `P` | Selecionar apenas os **pendentes** (não aprovados) |
+| `P` | Selecionar apenas os **pendentes** (nunca executados no cenário) |
 | `Enter` | Confirmar seleção e iniciar execução |
 | `Esc` | Cancelar e sair |
 
-**Dica:** Use `P` para re-executar rapidamente apenas os testes que falharam ou ainda não foram executados.
+**Dica:** `P` não marca os testes que falharam. Para reexecutar um FAIL, marque-o com `Espaço`.
 
 ### 4.4 Acompanhar a Execução
 
@@ -206,7 +216,7 @@ Ao final de cada teste, o resultado é exibido:
 | **FAIL** (vermelho) | Teste falhou (exit code diferente de 0) |
 | **ERR** (amarelo) | Erro inesperado na execução |
 
-Ao final de todos os testes, um resumo geral é apresentado com contagem de PASS/FAIL/ERR.
+Ao final de todos os testes, um resumo geral é apresentado com contagem de PASS/FAIL/ERROR.
 
 > ![Resultados Finais](img/placeholder-resultados-finais.png)  
 > *Insira aqui: screenshot do resumo final no console*
@@ -303,7 +313,7 @@ Ao fim, o painel mostra PASS/FAIL e abre o relatório `6_wifi_fast_transition/wi
 
 ### 5.1 O que é um Cenário
 
-Um **cenário** é uma sessão de testes associada a uma máquina e data. Ele agrupa todas as execuções (runs) e suas evidências em uma única pasta dentro de `Traces/`. Isso permite:
+Um **cenário** é uma sessão de testes associada a uma máquina e data. Ele agrupa todas as execuções (runs) e suas evidências em uma única pasta dentro de `Execucoes/`, com os resultados estruturados numa pasta de mesmo nome em `Resultados/`. Isso permite:
 
 - Executar testes em diferentes momentos (dias) e consolidar resultados
 - Re-executar apenas os testes que falharam
@@ -311,36 +321,49 @@ Um **cenário** é uma sessão de testes associada a uma máquina e data. Ele ag
 
 ### 5.2 Continuar um Cenário Existente
 
-Ao iniciar o hub, selecione o número do cenário que deseja continuar. O menu de testes mostrará o status da última execução de cada teste, permitindo selecionar apenas os pendentes ou falhos.
+Ao iniciar o hub, selecione o número do cenário que deseja continuar. O menu de testes mostrará o status da última execução de cada teste; os pendentes já vêm marcados, e os que falharam podem ser marcados com `Espaço`.
 
 ### 5.3 Re-execução de Testes
 
 Ao re-executar um teste que já foi rodado anteriormente:
 
-1. As evidências da execução anterior são **automaticamente movidas** para a pasta `_anterior/` dentro do cenário
+1. As evidências da execução anterior são **automaticamente movidas** para a subpasta `_anterior/` dentro da pasta do teste (ex.: `Traces/2_disco/_anterior/run1_<data-hora>/`)
 2. O teste roda novamente e gera novas evidências
 3. O `_state.json` é atualizado com a nova run
 
 **Nenhuma evidência é perdida.** O histórico completo fica preservado em `_anterior/`.
 
+> **Nota:** a pasta de evidências é a da categoria, compartilhada pelos scripts da mesma pasta. Reexecutar o `1_automacao_performance` também move para `_anterior/` as evidências atuais do `1-1_automacao_performance_dlp`, e vice-versa. Nada se perde, mas as evidências "atuais" passam a ser só as do teste reexecutado.
+
 ### 5.4 Estrutura de um Cenário `[Técnico]`
 
 ```
-Traces/
+Execucoes/
+└── ImagemLimpa_DESKTOP-ABC_2026-04-15/      # {cenário}_{hostname}_{data}
+    ├── Logs/
+    │   ├── run_20260415_093000.log          # Saída completa de cada script
+    │   └── run_20260415_093000.{html,csv,json}
+    └── Traces/
+        ├── _state.json                      # Estado e histórico de todas as runs
+        ├── _relatorio.{html,csv,json}       # Relatório consolidado
+        ├── informacoes_maquina.csv          # Inventário gerado pelo setup 1
+        ├── 1_cpu_memo/                      # Evidências do Módulo 1
+        │   └── dlp_usb/                     # Evidências da variante 1-1
+        ├── 2_disco/                         # Evidências do Módulo 2 e da variante 2-1
+        ├── 3_rede/
+        ├── 3_rede_internet/
+        ├── 4_boot_shutdown/
+        ├── 5_bateria/                       # Pré-voo, amostras, traces, bateria.csv
+        ├── 6_wifi_fast_transition/
+        └── <pasta do teste>/_anterior/      # Evidências de execuções anteriores
+            ├── run1_2026-04-15T09-30-00/
+            └── run2_2026-04-15T14-00-00/
+
+Resultados/
 └── ImagemLimpa_DESKTOP-ABC_2026-04-15/
-    ├── _state.json              # Estado e histórico de todas as runs
-    ├── _relatorio.html          # Relatório consolidado
-    ├── _relatorio.csv
-    ├── _relatorio.json
-    ├── 1_cpu_memo/              # Evidências atuais do teste de CPU
-    ├── 2_disco/                 # Evidências atuais do teste de disco
-    ├── 3_rede/                  # Evidências atuais do teste de rede
-    ├── 3_rede_internet/         # Evidências atuais do teste de rede na internet
-    ├── 4_boot_shutdown/         # Evidências atuais do teste de boot
-    ├── 5_bateria/               # Evidências atuais do teste de bateria (pré-voo, amostras, traces, bateria.csv)
-    └── _anterior/               # Evidências de execuções anteriores
-        ├── run1_2026-04-15 09-30-00/
-        └── run2_2026-04-15 14-00-00/
+    ├── maquina.csv                          # Modelo, série, CPU, RAM, disco, SO
+    ├── cenario.csv                          # Status consolidado de cada teste
+    └── cpu_memoria.csv, disco.csv, ...      # CSVs temáticos de cada módulo
 ```
 
 ---
@@ -351,8 +374,9 @@ Traces/
 
 | Local | Conteúdo | Quando usar |
 |-------|----------|-------------|
-| `Logs/` | Resultados **por execução** (run) | Consultar uma execução específica |
-| `Traces/{cenário}/` | Evidências e relatório **consolidado** do cenário | Visão completa de um ciclo de testes |
+| `Execucoes/{cenário}/Logs/` | Resultados **por execução** (run) | Consultar uma execução específica |
+| `Execucoes/{cenário}/Traces/` | Evidências e relatório **consolidado** do cenário | Visão completa de um ciclo de testes |
+| `Resultados/{cenário}/` | Inventário da máquina, status do cenário e CSVs temáticos de cada módulo (`cpu_memoria.csv`, `disco.csv`, `rede.csv`, `rede_internet.csv`, `boot_shutdown.csv`, `bateria.csv`, `wifi_ft.csv` e, quando executadas, `cpu_memoria_dlp.csv` e `disco_usb.csv`) | Planilhas e BI |
 
 ### 6.2 Formatos Disponíveis
 
@@ -365,11 +389,10 @@ Traces/
 
 ### 6.3 Interpretar o Relatório HTML
 
-O relatório HTML (`_relatorio.html`) contém:
+Há dois relatórios HTML:
 
-- **Cabeçalho:** Nome do cenário, máquina, data, estatísticas gerais (total de testes, PASS, FAIL)
-- **Tabela de resultados:** Cada teste com status colorido, duração, número de evidências
-- **Detalhes de erro:** Para testes FAIL, as últimas linhas de erro são exibidas expandidas
+- **`_relatorio.html` (consolidado do cenário):** nome do cenário, máquina, datas de criação e da última execução, total de runs e estatísticas (PASS, FAIL, ERROR). A tabela traz o **último resultado** de cada teste, com status colorido, duração, run em que foi obtido e pasta de evidências.
+- **`run_*.html` (uma execução):** máquina, usuário, início e tempo total. A tabela traz cada script executado naquela run, com fase (setup/teste), status, duração e número de evidências. Para testes que não passaram, mostra logo abaixo as últimas linhas de erro.
 
 > ![Relatório HTML](img/placeholder-relatorio-html.png)  
 > *Insira aqui: screenshot do relatório HTML aberto no navegador*
@@ -394,6 +417,8 @@ O relatório HTML (`_relatorio.html`) contém:
 | Hub não inicia / fecha imediatamente | Falta de privilégio de admin | Execute `hub.bat` como Administrador (clique direito → Executar como administrador) |
 | "Python não encontrado" | Python não instalado ou `.venv` ausente | Re-execute o setup selecionando scripts 4 e 5 |
 | Teste de rede falha com "Edge não encontrado" | Microsoft Edge ausente/removido da máquina | O Edge é nativo do Windows 10/11 — reinstale/repare o Microsoft Edge pelo site oficial da Microsoft |
+| Teste de rede falha com "URL do speedtest interno não configurada" | `config.local.json` ausente ou sem a chave `SpeedtestUrl` | Crie o `config.local.json` a partir do `config.local.example.json` (veja a seção 7.3) |
+| Teste de rede falha com "Falha ao iniciar o Microsoft Edge via Selenium" | O Selenium Manager não conseguiu baixar o `msedgedriver` | Verifique o acesso da máquina ao CDN de drivers do Edge, ou coloque um `msedgedriver.exe` compatível no `PATH` |
 | Teste de rede internet falha com "site inacessível ou bloqueado" | Política do agente zero trust/proxy bloqueando o fast.com (ou a categoria speedtest), ou máquina sem acesso à internet | Libere `fast.com`, `api.fast.com` e `*.oca.nflxvideo.net` na política; confira a tela capturada em `Evidencia_Internet_Bloqueio_*.png` e o log `teste_rede_internet_*.log` |
 | Teste de rede internet com menos de 5 aferições válidas | Rede instável ou medição sem concluir em 120 s | Verifique a conexão e o log; os valores ausentes aparecem como `N/A` em `resultado_afericoes_internet.csv` |
 | Teste de disco falha rapidamente | Espaço insuficiente em disco | Libere pelo menos 10 GB no disco principal |
@@ -405,7 +430,7 @@ O relatório HTML (`_relatorio.html`) contém:
 | Wi-Fi FT: trocas "Indeterminado" | O driver não informa a AKM no `netsh wlan show interfaces` | Atualize o driver; a evidência bruta fica em `brutos/netsh_interfaces*.txt` |
 | Wi-Fi FT: painel não abriu | Edge bloqueado por política | Abra no navegador a URL "Painel ao vivo" registrada no log `teste_wifi_ft_*.log`; o teste roda mesmo sem o painel |
 | Wi-Fi FT: métricas de internet `N/A` | Ping para `8.8.8.8` bloqueado pelo firewall | Esperado em redes corporativas; não reprova |
-| Teste de boot/shutdown não completa os 5 ciclos | Task Scheduler falhou ou máquina não reiniciou | Verifique se a tarefa agendada `BootShutdownTest` existe no Agendador de Tarefas |
+| Teste de boot/shutdown não completa os 5 ciclos | Task Scheduler falhou ou máquina não reiniciou | Verifique se a tarefa agendada `HardwareTestHub_Reiniciador` existe no Agendador de Tarefas |
 | Bateria: "Este teste exige um notebook com bateria reconhecida pelo Windows" | Desktop ou bateria não reconhecida | O teste só roda em notebook; confira a bateria no Gerenciador de Dispositivos. Nada foi alterado na máquina |
 | Bateria: "Carga da bateria em X%; o mínimo para iniciar é 95%" | Bateria não carregada ou limite de carga do fabricante ativo | Carregue a bateria na tomada; desative o limite de carga do fabricante (app ou BIOS) e execute de novo |
 | Bateria: "Ferramentas de captura não encontradas no PATH" | Windows Performance Toolkit ausente | Instale o WPT (o mesmo do Módulo 1) e inclua a pasta dele no PATH |
@@ -435,7 +460,7 @@ O hub injeta as seguintes variáveis de ambiente para cada teste:
 |----------|-----------|
 | `HUB_EVIDENCE_DIR` | Pasta onde o teste deve salvar suas evidências |
 | `HUB_TRACE_DIR` | Igual a `HUB_EVIDENCE_DIR` |
-| `HUB_TRACE_ROOT` | Pasta raiz do cenário atual |
+| `HUB_TRACE_ROOT` | Pasta `Traces` do cenário atual |
 
 Configurações em `config.json`:
 
@@ -445,9 +470,8 @@ Configurações em `config.json`:
     "Paths": {
         "SetupRoot": "Setup",
         "TestsRoot": "Testes",
-        "LogDir": "Logs",
-        "ResultsDir": "Logs",
-        "TracesDir": "Traces"
+        "ResultadosDir": "Resultados",
+        "ExecucoesDir": "Execucoes"
     },
     "Settings": {
         "PythonVenvName": ".venv",
@@ -455,6 +479,12 @@ Configurações em `config.json`:
     }
 }
 ```
+
+Valores internos ficam em `config.local.json`, na raiz do hub. Esse arquivo não vai para o repositório; o modelo é o `config.local.example.json`:
+
+| Chave | Variável de ambiente equivalente | Uso |
+|-------|----------------------------------|-----|
+| `SpeedtestUrl` | `HUB_SPEEDTEST_URL` (tem prioridade) | URL do speedtest interno do Módulo 3 |
 
 ---
 

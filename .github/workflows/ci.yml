@@ -69,14 +69,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instala Ruff
-        run: pip install ruff==0.17.4
+      - name: Instala ferramentas
+        run: pip install ruff==0.17.4 markdown==3.11.3
 
       - name: Ruff (erros de sintaxe e nomes indefinidos)
-        run: ruff check --select E9,F63,F7,F82 --target-version py312 --output-format github Testes/
+        run: ruff check --select E9,F63,F7,F82 --target-version py312 --output-format github Testes/ docs/
 
       - name: Compila todos os scripts
-        run: python -m compileall -q Testes/
+        run: python -m compileall -q Testes/ docs/
+
+      - name: HTML da documentação em sincronia com o Markdown
+        run: python docs/gerar_html.py --check
 
   powershell:
     name: PowerShell

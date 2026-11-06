@@ -1,820 +1,1211 @@
 <!DOCTYPE html>
+<!-- Gerado a partir de manual-de-execucao.md por docs/gerar_html.py. Não edite à mão. -->
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manual de Execucao - Hardware Test Hub</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --verde-tech: #1EBD53;
-            --verde-tech-light: #e8f9ee;
-            --verde-tech-dark: #17943f;
-            --grafite: #1A1C1E;
-            --cinza-neutro: #687076;
-            --branco: #FFFFFF;
-            --cinza-gelo: #F4F6F8;
-            --vermelho: #E53E3E;
-            --vermelho-light: #FEF2F2;
-            --amarelo: #D69E2E;
-            --amarelo-light: #FEFCE8;
-            --azul: #3182CE;
-            --azul-light: #EBF8FF;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de Execução - Hardware Test Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* Estilo dos documentos HTML gerados por docs/gerar_html.py.
+   Extraido dos HTML originais do Hardware Test Hub. */
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+:root {
+    --verde-tech: #1EBD53;
+    --verde-tech-light: #e8f9ee;
+    --verde-tech-dark: #17943f;
+    --grafite: #1A1C1E;
+    --cinza-neutro: #687076;
+    --branco: #FFFFFF;
+    --cinza-gelo: #F4F6F8;
+    --vermelho: #E53E3E;
+    --vermelho-light: #FEF2F2;
+    --amarelo: #D69E2E;
+    --amarelo-light: #FEFCE8;
+    --azul: #3182CE;
+    --azul-light: #EBF8FF;
+}
 
-        body {
-            font-family: 'Inter', sans-serif;
-            font-weight: 400;
-            font-size: 15px;
-            line-height: 1.7;
-            color: var(--grafite);
-            background-color: var(--cinza-gelo);
-        }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-        .container {
-            max-width: 960px;
-            margin: 0 auto;
-            padding: 40px 24px;
-        }
+body {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--grafite);
+    background-color: var(--cinza-gelo);
+}
 
-        /* Header */
-        .doc-header {
-            background: var(--branco);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            padding: 40px;
-            margin-bottom: 32px;
-            border-left: 4px solid var(--verde-tech);
-        }
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+}
 
-        .doc-header h1 {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 700;
-            font-size: 28px;
-            color: var(--grafite);
-            margin-bottom: 8px;
-        }
+/* Header */
+.doc-header {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 40px;
+    margin-bottom: 32px;
+    border-left: 4px solid var(--verde-tech);
+}
 
-        .doc-header .subtitle {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 16px;
-            color: var(--verde-tech);
-            margin-bottom: 16px;
-        }
+.doc-header h1 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    color: var(--grafite);
+    margin-bottom: 8px;
+}
 
-        .doc-meta {
-            display: flex;
-            gap: 24px;
-            flex-wrap: wrap;
-            font-size: 13px;
-            color: var(--cinza-neutro);
-        }
+.doc-header .subtitle {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--verde-tech);
+    margin-bottom: 16px;
+}
 
-        .doc-meta span {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+.doc-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--cinza-neutro);
+}
 
-        /* TOC */
-        .toc {
-            background: var(--branco);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            padding: 32px 40px;
-            margin-bottom: 32px;
-        }
+.doc-meta span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
 
-        .toc h2 {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 18px;
-            color: var(--grafite);
-            margin-bottom: 16px;
-        }
+/* TOC */
+.toc {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 32px 40px;
+    margin-bottom: 32px;
+}
 
-        .toc ol {
-            padding-left: 20px;
-        }
+.toc h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--grafite);
+    margin-bottom: 16px;
+}
 
-        .toc li {
-            margin-bottom: 6px;
-        }
+.toc ol {
+    padding-left: 20px;
+}
 
-        .toc a {
-            color: var(--verde-tech);
-            text-decoration: none;
-            font-weight: 500;
-        }
+.toc li {
+    margin-bottom: 6px;
+}
 
-        .toc a:hover {
-            text-decoration: underline;
-        }
+.toc a {
+    color: var(--verde-tech);
+    text-decoration: none;
+    font-weight: 500;
+}
 
-        /* Sections */
-        .section {
-            background: var(--branco);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            padding: 32px 40px;
-            margin-bottom: 24px;
-        }
+.toc a:hover {
+    text-decoration: underline;
+}
 
-        h2 {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 700;
-            font-size: 22px;
-            color: var(--grafite);
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid var(--cinza-gelo);
-        }
+/* Sections */
+.section {
+    background: var(--branco);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 32px 40px;
+    margin-bottom: 24px;
+}
 
-        h3 {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 17px;
-            color: var(--grafite);
-            margin-top: 24px;
-            margin-bottom: 12px;
-        }
+h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--grafite);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--cinza-gelo);
+}
 
-        p {
-            margin-bottom: 14px;
-            color: var(--grafite);
-        }
+h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--grafite);
+    margin-top: 24px;
+    margin-bottom: 12px;
+}
 
-        /* Tags */
-        .tag {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 500;
-            padding: 2px 8px;
-            border-radius: 4px;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
+p {
+    margin-bottom: 14px;
+    color: var(--grafite);
+}
 
-        .tag-tecnico {
-            background: var(--azul-light);
-            color: var(--azul);
-        }
+/* Tags */
+.tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
 
-        .tag-gestao {
-            background: var(--amarelo-light);
-            color: var(--amarelo);
-        }
+.tag-tecnico {
+    background: var(--azul-light);
+    color: var(--azul);
+}
 
-        .tag-operador {
-            background: var(--verde-tech-light);
-            color: var(--verde-tech);
-        }
+.tag-gestao {
+    background: var(--amarelo-light);
+    color: var(--amarelo);
+}
 
-        /* Tables */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 16px 0;
-            font-size: 14px;
-        }
+.tag-operador {
+    background: var(--verde-tech-light);
+    color: var(--verde-tech);
+}
 
-        thead th {
-            background: var(--cinza-gelo);
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--cinza-neutro);
-            padding: 10px 14px;
-            text-align: left;
-            border-bottom: 2px solid #E2E8F0;
-        }
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+}
 
-        tbody td {
-            padding: 10px 14px;
-            border-bottom: 1px solid #EDF2F7;
-            vertical-align: top;
-        }
+thead th {
+    background: var(--cinza-gelo);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--cinza-neutro);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid #E2E8F0;
+}
 
-        tbody tr:hover {
-            background: var(--cinza-gelo);
-        }
+tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #EDF2F7;
+    vertical-align: top;
+}
 
-        /* Code blocks */
-        code {
-            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-            font-size: 13px;
-            background: var(--cinza-gelo);
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: var(--grafite);
-        }
+tbody tr:hover {
+    background: var(--cinza-gelo);
+}
 
-        pre {
-            background: #1a1c1e;
-            color: #e2e8f0;
-            padding: 20px;
-            border-radius: 8px;
-            overflow-x: auto;
-            margin: 16px 0;
-            font-size: 13px;
-            line-height: 1.5;
-        }
+/* Code blocks */
+code {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    background: var(--cinza-gelo);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--grafite);
+}
 
-        pre code {
-            background: none;
-            padding: 0;
-            color: inherit;
-        }
+pre {
+    background: #1a1c1e;
+    color: #e2e8f0;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
 
-        /* Callouts */
-        .callout {
-            padding: 16px 20px;
-            border-radius: 6px;
-            margin: 16px 0;
-            font-size: 14px;
-        }
+pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+}
 
-        .callout-info {
-            background: var(--azul-light);
-            border-left: 4px solid var(--azul);
-        }
+/* Callouts */
+.callout {
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin: 16px 0;
+    font-size: 14px;
+}
 
-        .callout-warning {
-            background: var(--amarelo-light);
-            border-left: 4px solid var(--amarelo);
-        }
+.callout-info {
+    background: var(--azul-light);
+    border-left: 4px solid var(--azul);
+}
 
-        .callout-success {
-            background: var(--verde-tech-light);
-            border-left: 4px solid var(--verde-tech);
-        }
+.callout-warning {
+    background: var(--amarelo-light);
+    border-left: 4px solid var(--amarelo);
+}
 
-        .callout strong {
-            display: block;
-            margin-bottom: 4px;
-        }
+.callout-success {
+    background: var(--verde-tech-light);
+    border-left: 4px solid var(--verde-tech);
+}
 
-        /* Image placeholders */
-        .img-placeholder {
-            background: var(--cinza-gelo);
-            border: 2px dashed #CBD5E0;
-            border-radius: 8px;
-            padding: 40px 20px;
-            text-align: center;
-            margin: 16px 0;
-            color: var(--cinza-neutro);
-            font-size: 13px;
-        }
+.callout strong {
+    display: block;
+    margin-bottom: 4px;
+}
 
-        .img-placeholder .icon {
-            font-size: 32px;
-            display: block;
-            margin-bottom: 8px;
-        }
+/* Image placeholders */
+.img-placeholder {
+    background: var(--cinza-gelo);
+    border: 2px dashed #CBD5E0;
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    margin: 16px 0;
+    color: var(--cinza-neutro);
+    font-size: 13px;
+}
 
-        /* Status badges */
-        .badge {
-            display: inline-block;
-            font-size: 12px;
-            font-weight: 500;
-            padding: 3px 10px;
-            border-radius: 12px;
-        }
+.img-placeholder .icon {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 8px;
+}
 
-        .badge-pass {
-            background: var(--verde-tech-light);
-            color: var(--verde-tech);
-        }
+/* Status badges */
+.badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 12px;
+}
 
-        .badge-fail {
-            background: var(--vermelho-light);
-            color: var(--vermelho);
-        }
+.badge-pass {
+    background: var(--verde-tech-light);
+    color: var(--verde-tech);
+}
 
-        .badge-pending {
-            background: var(--cinza-gelo);
-            color: var(--cinza-neutro);
-        }
+.badge-fail {
+    background: var(--vermelho-light);
+    color: var(--vermelho);
+}
 
-        /* Keyboard keys */
-        kbd {
-            display: inline-block;
-            background: var(--cinza-gelo);
-            border: 1px solid #CBD5E0;
-            border-radius: 4px;
-            padding: 2px 8px;
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-        }
+.badge-pending {
+    background: var(--cinza-gelo);
+    color: var(--cinza-neutro);
+}
 
-        /* Lists */
-        ul, ol {
-            margin: 12px 0;
-            padding-left: 24px;
-        }
+/* Keyboard keys */
+kbd {
+    display: inline-block;
+    background: var(--cinza-gelo);
+    border: 1px solid #CBD5E0;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
 
-        li {
-            margin-bottom: 6px;
-        }
+/* Lists */
+ul, ol {
+    margin: 12px 0;
+    padding-left: 24px;
+}
 
-        /* Print */
-        @media print {
-            body { background: white; }
-            .container { padding: 0; }
-            .section, .doc-header, .toc {
-                box-shadow: none;
-                border: 1px solid #eee;
-                break-inside: avoid;
-            }
-        }
-    </style>
+li {
+    margin-bottom: 6px;
+}
+
+/* Print */
+
+.callout-danger { background: var(--vermelho-light); border-left: 4px solid var(--vermelho); }
+
+.badge-warning { background: var(--amarelo-light); color: var(--amarelo); }
+
+.badge-normal { background: var(--verde-tech-light); color: var(--verde-tech); }
+
+@media print {
+    body { background: white; }
+    .container { padding: 0; }
+    .section, .doc-header, .toc {
+        box-shadow: none;
+        border: 1px solid #eee;
+        break-inside: avoid;
+    }
+}
+</style>
 </head>
 <body>
-    <div class="container">
+<div class="container">
 
-        <!-- Header -->
-        <div class="doc-header">
-            <h1>Manual de Execucao</h1>
-            <div class="subtitle">Hardware Test Hub</div>
-            <div class="doc-meta">
-                <span>Versao 1.0</span>
-                <span>|</span>
-                <span>15 de abril de 2026</span>
-                <span>|</span>
-                <span>Operadores, Equipe Tecnica, Gestores</span>
-            </div>
-        </div>
+<div class="doc-header">
+<h1>Manual de Execução</h1>
+<div class="subtitle">Hardware Test Hub</div>
+<div class="doc-meta"><span>Versão 1.1</span> <span>|</span> <span>6 de novembro de 2026</span> <span>|</span> <span>Operadores de campo, equipe técnica, gestores</span></div>
+</div>
 
-        <!-- TOC -->
-        <div class="toc">
-            <h2>Sumario</h2>
-            <ol>
-                <li><a href="#visao-geral">Visao Geral</a></li>
-                <li><a href="#pre-requisitos">Pre-requisitos</a></li>
-                <li><a href="#instalacao">Instalacao e Primeiro Uso</a></li>
-                <li><a href="#operacao">Operacao Passo a Passo</a></li>
-                <li><a href="#cenarios">Cenarios e Re-execucao</a></li>
-                <li><a href="#saidas">Saidas e Relatorios</a></li>
-                <li><a href="#troubleshooting">Troubleshooting</a></li>
-                <li><a href="#referencia">Referencia Rapida</a></li>
-            </ol>
-        </div>
+<div class="toc">
+<h2>Sumário</h2>
+<ol>
+<li><a href="#1-visão-geral">Visão Geral</a></li>
+<li><a href="#2-pré-requisitos">Pré-requisitos</a></li>
+<li><a href="#3-instalação-e-primeiro-uso">Instalação e Primeiro Uso</a></li>
+<li><a href="#4-operação-passo-a-passo">Operação Passo a Passo</a></li>
+<li><a href="#5-cenários-e-re-execução">Cenários e Re-execução</a></li>
+<li><a href="#6-saídas-e-relatórios">Saídas e Relatórios</a></li>
+<li><a href="#7-troubleshooting">Troubleshooting</a></li>
+<li><a href="#8-referência-rápida">Referência Rápida</a></li>
+</ol>
+</div>
 
-        <!-- 1. Visao Geral -->
-        <div class="section" id="visao-geral">
-            <h2>1. Visao Geral</h2>
-            <p>O <strong>Hardware Test Hub</strong> e um framework Windows para validacao de hardware que automatiza a preparacao do ambiente, execucao de testes de diagnostico (CPU, memoria, disco, rede, boot/shutdown) e geracao de relatorios. Atraves de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados sao persistidos em multiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenario.</p>
-        </div>
+<div class="section">
+<h2 id="1-visão-geral">1. Visão Geral</h2>
+<p>O <strong>Hardware Test Hub</strong> é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (CPU, memória, disco, rede, boot/shutdown e bateria) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.</p>
+</div>
 
-        <!-- 2. Pre-requisitos -->
-        <div class="section" id="pre-requisitos">
-            <h2>2. Pre-requisitos</h2>
+<div class="section">
+<h2 id="2-pré-requisitos">2. Pré-requisitos</h2>
+<h3 id="21-hardware-e-sistema-operacional">2.1 Hardware e Sistema Operacional</h3>
+<table>
+<thead>
+<tr>
+<th>Requisito</th>
+<th>Especificação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sistema Operacional</td>
+<td>Windows 10 ou Windows 11</td>
+</tr>
+<tr>
+<td>Privilégios</td>
+<td>Acesso de Administrador local</td>
+</tr>
+<tr>
+<td>Conexão de rede</td>
+<td>Necessária para testes de rede e instalação de dependências</td>
+</tr>
+<tr>
+<td>Espaço em disco</td>
+<td>Mínimo 10 GB livres (o teste de disco cria arquivo temporário de 8 GB)</td>
+</tr>
+<tr>
+<td>Bateria (Módulo 5)</td>
+<td>Notebook com bateria reconhecida pelo Windows, carregada a pelo menos <strong>95%</strong> no início. Desative durante a homologação o limite de carga do fabricante (ex.: Dell "Primarily AC" ou carga adaptativa), que impede chegar a 95%</td>
+</tr>
+<tr>
+<td>Wi-Fi Fast Transition (Módulo 6)</td>
+<td>Notebook com Wi-Fi <strong>conectado à rede a testar</strong> antes de iniciar; rede com 2 ou mais APs do mesmo SSID no percurso da caminhada</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-software">2.2 Software</h3>
+<p>Os itens abaixo são instalados automaticamente pela <strong>Fase de Setup</strong> do hub. Não é necessário instalá-los manualmente antes da primeira execução:</p>
+<ul>
+<li>Python 3.x (com ambiente virtual <code>.venv</code>)</li>
+<li>Microsoft Edge (nativo do Windows 10/11 — usado no teste de rede)</li>
+<li>Dependências Python: <code>psutil</code>, <code>speedtest-cli</code>, <code>requests</code>, <code>selenium</code>, <code>pandas</code>, <code>pyautogui</code>, <code>pyperclip</code>, <code>pynput</code></li>
+</ul>
+<p>Para o <strong>teste de bateria (Módulo 5)</strong>, além disso:</p>
+<ul>
+<li><strong>Windows Performance Toolkit</strong> (<code>wpr.exe</code> e <code>wpaexporter.exe</code>) no PATH — o mesmo pré-requisito do Módulo 1</li>
+<li><strong>Microsoft Edge com a conta Google já logada</strong> (Google Docs e Sheets), como no Módulo 1</li>
+<li><strong>Feche o Edge antes de iniciar</strong>: o teste encerra o Edge e reabre só com as páginas dele</li>
+</ul>
+<h3 id="23-rede-técnico">2.3 Rede <span class="tag tag-tecnico">Técnico</span></h3>
+<ul>
+<li>O teste de rede acessa o servidor de speedtest interno, cuja URL fica fora do repositório: chave <code>SpeedtestUrl</code> do <code>config.local.json</code> na raiz do hub (modelo em <code>config.local.example.json</code>) ou variável de ambiente <code>HUB_SPEEDTEST_URL</code>. Verifique se a máquina tem acesso a essa URL antes de executar o módulo de rede.</li>
+<li>O teste complementar de rede na internet (<code>3-1_teste_rede_internet.py</code>) acessa <code>https://fast.com/</code> (Netflix). Os domínios <code>fast.com</code>, <code>api.fast.com</code> e <code>*.oca.nflxvideo.net</code> — ou a categoria "speedtest" — precisam estar liberados na política do agente zero trust/proxy; caso contrário, o teste falha com "site inacessível ou bloqueado".</li>
+<li>Esse teste registra no CSV o <strong>IP público de saída</strong> e a localização vistos pelo fast.com, como evidência do caminho percorrido pelo tráfego (com o agente ativo, devem ser os do nó de saída do agente).</li>
+</ul>
+<h3 id="24-estrutura-de-pastas-esperada-técnico">2.4 Estrutura de Pastas Esperada <span class="tag tag-tecnico">Técnico</span></h3>
+<pre><code>C:\TesteHub\
+├── hub.bat              # Ponto de entrada
+├── hub.ps1              # Orquestrador principal
+├── config.json          # Configurações
+├── config.local.json    # Valores internos, como a URL do speedtest (não versionado)
+├── Setup\environment\   # Scripts de setup (10 scripts)
+├── Testes\              # Módulos de teste (6 módulos + 2 variantes DLP/USB)
+├── Execucoes\           # Logs, evidências e estado de cada cenário (criada pelo hub)
+└── Resultados\          # CSVs estruturados de cada cenário (criada pelo hub)
+</code></pre>
+<div class="callout callout-warning"><strong>Importante</strong>O hub espera estar em <code>C:\TesteHub</code>. Caso utilize outro caminho, ajuste a referência no <code>hub.bat</code>.</div>
+</div>
 
-            <h3>2.1 Hardware e Sistema Operacional</h3>
-            <table>
-                <thead>
-                    <tr><th>Requisito</th><th>Especificacao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Sistema Operacional</td><td>Windows 10 ou Windows 11</td></tr>
-                    <tr><td>Privilegios</td><td>Acesso de Administrador local</td></tr>
-                    <tr><td>Conexao de rede</td><td>Necessaria para testes de rede e instalacao de dependencias</td></tr>
-                    <tr><td>Espaco em disco</td><td>Minimo 10 GB livres (teste de disco cria arquivo temporario de 8 GB)</td></tr>
-                </tbody>
-            </table>
+<div class="section">
+<h2 id="3-instalação-e-primeiro-uso">3. Instalação e Primeiro Uso</h2>
+<h3 id="31-copiar-o-repositório">3.1 Copiar o Repositório</h3>
+<p>Copie toda a pasta do projeto para <code>C:\TesteHub</code> na máquina de teste.</p>
+<p>Confira se a cópia inclui os arquivos internos que <strong>não estão no repositório do GitHub</strong>: o <code>config.local.json</code> (URL do speedtest interno) e os perfis <code>Agentes_SI_Profile.wpaProfile</code> (em <code>Testes\1_cpu_memo\</code>) e <code>Agentes_SI_Bateria_Profile.wpaProfile</code> (em <code>Testes\5_bateria\</code>). Sem os perfis, os módulos 1 e 5 rodam, mas pulam a exportação CSV dos traces.</p>
+<h3 id="32-primeira-execução">3.2 Primeira Execução</h3>
+<ol>
+<li>Clique duas vezes em <code>hub.bat</code></li>
+<li>Se solicitado pelo UAC (Controle de Conta de Usuário), clique em <strong>Sim</strong> para conceder privilégios de administrador</li>
+</ol>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot da tela de elevação UAC ao executar hub.bat<br><em>Salvar como: img/placeholder-uac.png</em></div>
+<ol start="3">
+<li>O hub iniciará no console PowerShell</li>
+</ol>
+<h3 id="33-fase-de-setup-primeira-vez">3.3 Fase de Setup (Primeira Vez)</h3>
+<p>Na primeira execução, a <strong>Fase de Setup</strong> será apresentada automaticamente. Ela prepara o ambiente da máquina:</p>
+<table>
+<thead>
+<tr>
+<th>Script</th>
+<th>O que faz</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>1_captura_infos_pc</code></td>
+<td>Coleta informações do sistema (CPU, RAM, disco, bateria, SO)</td>
+</tr>
+<tr>
+<td><code>2_opcoes_energia</code></td>
+<td>Configura o plano de energia (evita suspensão durante os testes)</td>
+</tr>
+<tr>
+<td><code>3_softwares_msStore</code></td>
+<td>Instala via winget o Windows ADK, o CrystalDiskMark e o CrystalDiskInfo</td>
+</tr>
+<tr>
+<td><code>4_install_python</code></td>
+<td>Instala o Python 3.12</td>
+</tr>
+<tr>
+<td><code>5_install_py_dependencies</code></td>
+<td>Cria o ambiente virtual e instala os pacotes Python</td>
+</tr>
+<tr>
+<td><code>6_pausa_WinUpdate</code></td>
+<td>Pausa o Windows Update por 35 dias (evita interferência nos testes)</td>
+</tr>
+<tr>
+<td><code>8_enable_diagnostics</code></td>
+<td>Habilita os diagnósticos de boot/shutdown do Windows</td>
+</tr>
+<tr>
+<td><code>9_AdicionarTecladoUSInt</code></td>
+<td>Adiciona o layout de teclado EUA-Internacional</td>
+</tr>
+<tr>
+<td><code>12_remover_appx_bloatware</code></td>
+<td>Remove aplicativos pré-instalados (Xbox, Copilot, Teams, Notícias e outros)</td>
+</tr>
+<tr>
+<td><code>13_remover_onedrive</code></td>
+<td>Desinstala o OneDrive e bloqueia a reinstalação</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recomendação:</strong> Na primeira execução, selecione <strong>todos</strong> os scripts de setup (tecla <code>A</code>). Em execuções subsequentes, o setup pode ser ignorado (veja a seção 3.4).</p>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot do menu checkbox da Fase de Setup<br><em>Salvar como: img/placeholder-menu-setup.png</em></div>
+<h3 id="34-pular-o-setup-em-execuções-futuras-técnico">3.4 Pular o Setup em Execuções Futuras <span class="tag tag-tecnico">Técnico</span></h3>
+<p>Edite o arquivo <code>config.json</code> e altere:</p>
+<pre><code class="language-json">{
+    &quot;SkipSetup&quot;: true
+}
+</code></pre>
+<p>Isso faz o hub pular direto para a Fase de Testes nas próximas execuções.</p>
+</div>
 
-            <h3>2.2 Software</h3>
-            <p>Os itens abaixo sao instalados automaticamente pela <strong>Fase de Setup</strong> do hub. Nao e necessario instala-los manualmente antes da primeira execucao:</p>
-            <ul>
-                <li>Python 3.x (com ambiente virtual <code>.venv</code>)</li>
-                <li>Google Chrome (para teste de rede)</li>
-                <li>Dependencias Python: <code>psutil</code>, <code>speedtest-cli</code>, <code>requests</code>, <code>selenium</code>, <code>pandas</code>, <code>pyautogui</code>, <code>pyperclip</code>, <code>pynput</code></li>
-            </ul>
+<div class="section">
+<h2 id="4-operação-passo-a-passo">4. Operação Passo a Passo</h2>
+<h3 id="41-selecionar-ou-criar-um-cenário">4.1 Selecionar ou Criar um Cenário</h3>
+<p>Ao iniciar, o hub exibe os 5 cenários mais recentes (se houver) e oferece três opções:</p>
+<ul>
+<li><strong><code>[N]</code></strong> — Criar um novo cenário (será solicitado um nome, ex: <code>ImagemLimpa</code>)</li>
+<li><strong><code>[1-5]</code></strong> — Continuar um cenário existente</li>
+<li><strong><code>[E]</code></strong> — Exportar um cenário para ZIP: o hub compacta a pasta do cenário, confere se o ZIP tem o mesmo número de arquivos e só então remove a pasta original. Ao final de cada execução, o hub também pergunta se deseja exportar o cenário.</li>
+</ul>
+<p>O nome do cenário é combinado com o hostname e a data, resultando em algo como: <code>ImagemLimpa_DESKTOP-ABC_2026-04-15</code></p>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot da tela de seleção/criação de cenário<br><em>Salvar como: img/placeholder-selecao-cenario.png</em></div>
+<h3 id="42-navegar-o-menu-de-testes">4.2 Navegar o Menu de Testes</h3>
+<p>Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupados pelo nome da pasta, sem o prefixo numérico, e os que nunca rodaram no cenário (<strong>pendentes</strong>) já vêm marcados:</p>
+<pre><code>-- Cpu Memo --------------------------------
+[X] 1_automacao_performance        [PY]   pendente
+[X] 1-1_automacao_performance_dlp  [PY]   pendente
+-- Disco -----------------------------------
+[X] 2_teste_disco                  [PY]   pendente
+[X] 2-1_teste_disco_dlp            [PY]   pendente
+-- Rede ------------------------------------
+[X] 3_teste_rede                   [PY]   pendente
+-- Rede Internet ---------------------------
+[X] 3-1_teste_rede_internet        [PY]   pendente
+-- Boot Shutdown ---------------------------
+[X] 4_boot_shutdown_auto           [PY]   pendente
+-- Bateria ---------------------------------
+[X] 5_teste_bateria                [PY]   pendente
+-- Wifi Fast Transition --------------------
+[X] 6_teste_fast_transition        [PY]   pendente
+</code></pre>
+<p>Desmarque com <code>Espaço</code> o que não for executar agora. Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), e as variantes DLP/USB (<code>1-1</code> e <code>2-1</code>) só fazem sentido com um pendrive em <code>E:\</code>.</p>
+<p>Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:</p>
+<pre><code>[ ] 1_automacao_performance        [PY]   PASS  (361.5s)
+[ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
+[X] 3_teste_rede                   [PY]   pendente
+[X] 3-1_teste_rede_internet        [PY]   pendente
+</code></pre>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot do menu checkbox com testes e status<br><em>Salvar como: img/placeholder-menu-testes.png</em></div>
+<h3 id="43-controles-do-menu">4.3 Controles do Menu</h3>
+<table>
+<thead>
+<tr>
+<th>Tecla</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>↑</code> <code>↓</code></td>
+<td>Navegar entre os itens</td>
+</tr>
+<tr>
+<td><code>Espaço</code></td>
+<td>Marcar/desmarcar o item atual</td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td>Selecionar/desselecionar <strong>todos</strong></td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td>Selecionar apenas os <strong>pendentes</strong> (nunca executados no cenário)</td>
+</tr>
+<tr>
+<td><code>Enter</code></td>
+<td>Confirmar seleção e iniciar execução</td>
+</tr>
+<tr>
+<td><code>Esc</code></td>
+<td>Cancelar e sair</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Dica:</strong> <code>P</code> não marca os testes que falharam. Para reexecutar um FAIL, marque-o com <code>Espaço</code>.</p>
+<h3 id="44-acompanhar-a-execução">4.4 Acompanhar a Execução</h3>
+<p>Após confirmar, o hub mostra um resumo dos testes selecionados e inicia a execução sequencial. Durante a execução:</p>
+<ul>
+<li>O console exibe o progresso em tempo real (nome do teste, tempo decorrido)</li>
+<li>Testes com interface visual (CPU, Disco, Rede, Bateria) exibem um <strong>overlay transparente</strong> na tela com informações de progresso</li>
+<li>O overlay é "click-through" — não interfere no uso da máquina</li>
+</ul>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot da execução com overlay de progresso visível<br><em>Salvar como: img/placeholder-execucao-progresso.png</em></div>
+<h3 id="45-interpretar-resultados-na-tela">4.5 Interpretar Resultados na Tela</h3>
+<p>Ao final de cada teste, o resultado é exibido:</p>
+<table>
+<thead>
+<tr>
+<th>Indicador</th>
+<th>Significado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="badge badge-pass">PASS</span> (verde)</td>
+<td>Teste concluído com sucesso (exit code 0)</td>
+</tr>
+<tr>
+<td><span class="badge badge-fail">FAIL</span> (vermelho)</td>
+<td>Teste falhou (exit code diferente de 0)</td>
+</tr>
+<tr>
+<td><strong>ERR</strong> (amarelo)</td>
+<td>Erro inesperado na execução</td>
+</tr>
+</tbody>
+</table>
+<p>Ao final de todos os testes, um resumo geral é apresentado com contagem de PASS/FAIL/ERROR.</p>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot do resumo final no console<br><em>Salvar como: img/placeholder-resultados-finais.png</em></div>
+<h3 id="46-teste-de-bateria-módulo-5--passo-a-passo-do-operador">4.6 Teste de Bateria (Módulo 5) — Passo a Passo do Operador</h3>
+<p>O teste de bateria leva <strong>~2h20–2h40</strong> e precisa do operador no começo (para desconectar o carregador) e no fim (para reconectar). Prefira executá-lo <strong>sozinho</strong>, sem outros testes na mesma seleção.</p>
+<p><strong>1. Prepare a máquina, ainda na tomada</strong></p>
+<ul>
+<li>Carregue a bateria até pelo menos <strong>95%</strong> (desative o limite de carga do fabricante, se houver).</li>
+<li>Feche o Edge e os demais aplicativos. Deixe a conta Google logada no Edge.</li>
+<li>Conecte a rede com acesso à internet e desconecte monitor externo e dock.</li>
+<li>Se a política da máquina bloqueia a tela por inatividade, desative o bloqueio durante o teste (o teste mantém a tela ligada sem simular teclado ou mouse, mas não contorna política).</li>
+</ul>
+<p><strong>2. Selecione o teste</strong></p>
+<p>No menu de testes, marque <code>5_teste_bateria.py</code> (seção <strong>Bateria</strong>) e confirme com <code>Enter</code>.</p>
+<p><strong>3. Aguarde o pré-voo (~1 min)</strong></p>
+<p>O teste confere a bateria, a carga, as ferramentas de captura, a rede e o monitor; abre e fecha o Edge para conferir a conta Google; e ajusta plano e modo de energia, Economia de energia, brilho, Bluetooth e suspensão. Se aparecer a janela <strong>"Ação Necessária — Login no Google"</strong> (ou "no Edge"), faça o login no Edge e clique em <strong>OK</strong>.</p>
+<p>Se algum item não puder ser ajustado, a janela <strong>"Teste de bateria não iniciado"</strong> lista os pendentes; nada é medido e as configurações já voltam ao que eram (veja a seção 7.1).</p>
+<p><strong>4. Desconecte o carregador e confirme o checklist</strong></p>
+<p>Na janela <strong>"Teste de bateria — desconecte o carregador"</strong>:</p>
+<ol>
+<li>Desconecte periféricos (mouse, teclado, pendrive, fone) e o dock/hub USB, e apague a luz do teclado.</li>
+<li>Marque as três caixas e clique em <strong>Confirmo o checklist</strong>.</li>
+<li>Desconecte o carregador da tomada — a janela mostra "Carregador: DESCONECTADO" e a medição começa sozinha.</li>
+</ol>
+<p>O limite para isso é de <strong>10 minutos</strong>; depois disso o teste encerra sem medir (FAIL) e restaura a máquina. <strong>Cancelar teste</strong> ou <code>Ctrl+Q</code> interrompem com segurança.</p>
+<p><strong>5. Não use a máquina (~2h10)</strong></p>
+<p>O overlay mostra a fase, a carga e os minutos restantes:</p>
+<table>
+<thead>
+<tr>
+<th>Fase no overlay</th>
+<th>O que acontece</th>
+<th>Duração</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Estabilização</td>
+<td>Confere brilho, modo e Economia já na bateria (fora da medição)</td>
+<td>5 min</td>
+</tr>
+<tr>
+<td>Fase ociosa</td>
+<td>Tela ligada, nada aberto pelo teste</td>
+<td>60 min</td>
+</tr>
+<tr>
+<td>Transição</td>
+<td>Salva o trace e abre o Edge com documento, planilha e PDF</td>
+<td>~1–5 min</td>
+</tr>
+<tr>
+<td>Fase de escritório</td>
+<td>O teste digita e navega no Edge sozinho</td>
+<td>60 min</td>
+</tr>
+</tbody>
+</table>
+<p>Não toque no mouse nem no teclado — na fase de escritório o teste está usando os dois. Levar o mouse a um canto da tela aciona a parada segura. <strong>Não reconecte o carregador</strong> antes do aviso: isso invalida a medição.</p>
+<p><strong>6. Reconecte quando o aviso pedir</strong></p>
+<p>A janela <strong>"Teste de bateria — medição encerrada"</strong> (e o overlay "O carregador já pode ser reconectado") indica o fim da medição. Reconecte o carregador. O teste ainda converte os traces e gera o SRUM e o relatório de energia (~5–20 min), restaura as configurações e devolve o resultado ao hub.</p>
+<p>O resultado detalhado fica em <code>5_bateria/bateria.csv</code> (copiado para <code>Resultados/</code>): <code>Coleta_Valida = sim</code> indica uma execução que serve para comparar baseline × agente.</p>
+<h3 id="47-teste-de-wi-fi-fast-transition-módulo-6--passo-a-passo-do-operador">4.7 Teste de Wi-Fi Fast Transition (Módulo 6) — Passo a Passo do Operador</h3>
+<p>O teste leva <strong>~7 min</strong> (1 min de coleta + 5 min de caminhada + 1 min de processamento) e precisa do operador <strong>andando com o notebook</strong> durante a caminhada. Execute-o <strong>sozinho</strong> na seleção, numa máquina que você possa levar pelo escritório.</p>
+<p><strong>1. Prepare a máquina</strong></p>
+<ul>
+<li>Conecte o Wi-Fi na rede que será testada (a rede corporativa com 802.11r). O teste usa a rede <strong>já conectada</strong>: não pede SSID nem senha.</li>
+<li>Deixe a tampa aberta e o carregador desconectado (ou leve-o junto), para poder andar.</li>
+<li>Planeje um percurso que passe por áreas de <strong>APs diferentes</strong> do mesmo SSID (ex.: de uma ponta à outra do andar).</li>
+</ul>
+<p><strong>2. Selecione o teste</strong></p>
+<p>No menu de testes, marque <code>6_teste_fast_transition.py</code> (seção <strong>Wifi Fast Transition</strong>) e confirme com <code>Enter</code>.</p>
+<p><strong>3. Aguarde a coleta (~15–30 s)</strong></p>
+<p>O teste confere a conexão e coleta adaptador, driver, BIOS, energia e os APs visíveis. Em seguida, o <strong>painel ao vivo</strong> abre sozinho numa janela do Edge.</p>
+<p><strong>4. Inicie a caminhada</strong></p>
+<p>Clique em <strong>Iniciar caminhada</strong> (se ninguém clicar, ela começa sozinha em 60 s). Durante os 5 minutos, ande pelo percurso. O painel mostra:</p>
+<table>
+<thead>
+<tr>
+<th>Área do painel</th>
+<th>O que mostra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AP atual</td>
+<td>AP em uso (AP1, AP2... com cor fixa), BSSID, canal, banda e AKM</td>
+</tr>
+<tr>
+<td>Sinal (RSSI)</td>
+<td>Intensidade do sinal em dBm (≥ -60 bom, -60 a -70 razoável, &lt; -70 fraco)</td>
+</tr>
+<tr>
+<td>Roamings</td>
+<td>Contadores ✓ FT, ✕ Não FT e ? Indeterminado</td>
+</tr>
+<tr>
+<td>Gráficos</td>
+<td>RSSI e latência dos últimos 90 s; linhas verticais marcam cada troca de AP</td>
+</tr>
+<tr>
+<td>Trocas de AP</td>
+<td>Lista das trocas com classificação, tempo de troca e interrupção</td>
+</tr>
+</tbody>
+</table>
+<p>A cada troca de AP aparece um destaque grande na tela (verde = FT, vermelho = Não FT, amarelo = lendo a AKM). <strong>Encerrar agora</strong> termina antes do tempo e ainda gera o relatório. Fechar o painel não interrompe o teste.</p>
+<p><strong>5. Veja o resultado</strong></p>
+<p>Ao fim, o painel mostra PASS/FAIL e abre o relatório <code>6_wifi_fast_transition/wifi_ft_relatorio.html</code>, com gráficos e informações técnicas. O <code>wifi_ft.csv</code> é copiado para <code>Resultados/</code>.</p>
+</div>
 
-            <h3>2.3 Rede <span class="tag tag-tecnico">Tecnico</span></h3>
-            <p>O teste de rede acessa o servidor de speedtest interno, cuja URL fica fora do repositorio: chave <code>SpeedtestUrl</code> do <code>config.local.json</code> na raiz do hub (modelo em <code>config.local.example.json</code>) ou variavel de ambiente <code>HUB_SPEEDTEST_URL</code>. Verifique se a maquina tem acesso a essa URL antes de executar o modulo de rede.</p>
+<div class="section">
+<h2 id="5-cenários-e-re-execução">5. Cenários e Re-execução</h2>
+<h3 id="51-o-que-é-um-cenário">5.1 O que é um Cenário</h3>
+<p>Um <strong>cenário</strong> é uma sessão de testes associada a uma máquina e data. Ele agrupa todas as execuções (runs) e suas evidências em uma única pasta dentro de <code>Execucoes/</code>, com os resultados estruturados numa pasta de mesmo nome em <code>Resultados/</code>. Isso permite:</p>
+<ul>
+<li>Executar testes em diferentes momentos (dias) e consolidar resultados</li>
+<li>Re-executar apenas os testes que falharam</li>
+<li>Manter histórico completo de todas as tentativas</li>
+</ul>
+<h3 id="52-continuar-um-cenário-existente">5.2 Continuar um Cenário Existente</h3>
+<p>Ao iniciar o hub, selecione o número do cenário que deseja continuar. O menu de testes mostrará o status da última execução de cada teste; os pendentes já vêm marcados, e os que falharam podem ser marcados com <code>Espaço</code>.</p>
+<h3 id="53-re-execução-de-testes">5.3 Re-execução de Testes</h3>
+<p>Ao re-executar um teste que já foi rodado anteriormente:</p>
+<ol>
+<li>As evidências da execução anterior são <strong>automaticamente movidas</strong> para a subpasta <code>_anterior/</code> dentro da pasta do teste (ex.: <code>Traces/2_disco/_anterior/run1_&lt;data-hora&gt;/</code>)</li>
+<li>O teste roda novamente e gera novas evidências</li>
+<li>O <code>_state.json</code> é atualizado com a nova run</li>
+</ol>
+<p><strong>Nenhuma evidência é perdida.</strong> O histórico completo fica preservado em <code>_anterior/</code>.</p>
+<div class="callout callout-info"><strong>Nota</strong>a pasta de evidências é a da categoria, compartilhada pelos scripts da mesma pasta. Reexecutar o <code>1_automacao_performance</code> também move para <code>_anterior/</code> as evidências atuais do <code>1-1_automacao_performance_dlp</code>, e vice-versa. Nada se perde, mas as evidências "atuais" passam a ser só as do teste reexecutado.</div>
+<h3 id="54-estrutura-de-um-cenário-técnico">5.4 Estrutura de um Cenário <span class="tag tag-tecnico">Técnico</span></h3>
+<pre><code>Execucoes/
+└── ImagemLimpa_DESKTOP-ABC_2026-04-15/      # {cenário}_{hostname}_{data}
+    ├── Logs/
+    │   ├── run_20260415_093000.log          # Saída completa de cada script
+    │   └── run_20260415_093000.{html,csv,json}
+    └── Traces/
+        ├── _state.json                      # Estado e histórico de todas as runs
+        ├── _relatorio.{html,csv,json}       # Relatório consolidado
+        ├── informacoes_maquina.csv          # Inventário gerado pelo setup 1
+        ├── 1_cpu_memo/                      # Evidências do Módulo 1
+        │   └── dlp_usb/                     # Evidências da variante 1-1
+        ├── 2_disco/                         # Evidências do Módulo 2 e da variante 2-1
+        ├── 3_rede/
+        ├── 3_rede_internet/
+        ├── 4_boot_shutdown/
+        ├── 5_bateria/                       # Pré-voo, amostras, traces, bateria.csv
+        ├── 6_wifi_fast_transition/
+        └── &lt;pasta do teste&gt;/_anterior/      # Evidências de execuções anteriores
+            ├── run1_2026-04-15T09-30-00/
+            └── run2_2026-04-15T14-00-00/
 
-            <h3>2.4 Estrutura de Pastas Esperada <span class="tag tag-tecnico">Tecnico</span></h3>
-            <pre><code>C:\TesteHub\
-  hub.bat              # Ponto de entrada
-  hub.ps1              # Orquestrador principal
-  config.json          # Configuracoes
-  Setup\environment\   # Scripts de setup (9 scripts)
-  Testes\              # Modulos de teste (4 categorias)
-  Logs\                # Resultados por execucao
-  Traces\              # Evidencias por cenario</code></pre>
+Resultados/
+└── ImagemLimpa_DESKTOP-ABC_2026-04-15/
+    ├── maquina.csv                          # Modelo, série, CPU, RAM, disco, SO
+    ├── cenario.csv                          # Status consolidado de cada teste
+    └── cpu_memoria.csv, disco.csv, ...      # CSVs temáticos de cada módulo
+</code></pre>
+</div>
 
-            <div class="callout callout-warning">
-                <strong>Importante</strong>
-                O hub espera estar em <code>C:\TesteHub</code>. Caso utilize outro caminho, ajuste a referencia no <code>hub.bat</code>.
-            </div>
-        </div>
+<div class="section">
+<h2 id="6-saídas-e-relatórios">6. Saídas e Relatórios</h2>
+<h3 id="61-onde-encontrar-os-resultados">6.1 Onde Encontrar os Resultados</h3>
+<table>
+<thead>
+<tr>
+<th>Local</th>
+<th>Conteúdo</th>
+<th>Quando usar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Execucoes/{cenário}/Logs/</code></td>
+<td>Resultados <strong>por execução</strong> (run)</td>
+<td>Consultar uma execução específica</td>
+</tr>
+<tr>
+<td><code>Execucoes/{cenário}/Traces/</code></td>
+<td>Evidências e relatório <strong>consolidado</strong> do cenário</td>
+<td>Visão completa de um ciclo de testes</td>
+</tr>
+<tr>
+<td><code>Resultados/{cenário}/</code></td>
+<td>Inventário da máquina, status do cenário e CSVs temáticos de cada módulo (<code>cpu_memoria.csv</code>, <code>disco.csv</code>, <code>rede.csv</code>, <code>rede_internet.csv</code>, <code>boot_shutdown.csv</code>, <code>bateria.csv</code>, <code>wifi_ft.csv</code> e, quando executadas, <code>cpu_memoria_dlp.csv</code> e <code>disco_usb.csv</code>)</td>
+<td>Planilhas e BI</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-formatos-disponíveis">6.2 Formatos Disponíveis</h3>
+<table>
+<thead>
+<tr>
+<th>Formato</th>
+<th>Arquivo</th>
+<th>Melhor para</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HTML</strong></td>
+<td><code>run_*.html</code> / <code>_relatorio.html</code></td>
+<td>Visualização e apresentação</td>
+</tr>
+<tr>
+<td><strong>CSV</strong></td>
+<td><code>run_*.csv</code> / <code>_relatorio.csv</code></td>
+<td>Análise em Excel ou ferramentas de BI</td>
+</tr>
+<tr>
+<td><strong>JSON</strong></td>
+<td><code>run_*.json</code> / <code>_relatorio.json</code></td>
+<td>Integração com sistemas externos</td>
+</tr>
+<tr>
+<td><strong>LOG</strong></td>
+<td><code>run_*.log</code></td>
+<td>Diagnóstico de problemas (saída completa dos scripts)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63-interpretar-o-relatório-html">6.3 Interpretar o Relatório HTML</h3>
+<p>Há dois relatórios HTML:</p>
+<ul>
+<li><strong><code>_relatorio.html</code> (consolidado do cenário):</strong> nome do cenário, máquina, datas de criação e da última execução, total de runs e estatísticas (PASS, FAIL, ERROR). A tabela traz o <strong>último resultado</strong> de cada teste, com status colorido, duração, run em que foi obtido e pasta de evidências.</li>
+<li><strong><code>run_*.html</code> (uma execução):</strong> máquina, usuário, início e tempo total. A tabela traz cada script executado naquela run, com fase (setup/teste), status, duração e número de evidências. Para testes que não passaram, mostra logo abaixo as últimas linhas de erro.</li>
+</ul>
+<div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot do relatório HTML aberto no navegador<br><em>Salvar como: img/placeholder-relatorio-html.png</em></div>
+<h3 id="64-qual-relatório-usar-gestão">6.4 Qual Relatório Usar <span class="tag tag-gestao">Gestão</span></h3>
+<table>
+<thead>
+<tr>
+<th>Necessidade</th>
+<th>Relatório recomendado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Apresentar resultado a stakeholders</td>
+<td><code>_relatorio.html</code> (cenário consolidado)</td>
+</tr>
+<tr>
+<td>Alimentar planilha de acompanhamento</td>
+<td><code>_relatorio.csv</code></td>
+</tr>
+<tr>
+<td>Auditar uma execução específica</td>
+<td><code>run_*.json</code> (dados estruturados com timestamps)</td>
+</tr>
+<tr>
+<td>Investigar falha em um teste</td>
+<td><code>run_*.log</code> (saída completa do script)</td>
+</tr>
+</tbody>
+</table>
+</div>
 
-        <!-- 3. Instalacao -->
-        <div class="section" id="instalacao">
-            <h2>3. Instalacao e Primeiro Uso</h2>
-
-            <h3>3.1 Copiar o Repositorio</h3>
-            <p>Copie toda a pasta do projeto para <code>C:\TesteHub</code> na maquina de teste.</p>
-
-            <h3>3.2 Primeira Execucao</h3>
-            <ol>
-                <li>Clique duas vezes em <code>hub.bat</code></li>
-                <li>Se solicitado pelo UAC (Controle de Conta de Usuario), clique em <strong>Sim</strong> para conceder privilegios de administrador</li>
-            </ol>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128247;</span>
-                <strong>Insira aqui:</strong> screenshot da tela de elevacao UAC ao executar hub.bat<br>
-                <em>Salvar como: img/placeholder-uac.png</em>
-            </div>
-
-            <ol start="3">
-                <li>O hub iniciara no console PowerShell</li>
-            </ol>
-
-            <h3>3.3 Fase de Setup (Primeira Vez)</h3>
-            <p>Na primeira execucao, a <strong>Fase de Setup</strong> sera apresentada automaticamente. Ela prepara o ambiente da maquina:</p>
-
-            <table>
-                <thead>
-                    <tr><th>#</th><th>Script</th><th>O que faz</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>1</td><td><code>captura_infos_pc</code></td><td>Coleta informacoes do sistema (CPU, RAM, disco, bateria, SO)</td></tr>
-                    <tr><td>2</td><td><code>opcoes_energia</code></td><td>Configura plano de energia (evita suspensao durante testes)</td></tr>
-                    <tr><td>3</td><td><code>softwares_msStore</code></td><td>Instala aplicativos da Microsoft Store</td></tr>
-                    <tr><td>4</td><td><code>install_python</code></td><td>Instala o Python 3</td></tr>
-                    <tr><td>5</td><td><code>install_py_dependencies</code></td><td>Cria ambiente virtual e instala pacotes Python</td></tr>
-                    <tr><td>6</td><td><code>pausa_WinUpdate</code></td><td>Pausa o Windows Update (evita interferencia nos testes)</td></tr>
-                    <tr><td>7</td><td><code>install_google_chrome</code></td><td>Instala o Google Chrome</td></tr>
-                    <tr><td>8</td><td><code>enable_diagnostics</code></td><td>Habilita diagnosticos de performance do Windows</td></tr>
-                    <tr><td>9</td><td><code>AdicionarTecladoUSInt</code></td><td>Adiciona layout de teclado US International</td></tr>
-                </tbody>
-            </table>
-
-            <div class="callout callout-success">
-                <strong>Recomendacao</strong>
-                Na primeira execucao, selecione <strong>todos</strong> os scripts de setup (tecla <kbd>A</kbd>). Em execucoes subsequentes, o setup pode ser ignorado.
-            </div>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128247;</span>
-                <strong>Insira aqui:</strong> screenshot do menu checkbox da Fase de Setup<br>
-                <em>Salvar como: img/placeholder-menu-setup.png</em>
-            </div>
-
-            <h3>3.4 Pular o Setup em Execucoes Futuras <span class="tag tag-tecnico">Tecnico</span></h3>
-            <p>Edite o arquivo <code>config.json</code> e altere:</p>
-            <pre><code>{
-    "SkipSetup": true
-}</code></pre>
-        </div>
-
-        <!-- 4. Operacao -->
-        <div class="section" id="operacao">
-            <h2>4. Operacao Passo a Passo</h2>
-
-            <h3>4.1 Selecionar ou Criar um Cenario</h3>
-            <p>Ao iniciar, o hub exibe os ultimos 5 cenarios existentes (se houver) e oferece duas opcoes:</p>
-            <ul>
-                <li><kbd>N</kbd> &mdash; Criar um novo cenario (sera solicitado um nome, ex: <code>ImagemLimpa</code>)</li>
-                <li><kbd>1-5</kbd> &mdash; Continuar um cenario existente</li>
-            </ul>
-            <p>O nome do cenario e combinado com o hostname e a data, resultando em algo como: <code>ImagemLimpa_DESKTOP-ABC_2026-04-15</code></p>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128247;</span>
-                <strong>Insira aqui:</strong> screenshot da tela de selecao/criacao de cenario<br>
-                <em>Salvar como: img/placeholder-selecao-cenario.png</em>
-            </div>
-
-            <h3>4.2 Navegar o Menu de Testes</h3>
-            <p>Apos selecionar o cenario, o menu de testes e exibido. Os testes sao organizados por categoria:</p>
-
-            <pre><code>-- CPU & Memoria --
-[ ] 1_automacao_performance.py    [PY]  pendente
--- Disco --
-[ ] 2_teste_disco.py              [PY]  pendente
--- Rede --
-[ ] 3_teste_rede.py               [PY]  pendente
--- Boot & Shutdown --
-[ ] 4_boot_shutdown_auto.py       [PY]  pendente</code></pre>
-
-            <p>Se o cenario ja tem execucoes anteriores, o status e mostrado:</p>
-
-            <pre><code>[X] 1_automacao_performance.py    [PY]  <span style="color: #1EBD53;">PASS (361.5s)</span>
-[ ] 2_teste_disco.py              [PY]  <span style="color: #E53E3E;">FAIL</span>
-[ ] 3_teste_rede.py               [PY]  pendente</code></pre>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128247;</span>
-                <strong>Insira aqui:</strong> screenshot do menu checkbox com testes e status<br>
-                <em>Salvar como: img/placeholder-menu-testes.png</em>
-            </div>
-
-            <h3>4.3 Controles do Menu</h3>
-            <table>
-                <thead>
-                    <tr><th>Tecla</th><th>Acao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Navegar entre os itens</td></tr>
-                    <tr><td><kbd>Espaco</kbd></td><td>Marcar/desmarcar o item atual</td></tr>
-                    <tr><td><kbd>A</kbd></td><td>Selecionar/desselecionar <strong>todos</strong></td></tr>
-                    <tr><td><kbd>P</kbd></td><td>Selecionar apenas os <strong>pendentes</strong> (nao aprovados)</td></tr>
-                    <tr><td><kbd>Enter</kbd></td><td>Confirmar selecao e iniciar execucao</td></tr>
-                    <tr><td><kbd>Esc</kbd></td><td>Cancelar e sair</td></tr>
-                </tbody>
-            </table>
-
-            <div class="callout callout-info">
-                <strong>Dica</strong>
-                Use <kbd>P</kbd> para re-executar rapidamente apenas os testes que falharam ou ainda nao foram executados.
-            </div>
-
-            <h3>4.4 Acompanhar a Execucao</h3>
-            <p>Apos confirmar, o hub mostra um resumo dos testes selecionados e inicia a execucao sequencial. Durante a execucao:</p>
-            <ul>
-                <li>O console exibe o progresso em tempo real (nome do teste, tempo decorrido)</li>
-                <li>Testes com interface visual (CPU, Disco, Rede) exibem um <strong>overlay transparente</strong> na tela com informacoes de progresso</li>
-                <li>O overlay e "click-through" &mdash; nao interfere no uso da maquina</li>
-            </ul>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128247;</span>
-                <strong>Insira aqui:</strong> screenshot da execucao com overlay de progresso visivel<br>
-                <em>Salvar como: img/placeholder-execucao-progresso.png</em>
-            </div>
-
-            <h3>4.5 Interpretar Resultados na Tela</h3>
-            <p>Ao final de cada teste, o resultado e exibido:</p>
-            <table>
-                <thead>
-                    <tr><th>Indicador</th><th>Significado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><span class="badge badge-pass">PASS</span></td><td>Teste concluido com sucesso (exit code 0)</td></tr>
-                    <tr><td><span class="badge badge-fail">FAIL</span></td><td>Teste falhou (exit code diferente de 0)</td></tr>
-                    <tr><td><span class="badge badge-pending">ERR</span></td><td>Erro inesperado na execucao</td></tr>
-                </tbody>
-            </table>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128247;</span>
-                <strong>Insira aqui:</strong> screenshot do resumo final no console<br>
-                <em>Salvar como: img/placeholder-resultados-finais.png</em>
-            </div>
-        </div>
-
-        <!-- 5. Cenarios -->
-        <div class="section" id="cenarios">
-            <h2>5. Cenarios e Re-execucao</h2>
-
-            <h3>5.1 O que e um Cenario</h3>
-            <p>Um <strong>cenario</strong> e uma sessao de testes associada a uma maquina e data. Ele agrupa todas as execucoes (runs) e suas evidencias em uma unica pasta dentro de <code>Traces/</code>. Isso permite:</p>
-            <ul>
-                <li>Executar testes em diferentes momentos (dias) e consolidar resultados</li>
-                <li>Re-executar apenas os testes que falharam</li>
-                <li>Manter historico completo de todas as tentativas</li>
-            </ul>
-
-            <h3>5.2 Continuar um Cenario Existente</h3>
-            <p>Ao iniciar o hub, selecione o numero do cenario que deseja continuar. O menu de testes mostrara o status da ultima execucao de cada teste, permitindo selecionar apenas os pendentes ou falhos.</p>
-
-            <h3>5.3 Re-execucao de Testes</h3>
-            <p>Ao re-executar um teste que ja foi rodado anteriormente:</p>
-            <ol>
-                <li>As evidencias da execucao anterior sao <strong>automaticamente movidas</strong> para a pasta <code>_anterior/</code></li>
-                <li>O teste roda novamente e gera novas evidencias</li>
-                <li>O <code>_state.json</code> e atualizado com a nova run</li>
-            </ol>
-
-            <div class="callout callout-success">
-                <strong>Nenhuma evidencia e perdida</strong>
-                O historico completo fica preservado em <code>_anterior/</code>.
-            </div>
-
-            <h3>5.4 Estrutura de um Cenario <span class="tag tag-tecnico">Tecnico</span></h3>
-            <pre><code>Traces/
-  ImagemLimpa_DESKTOP-ABC_2026-04-15/
-    _state.json              # Estado e historico de todas as runs
-    _relatorio.html          # Relatorio consolidado
-    _relatorio.csv
-    _relatorio.json
-    1_cpu_memo/              # Evidencias atuais do teste de CPU
-    2_disco/                 # Evidencias atuais do teste de disco
-    3_rede/                  # Evidencias atuais do teste de rede
-    4_boot_shutdown/         # Evidencias atuais do teste de boot
-    _anterior/               # Evidencias de execucoes anteriores
-      run1_2026-04-15 09-30-00/
-      run2_2026-04-15 14-00-00/</code></pre>
-        </div>
-
-        <!-- 6. Saidas -->
-        <div class="section" id="saidas">
-            <h2>6. Saidas e Relatorios</h2>
-
-            <h3>6.1 Onde Encontrar os Resultados</h3>
-            <table>
-                <thead>
-                    <tr><th>Local</th><th>Conteudo</th><th>Quando usar</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><code>Logs/</code></td><td>Resultados <strong>por execucao</strong> (run)</td><td>Consultar uma execucao especifica</td></tr>
-                    <tr><td><code>Traces/{cenario}/</code></td><td>Evidencias e relatorio <strong>consolidado</strong></td><td>Visao completa de um ciclo de testes</td></tr>
-                </tbody>
-            </table>
-
-            <h3>6.2 Formatos Disponiveis</h3>
-            <table>
-                <thead>
-                    <tr><th>Formato</th><th>Arquivo</th><th>Melhor para</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><strong>HTML</strong></td><td><code>run_*.html</code> / <code>_relatorio.html</code></td><td>Visualizacao e apresentacao</td></tr>
-                    <tr><td><strong>CSV</strong></td><td><code>run_*.csv</code> / <code>_relatorio.csv</code></td><td>Analise em Excel ou ferramentas de BI</td></tr>
-                    <tr><td><strong>JSON</strong></td><td><code>run_*.json</code> / <code>_relatorio.json</code></td><td>Integracao com sistemas externos</td></tr>
-                    <tr><td><strong>LOG</strong></td><td><code>run_*.log</code></td><td>Diagnostico de problemas</td></tr>
-                </tbody>
-            </table>
-
-            <h3>6.3 Interpretar o Relatorio HTML</h3>
-            <p>O relatorio HTML (<code>_relatorio.html</code>) contem:</p>
-            <ul>
-                <li><strong>Cabecalho:</strong> Nome do cenario, maquina, data, estatisticas gerais</li>
-                <li><strong>Tabela de resultados:</strong> Cada teste com status colorido, duracao, evidencias</li>
-                <li><strong>Detalhes de erro:</strong> Para testes FAIL, as ultimas linhas de erro sao exibidas</li>
-            </ul>
-
-            <div class="img-placeholder">
-                <span class="icon">&#128247;</span>
-                <strong>Insira aqui:</strong> screenshot do relatorio HTML aberto no navegador<br>
-                <em>Salvar como: img/placeholder-relatorio-html.png</em>
-            </div>
-
-            <h3>6.4 Qual Relatorio Usar <span class="tag tag-gestao">Gestao</span></h3>
-            <table>
-                <thead>
-                    <tr><th>Necessidade</th><th>Relatorio recomendado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Apresentar resultado a stakeholders</td><td><code>_relatorio.html</code> (cenario consolidado)</td></tr>
-                    <tr><td>Alimentar planilha de acompanhamento</td><td><code>_relatorio.csv</code></td></tr>
-                    <tr><td>Auditar uma execucao especifica</td><td><code>run_*.json</code> (dados estruturados)</td></tr>
-                    <tr><td>Investigar falha em um teste</td><td><code>run_*.log</code> (saida completa)</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- 7. Troubleshooting -->
-        <div class="section" id="troubleshooting">
-            <h2>7. Troubleshooting</h2>
-
-            <h3>7.1 Erros Comuns</h3>
-            <table>
-                <thead>
-                    <tr><th>Problema</th><th>Causa provavel</th><th>Solucao</th></tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Hub nao inicia / fecha imediatamente</td>
-                        <td>Falta de privilegio de admin</td>
-                        <td>Execute <code>hub.bat</code> como Administrador (clique direito &rarr; Executar como administrador)</td>
-                    </tr>
-                    <tr>
-                        <td>"Python nao encontrado"</td>
-                        <td>Python nao instalado ou <code>.venv</code> ausente</td>
-                        <td>Re-execute o setup selecionando scripts 4 e 5</td>
-                    </tr>
-                    <tr>
-                        <td>Teste de rede falha com "Chrome nao encontrado"</td>
-                        <td>Google Chrome nao instalado</td>
-                        <td>Re-execute o setup selecionando script 7</td>
-                    </tr>
-                    <tr>
-                        <td>Teste de disco falha rapidamente</td>
-                        <td>Espaco insuficiente em disco</td>
-                        <td>Libere pelo menos 10 GB no disco principal</td>
-                    </tr>
-                    <tr>
-                        <td>Overlay visual nao aparece</td>
-                        <td>Problema com <code>tkinter</code></td>
-                        <td>Verifique se o Python tem suporte a tkinter (padrao na instalacao oficial)</td>
-                    </tr>
-                    <tr>
-                        <td>Teste de boot/shutdown nao completa</td>
-                        <td>Task Scheduler falhou</td>
-                        <td>Verifique se a tarefa <code>BootShutdownTest</code> existe no Agendador de Tarefas</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <h3>7.2 Re-executar um Setup Individual</h3>
-            <p>Se um setup especifico falhou, nao e necessario re-executar todos:</p>
-            <ol>
-                <li>Abra <code>hub.bat</code></li>
-                <li>Na Fase de Setup, marque <strong>apenas</strong> o script que precisa ser re-executado</li>
-                <li>Confirme com <kbd>Enter</kbd></li>
-            </ol>
-
-            <h3>7.3 Variaveis de Ambiente e config.json <span class="tag tag-tecnico">Tecnico</span></h3>
-            <p>O hub injeta as seguintes variaveis de ambiente para cada teste:</p>
-            <table>
-                <thead>
-                    <tr><th>Variavel</th><th>Descricao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><code>HUB_EVIDENCE_DIR</code></td><td>Pasta onde o teste deve salvar suas evidencias</td></tr>
-                    <tr><td><code>HUB_TRACE_DIR</code></td><td>Igual a <code>HUB_EVIDENCE_DIR</code></td></tr>
-                    <tr><td><code>HUB_TRACE_ROOT</code></td><td>Pasta raiz do cenario atual</td></tr>
-                </tbody>
-            </table>
-
-            <p>Configuracoes em <code>config.json</code>:</p>
-            <pre><code>{
-    "SkipSetup": false,
-    "Paths": {
-        "SetupRoot": "Setup",
-        "TestsRoot": "Testes",
-        "LogDir": "Logs",
-        "ResultsDir": "Logs",
-        "TracesDir": "Traces"
+<div class="section">
+<h2 id="7-troubleshooting">7. Troubleshooting</h2>
+<h3 id="71-erros-comuns">7.1 Erros Comuns</h3>
+<table>
+<thead>
+<tr>
+<th>Problema</th>
+<th>Causa provável</th>
+<th>Solução</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hub não inicia / fecha imediatamente</td>
+<td>Falta de privilégio de admin</td>
+<td>Execute <code>hub.bat</code> como Administrador (clique direito → Executar como administrador)</td>
+</tr>
+<tr>
+<td>"Python não encontrado"</td>
+<td>Python não instalado ou <code>.venv</code> ausente</td>
+<td>Re-execute o setup selecionando scripts 4 e 5</td>
+</tr>
+<tr>
+<td>Teste de rede falha com "Edge não encontrado"</td>
+<td>Microsoft Edge ausente/removido da máquina</td>
+<td>O Edge é nativo do Windows 10/11 — reinstale/repare o Microsoft Edge pelo site oficial da Microsoft</td>
+</tr>
+<tr>
+<td>Teste de rede falha com "URL do speedtest interno não configurada"</td>
+<td><code>config.local.json</code> ausente ou sem a chave <code>SpeedtestUrl</code></td>
+<td>Crie o <code>config.local.json</code> a partir do <code>config.local.example.json</code> (veja a seção 7.3)</td>
+</tr>
+<tr>
+<td>Teste de rede falha com "Falha ao iniciar o Microsoft Edge via Selenium"</td>
+<td>O Selenium Manager não conseguiu baixar o <code>msedgedriver</code></td>
+<td>Verifique o acesso da máquina ao CDN de drivers do Edge, ou coloque um <code>msedgedriver.exe</code> compatível no <code>PATH</code></td>
+</tr>
+<tr>
+<td>Teste de rede internet falha com "site inacessível ou bloqueado"</td>
+<td>Política do agente zero trust/proxy bloqueando o fast.com (ou a categoria speedtest), ou máquina sem acesso à internet</td>
+<td>Libere <code>fast.com</code>, <code>api.fast.com</code> e <code>*.oca.nflxvideo.net</code> na política; confira a tela capturada em <code>Evidencia_Internet_Bloqueio_*.png</code> e o log <code>teste_rede_internet_*.log</code></td>
+</tr>
+<tr>
+<td>Teste de rede internet com menos de 5 aferições válidas</td>
+<td>Rede instável ou medição sem concluir em 120 s</td>
+<td>Verifique a conexão e o log; os valores ausentes aparecem como <code>N/A</code> em <code>resultado_afericoes_internet.csv</code></td>
+</tr>
+<tr>
+<td>Teste de disco falha rapidamente</td>
+<td>Espaço insuficiente em disco</td>
+<td>Libere pelo menos 10 GB no disco principal</td>
+</tr>
+<tr>
+<td>Overlay visual não aparece</td>
+<td>Problema com <code>tkinter</code></td>
+<td>Verifique se o Python foi instalado com suporte a tkinter (padrão na instalação oficial)</td>
+</tr>
+<tr>
+<td>Wi-Fi FT: "O Wi-Fi não está conectado"</td>
+<td>Máquina no cabo, Wi-Fi desligado ou desconectado</td>
+<td>Conecte o Wi-Fi na rede a testar e execute de novo</td>
+</tr>
+<tr>
+<td>Wi-Fi FT: FAIL "Nenhuma troca de AP aconteceu"</td>
+<td>O operador não se afastou do AP inicial, ou só há 1 AP do SSID no percurso</td>
+<td>Refaça a caminhada indo até áreas de outros APs (confira o inventário de APs no relatório)</td>
+</tr>
+<tr>
+<td>Wi-Fi FT: FAIL "nenhum com Fast Transition" e achado "a rede usa PSK/802.1X/SAE"</td>
+<td>O 802.11r não está habilitado no SSID</td>
+<td>Habilite o 802.11r (FT) no SSID da controladora/AP; não é problema da máquina</td>
+</tr>
+<tr>
+<td>Wi-Fi FT: rede anuncia FT, mas as trocas saem "Não FT"</td>
+<td>Driver/adaptador sem suporte, driver antigo ou política do Windows</td>
+<td>Veja "Transição Rápida" nas capacidades e a data do driver no relatório; atualize o driver Wi-Fi</td>
+</tr>
+<tr>
+<td>Wi-Fi FT: trocas "Indeterminado"</td>
+<td>O driver não informa a AKM no <code>netsh wlan show interfaces</code></td>
+<td>Atualize o driver; a evidência bruta fica em <code>brutos/netsh_interfaces*.txt</code></td>
+</tr>
+<tr>
+<td>Wi-Fi FT: painel não abriu</td>
+<td>Edge bloqueado por política</td>
+<td>Abra no navegador a URL "Painel ao vivo" registrada no log <code>teste_wifi_ft_*.log</code>; o teste roda mesmo sem o painel</td>
+</tr>
+<tr>
+<td>Wi-Fi FT: métricas de internet <code>N/A</code></td>
+<td>Ping para <code>8.8.8.8</code> bloqueado pelo firewall</td>
+<td>Esperado em redes corporativas; não reprova</td>
+</tr>
+<tr>
+<td>Teste de boot/shutdown não completa os 5 ciclos</td>
+<td>Task Scheduler falhou ou máquina não reiniciou</td>
+<td>Verifique se a tarefa agendada <code>HardwareTestHub_Reiniciador</code> existe no Agendador de Tarefas</td>
+</tr>
+<tr>
+<td>Bateria: "Este teste exige um notebook com bateria reconhecida pelo Windows"</td>
+<td>Desktop ou bateria não reconhecida</td>
+<td>O teste só roda em notebook; confira a bateria no Gerenciador de Dispositivos. Nada foi alterado na máquina</td>
+</tr>
+<tr>
+<td>Bateria: "Carga da bateria em X%; o mínimo para iniciar é 95%"</td>
+<td>Bateria não carregada ou limite de carga do fabricante ativo</td>
+<td>Carregue a bateria na tomada; desative o limite de carga do fabricante (app ou BIOS) e execute de novo</td>
+</tr>
+<tr>
+<td>Bateria: "Ferramentas de captura não encontradas no PATH"</td>
+<td>Windows Performance Toolkit ausente</td>
+<td>Instale o WPT (o mesmo do Módulo 1) e inclua a pasta dele no PATH</td>
+</tr>
+<tr>
+<td>Bateria: janela "Teste de bateria não iniciado"</td>
+<td>Item do pré-voo fora do padrão ou "bloqueado por política"</td>
+<td>A janela e o <code>bateria_preflight.csv</code> listam os itens pendentes; ajuste-os (ou peça exceção da política) e execute de novo. O teste já restaurou o que tinha alterado</td>
+</tr>
+<tr>
+<td>Bateria: "sem acesso à internet" ou "monitor externo conectado" no pré-voo</td>
+<td>Rede sem internet ou monitor externo/dock ligado</td>
+<td>Conecte a rede com internet e desconecte o monitor externo antes de iniciar</td>
+</tr>
+<tr>
+<td>Bateria: "O carregador não foi desconectado em 10 min" (<code>carregador_nao_desconectado</code>)</td>
+<td>Operador ausente na hora do aviso</td>
+<td>Execute de novo com o operador presente</td>
+</tr>
+<tr>
+<td>Bateria: FAIL com motivo <code>carregador_reconectado</code></td>
+<td>Carregador reconectado antes do aviso de fim da medição</td>
+<td>Execute de novo e só reconecte quando a janela "medição encerrada" pedir</td>
+</tr>
+<tr>
+<td>Bateria: FAIL com motivo <code>protecao_bateria</code></td>
+<td>A carga chegou a 7% na fase ociosa ou antes de 30 min da fase de escritório</td>
+<td>A bateria não sustenta as duas fases: comece com 100% de carga; se persistir, registre a autonomia baixa</td>
+</tr>
+<tr>
+<td>Bateria: FAIL com motivo <code>sessao_bloqueada</code></td>
+<td>A política de bloqueio por inatividade bloqueou a sessão</td>
+<td>Desative o bloqueio automático de tela durante o teste (ou peça exceção da política) e execute de novo</td>
+</tr>
+<tr>
+<td>Bateria: FAIL com motivo <code>login_exigido</code></td>
+<td>O Google pediu login quando o Edge abriu já na bateria</td>
+<td>Faça o login no Edge na tomada e execute de novo</td>
+</tr>
+<tr>
+<td>Bateria: FAIL com motivo <code>padronizacao_na_bateria</code></td>
+<td>Brilho, modo de energia ou Economia de energia não ficaram no padrão depois de desconectar</td>
+<td>Veja as linhas "efetivo" no <code>bateria_preflight.csv</code>; confira o software de energia do fabricante</td>
+</tr>
+<tr>
+<td>Bateria: máquina ficou com brilho 50%, Bluetooth desligado ou energia alterada</td>
+<td>O processo foi encerrado à força (ex.: janela do hub fechada) e a restauração automática não rodou</td>
+<td>Use a coluna <code>Antes</code> do <code>bateria_preflight.csv</code>: brilho e Bluetooth pelas Configurações; para os itens de energia, <code>powercfg /setdcvalueindex SCHEME_CURRENT &lt;subgrupo&gt; &lt;configuração&gt; &lt;valor&gt;</code> seguido de <code>powercfg /setactive SCHEME_CURRENT</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="72-re-executar-um-setup-individual">7.2 Re-executar um Setup Individual</h3>
+<p>Se um setup específico falhou, não é necessário re-executar todos:</p>
+<ol>
+<li>Abra <code>hub.bat</code></li>
+<li>Na Fase de Setup, marque <strong>apenas</strong> o script que precisa ser re-executado</li>
+<li>Confirme com <code>Enter</code></li>
+</ol>
+<h3 id="73-variáveis-de-ambiente-e-configjson-técnico">7.3 Variáveis de Ambiente e config.json <span class="tag tag-tecnico">Técnico</span></h3>
+<p>O hub injeta as seguintes variáveis de ambiente para cada teste:</p>
+<table>
+<thead>
+<tr>
+<th>Variável</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HUB_EVIDENCE_DIR</code></td>
+<td>Pasta onde o teste deve salvar suas evidências</td>
+</tr>
+<tr>
+<td><code>HUB_TRACE_DIR</code></td>
+<td>Igual a <code>HUB_EVIDENCE_DIR</code></td>
+</tr>
+<tr>
+<td><code>HUB_TRACE_ROOT</code></td>
+<td>Pasta <code>Traces</code> do cenário atual</td>
+</tr>
+</tbody>
+</table>
+<p>Configurações em <code>config.json</code>:</p>
+<pre><code class="language-json">{
+    &quot;SkipSetup&quot;: false,
+    &quot;Paths&quot;: {
+        &quot;SetupRoot&quot;: &quot;Setup&quot;,
+        &quot;TestsRoot&quot;: &quot;Testes&quot;,
+        &quot;ResultadosDir&quot;: &quot;Resultados&quot;,
+        &quot;ExecucoesDir&quot;: &quot;Execucoes&quot;
     },
-    "Settings": {
-        "PythonVenvName": ".venv",
-        "HtmlReportTitle": "Hardware Test Hub - Relatorio Final"
+    &quot;Settings&quot;: {
+        &quot;PythonVenvName&quot;: &quot;.venv&quot;,
+        &quot;HtmlReportTitle&quot;: &quot;Hardware Test Hub - Relatório Final&quot;
     }
-}</code></pre>
-        </div>
+}
+</code></pre>
+<p>Valores internos ficam em <code>config.local.json</code>, na raiz do hub. Esse arquivo não vai para o repositório; o modelo é o <code>config.local.example.json</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Chave</th>
+<th>Variável de ambiente equivalente</th>
+<th>Uso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SpeedtestUrl</code></td>
+<td><code>HUB_SPEEDTEST_URL</code> (tem prioridade)</td>
+<td>URL do speedtest interno do Módulo 3</td>
+</tr>
+</tbody>
+</table>
+</div>
 
-        <!-- 8. Referencia Rapida -->
-        <div class="section" id="referencia">
-            <h2>8. Referencia Rapida</h2>
-
-            <h3>Controles do Menu</h3>
-            <table>
-                <thead>
-                    <tr><th>Tecla</th><th>Acao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Navegar</td></tr>
-                    <tr><td><kbd>Espaco</kbd></td><td>Marcar/desmarcar item</td></tr>
-                    <tr><td><kbd>A</kbd></td><td>Selecionar/desselecionar todos</td></tr>
-                    <tr><td><kbd>P</kbd></td><td>Selecionar apenas pendentes</td></tr>
-                    <tr><td><kbd>Enter</kbd></td><td>Confirmar e executar</td></tr>
-                    <tr><td><kbd>Esc</kbd></td><td>Cancelar</td></tr>
-                </tbody>
-            </table>
-
-            <h3>Exit Codes dos Testes</h3>
-            <table>
-                <thead>
-                    <tr><th>Codigo</th><th>Status</th><th>Significado</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><code>0</code></td><td><span class="badge badge-pass">PASS</span></td><td>Teste concluido com sucesso</td></tr>
-                    <tr><td><code>&ne; 0</code></td><td><span class="badge badge-fail">FAIL</span></td><td>Teste falhou ou encontrou erro</td></tr>
-                </tbody>
-            </table>
-
-            <h3>Comandos de Execucao</h3>
-            <pre><code>REM Iniciar o hub (com elevacao UAC automatica)
+<div class="section">
+<h2 id="8-referência-rápida">8. Referência Rápida</h2>
+<h3 id="controles-do-menu">Controles do Menu</h3>
+<table>
+<thead>
+<tr>
+<th>Tecla</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>↑</code> <code>↓</code></td>
+<td>Navegar</td>
+</tr>
+<tr>
+<td><code>Espaço</code></td>
+<td>Marcar/desmarcar item</td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td>Selecionar/desselecionar todos</td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td>Selecionar apenas pendentes</td>
+</tr>
+<tr>
+<td><code>Enter</code></td>
+<td>Confirmar e executar</td>
+</tr>
+<tr>
+<td><code>Esc</code></td>
+<td>Cancelar</td>
+</tr>
+</tbody>
+</table>
+<h3 id="exit-codes-dos-testes">Exit Codes dos Testes</h3>
+<table>
+<thead>
+<tr>
+<th>Código</th>
+<th>Status</th>
+<th>Significado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>PASS</td>
+<td>Teste concluído com sucesso</td>
+</tr>
+<tr>
+<td><code>≠ 0</code></td>
+<td>FAIL</td>
+<td>Teste falhou ou encontrou erro</td>
+</tr>
+</tbody>
+</table>
+<h3 id="comandos-de-execução">Comandos de Execução</h3>
+<pre><code class="language-bat">REM Iniciar o hub (com elevação UAC automática)
 hub.bat
 
-REM Iniciar diretamente via PowerShell (ja como Admin)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File hub.ps1</code></pre>
+REM Iniciar diretamente via PowerShell (já como Admin)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File hub.ps1
+</code></pre>
+<h3 id="atalhos-de-teclado-nos-testes-visuais">Atalhos de Teclado nos Testes Visuais</h3>
+<table>
+<thead>
+<tr>
+<th>Atalho</th>
+<th>Teste</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Ctrl+Q</code></td>
+<td>CPU &amp; Memória, Bateria</td>
+<td>Interromper teste de forma segura</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><strong>Nota sobre imagens</strong>Os placeholders <code>img/placeholder-*.png</code> devem ser substituídos por screenshots reais capturados durante a execução do hub. Crie a pasta <code>docs/img/</code> e salve as imagens com os nomes indicados.</div>
+</div>
 
-            <h3>Atalhos nos Testes Visuais</h3>
-            <table>
-                <thead>
-                    <tr><th>Atalho</th><th>Teste</th><th>Acao</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>CPU & Memoria</td><td>Interromper teste de forma segura</td></tr>
-                </tbody>
-            </table>
-        </div>
+<div style="text-align: center; padding: 24px; color: var(--cinza-neutro); font-size: 12px;">
+<p>Hardware Test Hub &mdash; Manual de Execução v1.1 &mdash; Novembro de 2026</p>
+<p style="margin-top: 8px;">Gerado a partir de <code>docs/manual-de-execucao.md</code>.</p>
+</div>
 
-        <!-- Footer -->
-        <div style="text-align: center; padding: 24px; color: var(--cinza-neutro); font-size: 12px;">
-            <p><strong>Nota sobre imagens:</strong> Os placeholders devem ser substituidos por screenshots reais. Crie a pasta <code>docs/img/</code> e salve as imagens com os nomes indicados em cada placeholder.</p>
-            <p style="margin-top: 12px;">Hardware Test Hub &mdash; Manual de Execucao v1.0 &mdash; Abril 2026</p>
-        </div>
-
-    </div>
+</div>
 </body>
 </html>

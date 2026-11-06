@@ -25,7 +25,7 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 
 ### Destaques
 
-- **Menu interativo**: seleção múltipla por setas e espaço; `A` marca todos e `P` marca só os pendentes ou que falharam.
+- **Menu interativo**: seleção múltipla por setas e espaço. Os testes pendentes já vêm marcados, `A` marca todos e `P` volta a marcar só os pendentes.
 - **Duas fases**: preparação da máquina (energia, Windows Update, Python, bloatware…) e testes de hardware.
 - **Cenários persistentes**: o histórico de execuções fica em `_state.json`. Numa reexecução, as evidências anteriores vão para `_anterior/` em vez de serem sobrescritas.
 - **Relatórios em vários formatos**: HTML, CSV, JSON e log completo, por execução e consolidados por cenário, além de CSVs temáticos prontos para BI.
@@ -128,7 +128,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\TesteHub\hub.ps1
 | `↑` `↓` | Navegar |
 | `Espaço` | Marcar ou desmarcar |
 | `A` | Marcar ou desmarcar todos |
-| `P` | Marcar só os pendentes e os que falharam |
+| `P` | Marcar só os pendentes (nunca executados no cenário) |
 | `Enter` | Confirmar |
 | `Esc` | Cancelar |
 
@@ -214,7 +214,7 @@ No menu inicial, a opção **`E`** compacta um cenário em ZIP, confere a contag
 │   ├── 4_boot_shutdown/
 │   ├── 5_bateria/
 │   └── 6_wifi_fast_transition/
-├── docs/                      # manual de execução e metodologia (Markdown + HTML)
+├── docs/                      # manual e metodologia (.md = fonte; .html gerado por gerar_html.py)
 └── .github/                   # CI, Dependabot e modelos de issue e de PR
 ```
 
@@ -233,7 +233,7 @@ O hub encontra o script sozinho. Para regras de CSV temático, scripts auxiliare
 | [Manual de execução](docs/manual-de-execucao.md) | Operadores e equipe técnica | Instalação, passo a passo por módulo, re-execução e troubleshooting |
 | [Metodologia de testes](docs/metodologia-de-testes.md) | Equipe técnica, gestão e auditoria | Objetivo, procedimento, métricas e critério de aprovação de cada módulo |
 
-As versões `.html` em `docs/` são as mesmas páginas, para leitura offline ou impressão.
+As versões `.html` em `docs/` são as mesmas páginas, para leitura offline ou impressão. Elas são **geradas** a partir dos `.md` e não devem ser editadas à mão: depois de alterar um `.md`, rode `python docs/gerar_html.py` (requer `pip install markdown`). O CI falha se os dois formatos divergirem.
 
 ## Contribuindo
 

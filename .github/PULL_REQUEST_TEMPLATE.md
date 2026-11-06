@@ -16,5 +16,5 @@
 - [ ] O script retorna `0` só quando o teste passa e `≠ 0` em qualquer falha
 - [ ] Evidências são gravadas em `HUB_EVIDENCE_DIR` (nada na raiz do projeto)
 - [ ] Nenhum IP, hostname, credencial ou perfil `.wpaProfile` foi incluído
-- [ ] `docs/` atualizado (manual e metodologia), se o comportamento mudou
+- [ ] `docs/` atualizado (manual e metodologia), se o comportamento mudou, e HTML regenerado com `python docs/gerar_html.py`
 - [ ] `CHANGELOG.md` atualizado na seção "Não lançado"
