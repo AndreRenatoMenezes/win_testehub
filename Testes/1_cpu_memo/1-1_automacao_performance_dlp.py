@@ -441,6 +441,15 @@ def worker_thread(ui):
         logger.info("=== Todos os testes concluídos com sucesso! ===")
         time.sleep(3)
 
+    except KeyboardInterrupt:
+        # Ctrl+Q (check_stop) lanca KeyboardInterrupt, que nao e Exception: sem
+        # este bloco a thread morria com exit code 0 (PASS) e o WPR seguia gravando.
+        logger.warning("Execução interrompida pelo usuário.")
+        cancel_wpr_if_active()
+        ui.atualizar(0, "Interrompido pelo usuário.", "--")
+        _exit_code = 1
+        time.sleep(3)
+
     except Exception as err:
         logger.critical(f"Falha durante a execução: {err}", exc_info=True)
         cancel_wpr_if_active()

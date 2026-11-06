@@ -35,6 +35,10 @@ Testes/**/*.log
 Testes/**/*.csv
 Testes/**/*.png
 *.etl
+# Arquivos de carga criados pelas variantes DLP/USB na pasta do script
+# (100 MB a 2 GB: acima do limite de 100 MB por arquivo do GitHub)
+Testes/**/*.xlsx
+Testes/**/*.dat
 
 # ---------------------------------------------------------------------------
 # Sistema operacional / Google Drive / editores

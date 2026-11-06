@@ -11,6 +11,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - **Módulo 3 (Rede interna):** falhas de pré-requisito (navegador ou driver ausente) encerravam só a thread de trabalho, e o teste saía com código 0, registrando **PASS** sem medir nada. Agora elas resultam em **FAIL**, com o motivo no log.
 - **Módulo 3 (Rede interna):** o teste dependia de Google Chrome e de um `chromedriver.exe` local, que não fazem parte do projeto, e mandava rodar o setup `7_install_google_chrome`, que não existe. Agora ele usa o Microsoft Edge, com o driver obtido pelo Selenium Manager, como o Módulo 3.1 e como já dizia a documentação.
 - **Módulos 1 e 1.1 (CPU e Memória):** os dois testes gravavam na mesma pasta, então um sobrescrevia o `cpu_memoria.csv` e o `Resultados_Consolidados/` do outro, e a consolidação de quem rodasse por último misturava nas médias os CSVs exportados pelo outro teste. A variante 1.1 agora grava em `1_cpu_memo/dlp_usb/`, com o CSV temático `cpu_memoria_dlp.csv`.
+- **Módulo 1.1 (CPU e Memória, DLP/USB):** a parada segura (`Ctrl+Q`) escapava do tratamento de erros: o teste registrava **PASS** e a captura WPR continuava gravando em segundo plano. Agora a interrupção resulta em **FAIL** e cancela o WPR, como nos demais módulos.
+- `.gitignore`: os arquivos de carga das variantes DLP/USB (100 MB e 2 GB, criados na pasta do script) não podem mais ser versionados por engano.
 
 ### Adicionado
 
