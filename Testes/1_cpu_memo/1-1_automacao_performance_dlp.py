@@ -35,9 +35,14 @@ _exit_code = 0
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 SESSION_TIMESTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
-OUTPUT_PATH = os.environ.get(
-    'HUB_EVIDENCE_DIR',
-    os.path.join(BASE_DIR, f"Traces_{SESSION_TIMESTAMP}")
+# No hub, esta variante divide a pasta 1_cpu_memo com o Modulo 1. Sem uma
+# subpasta propria, os dois gravariam cpu_memoria.csv e Resultados_Consolidados/
+# no mesmo lugar, e a consolidacao por glob (CSV_*) misturaria os CSVs de um
+# teste nas medias do outro.
+_HUB_EVIDENCE_DIR = os.environ.get('HUB_EVIDENCE_DIR')
+OUTPUT_PATH = (
+    os.path.join(_HUB_EVIDENCE_DIR, "dlp_usb") if _HUB_EVIDENCE_DIR
+    else os.path.join(BASE_DIR, f"Traces_{SESSION_TIMESTAMP}")
 )
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 
@@ -396,7 +401,8 @@ def consolidate_results(ui):
     # --- CSV para o Hub ---
     cpu_freq = psutil.cpu_freq()
     mem = psutil.virtual_memory()
-    cpu_memo_csv_path = os.path.join(OUTPUT_PATH, "cpu_memoria.csv")
+    # Nome distinto do CSV tematico do Modulo 1: o hub copia os dois para Resultados/
+    cpu_memo_csv_path = os.path.join(OUTPUT_PATH, "cpu_memoria_dlp.csv")
     with open(cpu_memo_csv_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(["Metrica", "Valor", "Unidade"])

@@ -183,8 +183,9 @@ Resultados/
 └── ImagemLimpa_DESKTOP-ABC_2026-04-15/
     ├── maquina.csv                          # modelo, série, CPU, RAM, disco, SO
     ├── cenario.csv                          # status consolidado do cenário
-    └── cpu_memoria.csv, disco.csv, rede.csv, rede_internet.csv,
-        boot_shutdown.csv, bateria.csv, wifi_ft.csv
+    ├── cpu_memoria.csv, disco.csv, rede.csv, rede_internet.csv,
+    │   boot_shutdown.csv, bateria.csv, wifi_ft.csv
+    └── cpu_memoria_dlp.csv, disco_usb.csv   # variantes 1.1 e 2.1, quando executadas
 ```
 
 | Preciso de… | Use |

@@ -62,7 +62,16 @@ Se o teste gerar um CSV-resumo, registre-o no mapa `$expectedCSVs` da função `
 "7_gpu" = "gpu.csv"
 ```
 
-### 4. Execução não interativa
+### 4. Variantes na mesma pasta
+
+O hub dá a todos os scripts de uma pasta o mesmo `HUB_EVIDENCE_DIR`. Uma variante que divide a pasta com o módulo principal, como a `1-1` dentro de `1_cpu_memo`, deve:
+
+- gravar numa **subpasta própria** de `HUB_EVIDENCE_DIR` (a `1-1` usa `dlp_usb/`). Caso contrário, os dois testes sobrescrevem os arquivos um do outro, e globs como `CSV_*` misturam os resultados;
+- usar um nome de CSV temático próprio e registrá-lo no mapa `$variantCSVs` da `Copy-ThematicCSVs`, que copia esses CSVs para `Resultados/` só quando eles existem.
+
+O teste `.github/scripts/Test-CopyThematicCSVs.ps1`, executado no CI, cobre esse comportamento.
+
+### 5. Execução não interativa
 
 Scripts `.ps1` rodam com `-NonInteractive`, e a saída de todos é capturada para o log. Quando o teste precisar do operador, use uma janela própria (Tkinter, por exemplo), como fazem os módulos 5 e 6.
 

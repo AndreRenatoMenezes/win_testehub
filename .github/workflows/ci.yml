@@ -99,6 +99,12 @@ jobs:
           if ($falhas -gt 0) { exit 1 }
           Write-Host "Todos os scripts .ps1 foram analisados sem erro de sintaxe."
 
+      - name: Teste de regressão do hub (Copy-ThematicCSVs)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-CopyThematicCSVs.ps1
+          exit $LASTEXITCODE
+
       - name: PSScriptAnalyzer (severidade Error)
         shell: pwsh
         run: |

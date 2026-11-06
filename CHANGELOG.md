@@ -10,6 +10,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 - **Módulo 3 (Rede interna):** falhas de pré-requisito (navegador ou driver ausente) encerravam só a thread de trabalho, e o teste saía com código 0, registrando **PASS** sem medir nada. Agora elas resultam em **FAIL**, com o motivo no log.
 - **Módulo 3 (Rede interna):** o teste dependia de Google Chrome e de um `chromedriver.exe` local, que não fazem parte do projeto, e mandava rodar o setup `7_install_google_chrome`, que não existe. Agora ele usa o Microsoft Edge, com o driver obtido pelo Selenium Manager, como o Módulo 3.1 e como já dizia a documentação.
+- **Módulos 1 e 1.1 (CPU e Memória):** os dois testes gravavam na mesma pasta, então um sobrescrevia o `cpu_memoria.csv` e o `Resultados_Consolidados/` do outro, e a consolidação de quem rodasse por último misturava nas médias os CSVs exportados pelo outro teste. A variante 1.1 agora grava em `1_cpu_memo/dlp_usb/`, com o CSV temático `cpu_memoria_dlp.csv`.
+
+### Adicionado
+
+- O hub copia para `Resultados/` os CSVs das variantes DLP/USB (`cpu_memoria_dlp.csv` e `disco_usb.csv`), quando elas são executadas.
+- Teste de regressão da cópia de CSVs temáticos do hub, executado pelo CI no Windows PowerShell 5.1.
 
 ## [1.0.0] - 2026-11-06
 

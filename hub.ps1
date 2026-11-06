@@ -939,6 +939,13 @@ function Copy-ThematicCSVs {
         "6_wifi_fast_transition" = "wifi_ft.csv"
     }
 
+    # CSVs das variantes DLP/USB (1-1 e 2-1): opcionais -- copiados quando
+    # existirem, sem aviso quando ausentes. Caminho relativo a TraceRunDir.
+    $variantCSVs = [ordered]@{
+        "1_cpu_memo/dlp_usb/cpu_memoria_dlp.csv" = "cpu_memoria_dlp.csv"
+        "2_disco/disco_usb.csv"                  = "disco_usb.csv"
+    }
+
     $copied  = 0
     $missing = 0
 
@@ -961,6 +968,16 @@ function Copy-ThematicCSVs {
                 Add-Content -Path $LogFile -Value "[INFO] CSV tematico '$csvName' pendente -- teste '$folder' nao executado" -Encoding UTF8
             }
             $missing++
+        }
+    }
+
+    foreach ($relPath in $variantCSVs.Keys) {
+        $sourcePath = Join-Path $TraceRunDir $relPath
+        if (Test-Path $sourcePath) {
+            $csvName = $variantCSVs[$relPath]
+            Copy-Item -Path $sourcePath -Destination (Join-Path $ResultadosDir $csvName) -Force
+            Write-Host "  [OK] $csvName copiado" -ForegroundColor Green
+            $copied++
         }
     }
 
