@@ -90,7 +90,7 @@ Antes de cada script, o hub injeta `HUB_EVIDENCE_DIR` (onde gravar as evidência
 | Disco | ≥ 10 GB livres (o Módulo 2 cria um arquivo de teste de 8 GB) |
 | Software | Python 3.12 e as dependências são instalados pelo próprio setup. O Microsoft Edge já vem no Windows |
 | Módulos 1 e 5 | Windows Performance Toolkit (`wpr.exe` e `wpaexporter.exe`) no `PATH`, parte do Windows ADK; Edge com a conta Google logada |
-| Módulo 3 | Google Chrome e um `chromedriver.exe` compatível em `Testes/3_rede/` |
+| Módulo 3 | `config.local.json` com a URL do speedtest interno (veja [Configuração](#configuração)) |
 | Módulos 1.1 e 2.1 | Pendrive montado como `E:\` (configurável no topo de cada script) |
 | Módulo 5 | Notebook com bateria reconhecida e carregada a ≥ 95% |
 | Módulo 6 | Wi-Fi conectado à rede testada, com 2 ou mais APs do mesmo SSID no percurso |

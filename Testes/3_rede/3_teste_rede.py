@@ -4,14 +4,15 @@ import time
 import csv
 import re
 import json
+import shutil
 import logging
-import winreg
 import tkinter as tk
 import threading
 from datetime import datetime
 from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.edge.options import Options as EdgeOptions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -43,7 +44,6 @@ def carregar_url_teste():
 
 
 URL_TESTE = carregar_url_teste()
-CAMINHO_CHROMEDRIVER = os.path.join(DIRETORIO_ATUAL, "chromedriver.exe")
 SESSION_TIMESTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
 
 # --- INTEGRACAO COM O HARDWARE TEST HUB ---
@@ -76,73 +76,30 @@ logger.addHandler(_ch)
 
 
 # =============================================================================
-# DETECCAO DO CHROME
+# DETECCAO DO EDGE
 # =============================================================================
-def encontrar_chrome():
-    """Localiza o binario do Chrome via registry e caminhos conhecidos."""
+def encontrar_edge():
+    """Localiza o binario do Microsoft Edge em caminhos conhecidos.
 
-    # 1. Registry: App Paths (visao 64-bit e 32-bit)
-    for flag in (winreg.KEY_READ | winreg.KEY_WOW64_64KEY, winreg.KEY_READ | winreg.KEY_WOW64_32KEY):
-        try:
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe",
-                0, flag
-            )
-            caminho, _ = winreg.QueryValueEx(key, "")
-            winreg.CloseKey(key)
-            if caminho and os.path.isfile(caminho):
-                logger.debug(f"Chrome encontrado via App Paths: {caminho}")
-                return caminho
-        except OSError:
-            pass
-
-    # 2. Registry: Uninstall (WOW6432Node incluso pela flag acima)
-    for flag in (winreg.KEY_READ | winreg.KEY_WOW64_64KEY, winreg.KEY_READ | winreg.KEY_WOW64_32KEY):
-        try:
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Google Chrome",
-                0, flag
-            )
-            install_dir, _ = winreg.QueryValueEx(key, "InstallLocation")
-            winreg.CloseKey(key)
-            if install_dir:
-                caminho = os.path.join(install_dir, "chrome.exe")
-                if os.path.isfile(caminho):
-                    logger.debug(f"Chrome encontrado via Uninstall key: {caminho}")
-                    return caminho
-        except OSError:
-            pass
-
-    # 3. Registry: HKCU BLBeacon (instalacao per-user)
-    try:
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"SOFTWARE\Google\Chrome\BLBeacon")
-        winreg.CloseKey(key)
-        caminho = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Google", "Chrome", "Application", "chrome.exe")
-        if os.path.isfile(caminho):
-            logger.debug(f"Chrome encontrado via HKCU BLBeacon: {caminho}")
-            return caminho
-    except OSError:
-        pass
-
-    # 4. Fallback: caminhos de instalacao comuns
+    Verificacao leve, usada apenas para emitir mensagem de erro clara quando o
+    Edge nao existe. A inicializacao do driver NAO depende deste caminho: o
+    Selenium Manager localiza o Edge padrao do Windows e obtem o msedgedriver.
+    """
     candidatos = [
-        os.path.join(os.environ.get("ProgramFiles", ""), "Google", "Chrome", "Application", "chrome.exe"),
-        os.path.join(os.environ.get("ProgramFiles(x86)", ""), "Google", "Chrome", "Application", "chrome.exe"),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Google", "Chrome", "Application", "chrome.exe"),
+        os.path.join(os.environ.get("ProgramFiles", ""), "Microsoft", "Edge", "Application", "msedge.exe"),
+        os.path.join(os.environ.get("ProgramFiles(x86)", ""), "Microsoft", "Edge", "Application", "msedge.exe"),
+        shutil.which("msedge"),
     ]
     for caminho in candidatos:
-        logger.debug(f"Verificando caminho: {caminho}")
-        if os.path.isfile(caminho):
-            logger.debug(f"Chrome encontrado em: {caminho}")
+        if caminho and os.path.isfile(caminho):
+            logger.debug(f"Edge encontrado em: {caminho}")
             return caminho
 
-    logger.debug("Chrome nao encontrado em nenhum caminho conhecido.")
+    logger.debug("Edge nao encontrado em nenhum caminho conhecido.")
     return None
 
 
-CAMINHO_CHROME = encontrar_chrome()
+CAMINHO_EDGE = encontrar_edge()
 
 
 # =============================================================================
@@ -215,40 +172,43 @@ class MonitorOverlay:
 
 def realizar_afericoes(ui):
     logger.info("Verificando pre-requisitos...")
-    logger.info(f"  ChromeDriver : {CAMINHO_CHROMEDRIVER}")
-    logger.info(f"  Chrome       : {CAMINHO_CHROME or 'NAO ENCONTRADO'}")
+    logger.info(f"  Edge         : {CAMINHO_EDGE or 'NAO ENCONTRADO'}")
     logger.info(f"  URL Teste    : {URL_TESTE}")
     logger.info(f"  Afericoes    : {QTD_AFERICOES}")
     logger.info(f"  Saida        : {DIRETORIO_SAIDA}")
 
+    # Esta funcao roda dentro do worker_thread: falhas de pre-requisito usam
+    # raise (nunca sys.exit, que so encerra a thread e deixaria o exit code 0).
     if not URL_TESTE:
-        # raise (e nao sys.exit) para o worker_thread registrar exit code 1
         raise RuntimeError(
             "URL do speedtest interno nao configurada. Defina HUB_SPEEDTEST_URL "
             "ou crie config.local.json na raiz do hub (modelo: config.local.example.json)."
         )
 
-    if not CAMINHO_CHROME:
-        logger.error("Google Chrome nao foi encontrado no sistema.")
-        logger.error("Execute o setup '7_install_google_chrome' antes deste teste.")
-        sys.exit(1)
-
-    if not os.path.isfile(CAMINHO_CHROMEDRIVER):
-        logger.error(f"chromedriver.exe nao encontrado em: {CAMINHO_CHROMEDRIVER}")
-        sys.exit(1)
+    if not CAMINHO_EDGE:
+        raise RuntimeError(
+            "Microsoft Edge nao foi encontrado no sistema. O Edge e nativo do "
+            "Windows 10/11; verifique se nao foi removido da maquina."
+        )
 
     logger.info("Pre-requisitos verificados com sucesso.")
 
-    options = webdriver.ChromeOptions()
-    options.binary_location = CAMINHO_CHROME
+    options = EdgeOptions()
+    # Mantido do procedimento original: o speedtest interno e acessado por IP via HTTPS.
     options.add_argument('--ignore-certificate-errors')
     options.add_argument('--start-maximized')
 
-    logger.info("Iniciando Google Chrome via Selenium...")
-    ui.atualizar(0, QTD_AFERICOES, "Iniciando Chrome e acessando URL...")
-    driver = webdriver.Chrome(service=Service(CAMINHO_CHROMEDRIVER), options=options)
+    logger.info("Iniciando Microsoft Edge via Selenium...")
+    ui.atualizar(0, QTD_AFERICOES, "Iniciando Edge e acessando URL...")
+    try:
+        driver = webdriver.Edge(options=options)
+    except WebDriverException as e:
+        raise RuntimeError(
+            "Falha ao iniciar o Microsoft Edge via Selenium. Verifique se o "
+            "Selenium Manager conseguiu obter o msedgedriver (acesso ao CDN de drivers)."
+        ) from e
     wait = WebDriverWait(driver, 15)
-    logger.info("Chrome iniciado com sucesso.")
+    logger.info("Edge iniciado com sucesso.")
 
     resultados_csv = []
 
@@ -336,7 +296,7 @@ def realizar_afericoes(ui):
         logger.error(f"Erro durante as afericoes: {e}", exc_info=True)
 
     finally:
-        logger.info("Encerrando Chrome...")
+        logger.info("Encerrando Edge...")
         driver.quit()
 
     return resultados_csv

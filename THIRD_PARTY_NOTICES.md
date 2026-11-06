@@ -36,8 +36,7 @@ SOFTWARE.
 
 | Componente | Usado em | Como é obtido |
 |------------|----------|---------------|
-| Microsoft Edge WebDriver (`msedgedriver.exe`) | Módulo 1 | Selenium Manager, automaticamente, ou [download oficial](https://developer.microsoft.com/microsoft-edge/tools/webdriver/) |
-| ChromeDriver (`chromedriver.exe`) | Módulo 3 | [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) |
+| Microsoft Edge WebDriver (`msedgedriver.exe`) | Módulos 1, 3 e 3.1 | Selenium Manager, automaticamente, ou [download oficial](https://developer.microsoft.com/microsoft-edge/tools/webdriver/) |
 | Python 3.12 | Todos os testes `.py` | Setup `4_install_python` (python.org) |
 | Pacotes Python (psutil, selenium, pandas, pyautogui, pyperclip, pynput, requests, speedtest-cli) | Testes `.py` | Setup `5_install_py_dependencies` (PyPI) |
 | Windows ADK, CrystalDiskMark e CrystalDiskInfo | Preparação da máquina (o Windows Performance Toolkit dos Módulos 1 e 5 faz parte do ADK) | Setup `3_softwares_msStore` (winget) |
