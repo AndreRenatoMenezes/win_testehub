@@ -21,7 +21,7 @@
 
 ## 1. Visão Geral
 
-O **Hardware Test Hub** é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (CPU, memória, disco, rede, boot/shutdown e bateria) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.
+O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (CPU, memória, disco, rede, boot/shutdown e bateria) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.
 
 ---
 
@@ -475,7 +475,7 @@ Configurações em `config.json`:
     },
     "Settings": {
         "PythonVenvName": ".venv",
-        "HtmlReportTitle": "Hardware Test Hub - Relatório Final"
+        "HtmlReportTitle": "WinTestHub - Relatório Final"
     }
 }
 ```

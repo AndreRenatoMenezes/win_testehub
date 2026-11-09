@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relatório — Wi-Fi Fast Transition (802.11r)</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDQ4IDQ4IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IldpblRlc3RIdWIiPjx0aXRsZT5XaW5UZXN0SHViPC90aXRsZT48cmVjdCB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHJ4PSI4LjYiIGZpbGw9IiMwNTA4MEMiLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4LjY0IDguNjQpIHNjYWxlKDAuNjQwMDApIiBmaWxsPSJub25lIj48cmVjdCB4PSI0IiB5PSI1IiB3aWR0aD0iNDAiIGhlaWdodD0iMzgiIHJ4PSIyIiBzdHJva2U9IiNFRUVCRTIiIHN0cm9rZS13aWR0aD0iNSIvPjxwYXRoIGQ9Ik0xNC41IDI4IEwyMSAzNC41IEwzMy41IDIxLjUiIHN0cm9rZT0iIzYxQzU2OCIgc3Ryb2tlLXdpZHRoPSI2IiBzdHJva2UtbGluZWNhcD0ic3F1YXJlIi8+PC9nPjwvc3ZnPg==">
 <style>
   .viz-root {
     color-scheme: light;
     --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
     --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
     --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
-    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --good-ink: #006300;
+    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --good-ink: #006300; --marca: #2E7C35;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) .viz-root {
@@ -18,7 +19,7 @@
       --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
       --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
       --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-      --good-ink: #0ca30c;
+      --good-ink: #0ca30c; --marca: #61C568;
     }
   }
   :root[data-theme="dark"] .viz-root {
@@ -26,7 +27,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-    --good-ink: #0ca30c;
+    --good-ink: #0ca30c; --marca: #61C568;
   }
   * { box-sizing: border-box; }
   body { margin: 0; }
@@ -73,11 +74,13 @@
   .scroll { max-height: 320px; overflow: auto; }
   footer { margin-top: 36px; color: var(--muted); font-size: 12px; }
   @media print { .tema { display: none; } .card, .tile { break-inside: avoid; } }
+  .marca { width: 28px; height: 28px; flex: none; color: var(--ink); }
 </style>
 </head>
 <body>
 <div class="viz-root" id="raiz">
   <div class="topo">
+    <svg class="marca" viewBox="0 0 48 48" fill="none" role="img" aria-label="WinTestHub"><title>WinTestHub</title><rect x="4" y="5" width="40" height="38" rx="2" stroke="currentColor" stroke-width="3"/><line x1="4" y1="13" x2="44" y2="13" stroke="currentColor" stroke-width="3"/><path d="M14.5 28 L21 34.5 L33.5 21.5" style="stroke: var(--marca)" stroke-width="4" stroke-linecap="square"/></svg>
     <div>
       <h1>Wi-Fi Fast Transition (802.11r)</h1>
       <div class="sub" id="sub"></div>

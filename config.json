@@ -8,6 +8,6 @@
     },
     "Settings": {
         "PythonVenvName": ".venv",
-        "HtmlReportTitle": "Hardware Test Hub - Relatório Final"
+        "HtmlReportTitle": "WinTestHub - Relatório Final"
     }
 }

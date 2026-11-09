@@ -1,8 +1,13 @@
 <div align="center">
 
-# Hardware Test Hub
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/logo-dark.svg">
+  <img src="docs/assets/brand/logo-light.svg" alt="WinTestHub" width="420">
+</picture>
 
-**Framework para validação de hardware em máquinas Windows.**<br>
+<h1>WinTestHub</h1>
+
+**Hardware Test Hub: framework para validação de hardware em máquinas Windows.**<br>
 Prepara o ambiente, executa testes de CPU, memória, disco, rede, boot, bateria e Wi-Fi e gera relatórios rastreáveis por cenário.
 
 [![CI](https://github.com/AndreRenatoMenezes/win_testehub/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreRenatoMenezes/win_testehub/actions/workflows/ci.yml)
@@ -19,7 +24,7 @@ Prepara o ambiente, executa testes de CPU, memória, disco, rede, boot, bateria 
 
 ## Sobre
 
-O **Hardware Test Hub** padroniza a homologação de notebooks e desktops Windows. Um único ponto de entrada (`hub.bat`) eleva os privilégios, prepara a máquina e abre um menu no console onde o operador escolhe os testes. Cada teste é um script independente, que devolve PASS/FAIL pelo exit code e grava evidências numa pasta controlada pelo hub.
+O **WinTestHub** (Hardware Test Hub) padroniza a homologação de notebooks e desktops Windows. Um único ponto de entrada (`hub.bat`) eleva os privilégios, prepara a máquina e abre um menu no console onde o operador escolhe os testes. Cada teste é um script independente, que devolve PASS/FAIL pelo exit code e grava evidências numa pasta controlada pelo hub.
 
 Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `ComAgentes`). Assim dá para comparar a mesma máquina em configurações diferentes, retomar uma bateria de testes em outro dia e reexecutar só o que falhou, sem perder nenhuma evidência.
 
@@ -162,7 +167,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\TesteHub\hub.ps1
 | `Paths.ExecucoesDir` | `Execucoes` | Logs, traces e estado de cada cenário |
 | `Paths.ResultadosDir` | `Resultados` | Resultados estruturados (CSVs) de cada cenário |
 | `Settings.PythonVenvName` | `.venv` | Ambiente virtual usado para os testes `.py` |
-| `Settings.HtmlReportTitle` | `Hardware Test Hub - Relatório Final` | Título dos relatórios HTML |
+| `Settings.HtmlReportTitle` | `WinTestHub - Relatório Final` | Título dos relatórios HTML |
 
 ### `config.local.json` (não versionado)
 
@@ -233,6 +238,7 @@ No menu inicial, a opção **`E`** compacta um cenário em ZIP, confere a contag
 │   ├── 5_bateria/
 │   └── 6_wifi_fast_transition/
 ├── docs/                      # manual e metodologia (.md = fonte; .html gerado por gerar_html.py)
+│   └── assets/brand/          # logo, ícone, favicon e imagem de prévia do repositório
 └── .github/                   # CI, Dependabot e modelos de issue e de PR
 ```
 
@@ -252,6 +258,26 @@ O hub encontra o script sozinho. Para regras de CSV temático, scripts auxiliare
 | [Metodologia de testes](docs/metodologia-de-testes.md) | Equipe técnica, gestão e auditoria | Objetivo, procedimento, métricas e critério de aprovação de cada módulo |
 
 As versões `.html` em `docs/` são as mesmas páginas, para leitura offline ou impressão. Elas são **geradas** a partir dos `.md` e não devem ser editadas à mão: depois de alterar um `.md`, rode `python docs/gerar_html.py` (requer `pip install markdown`). O CI falha se os dois formatos divergirem.
+
+## Identidade visual
+
+Os arquivos da marca ficam em [`docs/assets/brand/`](docs/assets/brand/). O símbolo é uma janela com um check: a máquina Windows homologada, com resultado PASS.
+
+| Arquivo | Uso |
+|---------|-----|
+| `logo-dark.svg` / `logo-light.svg` | Logo completo para fundo escuro e para fundo claro |
+| `icon.svg`, `icon-256.png`, `icon-512.png` | Ícone do projeto (avatar, atalhos) |
+| `favicon.ico` | Favicon (16 a 256 px) |
+| `social-preview.png` | Prévia do repositório no GitHub (1280 × 640), em *Settings → Social preview* |
+
+| Cor | Hex | Uso |
+|-----|-----|-----|
+| Fundo | `#05080C` | Fundo escuro do ícone e da prévia |
+| Off-white | `#EEEBE2` | Moldura e texto sobre fundo escuro |
+| Verde | `#61C568` | Check e destaque sobre fundo escuro |
+| Verde escuro | `#2E7C35` | Check e destaque sobre fundo claro |
+
+Tipografia: [Geist e Geist Mono](https://vercel.com/font) (SIL Open Font License). Nos SVGs o texto já está convertido em curvas, então não é preciso ter a fonte instalada.
 
 ## Contribuindo
 

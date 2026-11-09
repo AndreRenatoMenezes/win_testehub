@@ -1,4 +1,4 @@
-# Contribuindo com o Hardware Test Hub
+# Contribuindo com o WinTestHub
 
 Obrigado por ajudar a melhorar o projeto. Este guia cobre o fluxo de trabalho e, principalmente, o **contrato** que todo script precisa seguir para funcionar dentro do hub.
 

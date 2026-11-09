@@ -27,7 +27,7 @@
 
 ### 1.1 Objetivo
 
-O **Hardware Test Hub** é um framework de validação de hardware projetado para avaliar o desempenho e a estabilidade dos principais componentes de uma máquina Windows: processador, memória, disco, rede, ciclo de boot/shutdown, consumo de bateria e roaming Wi-Fi com Fast Transition (802.11r). Os testes simulam cenários de uso intensivo e coletam métricas objetivas para determinar se o equipamento atende aos padrões operacionais esperados.
+O **WinTestHub** (Hardware Test Hub) é um framework de validação de hardware projetado para avaliar o desempenho e a estabilidade dos principais componentes de uma máquina Windows: processador, memória, disco, rede, ciclo de boot/shutdown, consumo de bateria e roaming Wi-Fi com Fast Transition (802.11r). Os testes simulam cenários de uso intensivo e coletam métricas objetivas para determinar se o equipamento atende aos padrões operacionais esperados.
 
 ### 1.2 Escopo
 

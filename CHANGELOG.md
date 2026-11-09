@@ -17,6 +17,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- **Identidade visual WinTestHub:** logo (janela com check), ícone, favicon e imagem de prévia do repositório em `docs/assets/brand/`. A marca entra no README, no banner do console, nos relatórios HTML do hub (`run_*.html` e `_relatorio.html`), na documentação HTML e nos painéis do Módulo 6. O título padrão dos relatórios passa a ser `WinTestHub - Relatorio Final`; a tarefa agendada `HardwareTestHub_Reiniciador` mantém o nome.
 - Documentação das variantes DLP/USB (seções 4.8 e 5.7 da metodologia) e da opção `[E]` de exportação do menu.
 - `docs/gerar_html.py`: gera os HTML da documentação a partir dos `.md`, com o visual original (`docs/assets/estilo.css`). O CI falha se os dois formatos divergirem.
 

@@ -1,11 +1,11 @@
 /* Estilo dos documentos HTML gerados por docs/gerar_html.py.
-   Extraido dos HTML originais do Hardware Test Hub. */
+   Identidade visual do WinTestHub (docs/assets/brand/). */
 
 :root {
-    --verde-tech: #1EBD53;
-    --verde-tech-light: #e8f9ee;
-    --verde-tech-dark: #17943f;
-    --grafite: #1A1C1E;
+    --verde-tech: #2E7C35;
+    --verde-tech-light: #EAF6EB;
+    --verde-tech-dark: #24632A;
+    --grafite: #0B0F14;
     --cinza-neutro: #687076;
     --branco: #FFFFFF;
     --cinza-gelo: #F4F6F8;
@@ -24,7 +24,7 @@
 }
 
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Geist', 'Segoe UI', sans-serif;
     font-weight: 400;
     font-size: 15px;
     line-height: 1.7;
@@ -48,8 +48,15 @@ body {
     border-left: 4px solid var(--verde-tech);
 }
 
+.doc-logo {
+    display: block;
+    height: 36px;
+    width: auto;
+    margin-bottom: 24px;
+}
+
 .doc-header h1 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Geist', 'Segoe UI', sans-serif;
     font-weight: 700;
     font-size: 28px;
     color: var(--grafite);
@@ -57,7 +64,7 @@ body {
 }
 
 .doc-header .subtitle {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Geist', 'Segoe UI', sans-serif;
     font-weight: 600;
     font-size: 16px;
     color: var(--verde-tech);
@@ -88,7 +95,7 @@ body {
 }
 
 .toc h2 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Geist', 'Segoe UI', sans-serif;
     font-weight: 600;
     font-size: 18px;
     color: var(--grafite);
@@ -123,7 +130,7 @@ body {
 }
 
 h2 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Geist', 'Segoe UI', sans-serif;
     font-weight: 700;
     font-size: 22px;
     color: var(--grafite);
@@ -133,7 +140,7 @@ h2 {
 }
 
 h3 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Geist', 'Segoe UI', sans-serif;
     font-weight: 600;
     font-size: 17px;
     color: var(--grafite);
@@ -182,7 +189,7 @@ table {
 
 thead th {
     background: var(--cinza-gelo);
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Geist', 'Segoe UI', sans-serif;
     font-weight: 600;
     font-size: 13px;
     text-transform: uppercase;
@@ -205,7 +212,7 @@ tbody tr:hover {
 
 /* Code blocks */
 code {
-    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-family: 'Geist Mono', 'Cascadia Code', 'Consolas', monospace;
     font-size: 13px;
     background: var(--cinza-gelo);
     padding: 2px 6px;
@@ -307,7 +314,7 @@ kbd {
     border: 1px solid #CBD5E0;
     border-radius: 4px;
     padding: 2px 8px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Geist', 'Segoe UI', sans-serif;
     font-size: 12px;
     font-weight: 500;
     box-shadow: 0 1px 2px rgba(0,0,0,0.08);

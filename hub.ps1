@@ -16,7 +16,7 @@ if (-not (Test-Path $configFile)) {
         }
         Settings = @{
             PythonVenvName  = ".venv"
-            HtmlReportTitle = "Hardware Test Hub - Relatorio Final"
+            HtmlReportTitle = "WinTestHub - Relatorio Final"
         }
     }
     $defaultConfig | ConvertTo-Json -Depth 5 | Set-Content $configFile -Encoding UTF8
@@ -34,14 +34,52 @@ $VenvPath      = Join-Path $PSScriptRoot $config.Settings.PythonVenvName
 # ---- Banner ------------------------------------------------------------------
 
 function Write-Header {
+    # Logo WinTestHub (janela + check) em ASCII; arquivos da marca em docs/assets/brand/
     Clear-Host
     Write-Host ""
-    Write-Host "  +==========================================+" -ForegroundColor Cyan
-    Write-Host "  |         HARDWARE  TEST  HUB              |" -ForegroundColor Cyan
-    Write-Host "  |  .ps1 + .py  |  multi-select  |  log     |" -ForegroundColor DarkCyan
-    Write-Host "  +==========================================+" -ForegroundColor Cyan
+    Write-Host "   +----------+" -ForegroundColor Gray
+    Write-Host "   |==========|   " -ForegroundColor Gray -NoNewline
+    Write-Host "Win" -ForegroundColor White -NoNewline
+    Write-Host "Test" -ForegroundColor Green -NoNewline
+    Write-Host "Hub" -ForegroundColor White
+    Write-Host "   |       " -ForegroundColor Gray -NoNewline
+    Write-Host "/" -ForegroundColor Green -NoNewline
+    Write-Host "  |   " -ForegroundColor Gray -NoNewline
+    Write-Host "HARDWARE / TEST / HUB" -ForegroundColor DarkGray
+    Write-Host "   |   " -ForegroundColor Gray -NoNewline
+    Write-Host "\  /" -ForegroundColor Green -NoNewline
+    Write-Host "   |   " -ForegroundColor Gray -NoNewline
+    Write-Host ".ps1 + .py  |  multi-select  |  log" -ForegroundColor DarkGray
+    Write-Host "   |    " -ForegroundColor Gray -NoNewline
+    Write-Host "\/" -ForegroundColor Green -NoNewline
+    Write-Host "    |" -ForegroundColor Gray
+    Write-Host "   +----------+" -ForegroundColor Gray
     Write-Host ""
 }
+
+# ---- Identidade visual dos relatorios HTML -----------------------------------
+# Mesmas cores do logo (docs/assets/brand/): grafite #0B0F14 e verde #2E7C35.
+
+$BrandFavicon = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDQ4IDQ4IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IldpblRlc3RIdWIiPjx0aXRsZT5XaW5UZXN0SHViPC90aXRsZT48cmVjdCB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHJ4PSI4LjYiIGZpbGw9IiMwNTA4MEMiLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4LjY0IDguNjQpIHNjYWxlKDAuNjQwMDApIiBmaWxsPSJub25lIj48cmVjdCB4PSI0IiB5PSI1IiB3aWR0aD0iNDAiIGhlaWdodD0iMzgiIHJ4PSIyIiBzdHJva2U9IiNFRUVCRTIiIHN0cm9rZS13aWR0aD0iNSIvPjxwYXRoIGQ9Ik0xNC41IDI4IEwyMSAzNC41IEwzMy41IDIxLjUiIHN0cm9rZT0iIzYxQzU2OCIgc3Ryb2tlLXdpZHRoPSI2IiBzdHJva2UtbGluZWNhcD0ic3F1YXJlIi8+PC9nPjwvc3ZnPg==">'
+$BrandHeader  = '<svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true"><rect x="4" y="5" width="40" height="38" rx="2" stroke="#0B0F14" stroke-width="2.5"/><line x1="4" y1="13" x2="44" y2="13" stroke="#0B0F14" stroke-width="2.5"/><path d="M14.5 28 L21 34.5 L33.5 21.5" stroke="#2E7C35" stroke-width="3.5" stroke-linecap="square"/></svg>'
+$BrandCss = @'
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; color: #0b0f14; margin: 40px; }
+            .brand { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #2e7c35; padding-bottom: 14px; margin-bottom: 24px; }
+            .brand-mark { width: 44px; height: 44px; flex: none; }
+            .brand-name { font-family: Consolas, 'Courier New', monospace; font-size: 0.75em; letter-spacing: 0.2em; text-transform: uppercase; color: #5b636d; margin-bottom: 4px; }
+            .brand-name b { color: #2e7c35; font-weight: normal; }
+            h1 { margin: 0; font-size: 1.6em; font-weight: 600; color: #0b0f14; }
+            .summary { background: #ffffff; padding: 20px; border-radius: 4px; border: 1px solid #dfe3e8; margin-bottom: 20px; }
+            .summary p { margin: 5px 0; font-size: 1.1em; }
+            table { width: 100%; border-collapse: collapse; background: #ffffff; border: 1px solid #dfe3e8; }
+            th, td { padding: 12px 15px; border-bottom: 1px solid #dfe3e8; text-align: left; }
+            th { background-color: #0b0f14; color: #eeebe2; font-weight: 600; }
+            tr:hover { background-color: #f1f3f5; }
+            .badge { padding: 5px 10px; border-radius: 999px; font-weight: bold; font-size: 0.9em; color: white; }
+            .bg-PASS { background-color: #2e7c35; }
+            .bg-FAIL { background-color: #c53030; }
+            .bg-ERROR { background-color: #b45309; }
+'@
 
 # ---- Descoberta de scripts ---------------------------------------------------
 
@@ -711,29 +749,19 @@ function Show-Summary {
     <head>
         <meta charset="UTF-8">
         <title>$htmlTitle</title>
+        $BrandFavicon
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; color: #343a40; margin: 40px; }
-            h1 { color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 10px; }
-            .summary { background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-            .summary p { margin: 5px 0; font-size: 1.1em; }
-            table { width: 100%; border-collapse: collapse; background: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            th, td { padding: 12px 15px; border-bottom: 1px solid #dee2e6; text-align: left; }
-            th { background-color: #0056b3; color: white; font-weight: bold; }
-            tr:hover { background-color: #f1f3f5; }
-            .badge { padding: 5px 10px; border-radius: 12px; font-weight: bold; font-size: 0.9em; color: white; }
-            .bg-PASS { background-color: #28a745; }
-            .bg-FAIL { background-color: #dc3545; }
-            .bg-ERROR { background-color: #fd7e14; }
+$BrandCss
         </style>
     </head>
     <body>
-        <h1>$htmlTitle</h1>
+        <div class="brand">$BrandHeader<div><div class="brand-name">Win<b>Test</b>Hub</div><h1>$htmlTitle</h1></div></div>
         <div class="summary">
             <p><strong>Maquina (Host):</strong> $env:COMPUTERNAME</p>
             <p><strong>Utilizador:</strong> $env:USERNAME</p>
             <p><strong>Inicio da Execucao:</strong> $($jsonObj.RunTimestamp)</p>
             <p><strong>Tempo Total:</strong> $([Math]::Round($TotalSec,2))s</p>
-            <p><strong>Estatisticas:</strong> Total: $($Results.Count) | <span style="color:#28a745;font-weight:bold;">Aprovados: $pass</span> | <span style="color:#dc3545;font-weight:bold;">Falhados: $fail</span> | <span style="color:#fd7e14;font-weight:bold;">Erros: $err</span></p>
+            <p><strong>Estatisticas:</strong> Total: $($Results.Count) | <span style="color:#2e7c35;font-weight:bold;">Aprovados: $pass</span> | <span style="color:#c53030;font-weight:bold;">Falhados: $fail</span> | <span style="color:#b45309;font-weight:bold;">Erros: $err</span></p>
         </div>
         <table>
             <tr><th>Fase</th><th>Nome do Teste</th><th>Tipo</th><th>Status</th><th>Duracao</th><th>Traces Gerados</th></tr>
@@ -741,7 +769,7 @@ function Show-Summary {
                 $errRow = ""
                 if ($_.Status -ne "PASS" -and $_.ErrorSnippet) {
                     $safeSnippet = $_.ErrorSnippet -replace '&','&amp;' -replace '<','&lt;' -replace '>','&gt;' -replace "`n","<br>"
-                    $errRow = "<tr><td colspan='6' style='background:#fff5f5;color:#dc3545;padding-left:30px;font-family:Consolas,monospace;font-size:0.85em;border-left:3px solid #dc3545;'>$safeSnippet</td></tr>"
+                    $errRow = "<tr><td colspan='6' style='background:#fff5f5;color:#c53030;padding-left:30px;font-family:Consolas,monospace;font-size:0.85em;border-left:3px solid #c53030;'>$safeSnippet</td></tr>"
                 }
                 "<tr>
                     <td>$($_.Kind.ToUpper())</td>
@@ -843,30 +871,20 @@ function Build-ConsolidatedReport {
     <head>
         <meta charset="UTF-8">
         <title>$htmlTitle - Consolidado</title>
+        $BrandFavicon
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; color: #343a40; margin: 40px; }
-            h1 { color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 10px; }
-            .summary { background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-            .summary p { margin: 5px 0; font-size: 1.1em; }
-            table { width: 100%; border-collapse: collapse; background: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            th, td { padding: 12px 15px; border-bottom: 1px solid #dee2e6; text-align: left; }
-            th { background-color: #0056b3; color: white; font-weight: bold; }
-            tr:hover { background-color: #f1f3f5; }
-            .badge { padding: 5px 10px; border-radius: 12px; font-weight: bold; font-size: 0.9em; color: white; }
-            .bg-PASS { background-color: #28a745; }
-            .bg-FAIL { background-color: #dc3545; }
-            .bg-ERROR { background-color: #fd7e14; }
+$BrandCss
         </style>
     </head>
     <body>
-        <h1>$htmlTitle - Relatorio Consolidado</h1>
+        <div class="brand">$BrandHeader<div><div class="brand-name">Win<b>Test</b>Hub</div><h1>$htmlTitle - Relatorio Consolidado</h1></div></div>
         <div class="summary">
             <p><strong>Cenario:</strong> $($State.scenario)</p>
             <p><strong>Maquina:</strong> $($State.machine)</p>
             <p><strong>Criado em:</strong> $($State.createdAt)</p>
             <p><strong>Ultima execucao:</strong> $($State.lastRunAt)</p>
             <p><strong>Total de runs:</strong> $totalRuns</p>
-            <p><strong>Estatisticas:</strong> Total: $total | <span style="color:#28a745;font-weight:bold;">Aprovados: $pass</span> | <span style="color:#dc3545;font-weight:bold;">Falhados: $fail</span> | <span style="color:#fd7e14;font-weight:bold;">Erros: $err</span></p>
+            <p><strong>Estatisticas:</strong> Total: $total | <span style="color:#2e7c35;font-weight:bold;">Aprovados: $pass</span> | <span style="color:#c53030;font-weight:bold;">Falhados: $fail</span> | <span style="color:#b45309;font-weight:bold;">Erros: $err</span></p>
         </div>
         <table>
             <tr><th>Teste</th><th>Status</th><th>Duracao</th><th>Run</th><th>Pasta</th></tr>
@@ -1171,7 +1189,7 @@ $allResults    = [System.Collections.Generic.List[PSCustomObject]]::new()
 $setupResults  = [System.Collections.Generic.List[PSCustomObject]]::new()
 $runStart      = Get-Date
 
-$logHeader = "HARDWARE TEST HUB -- $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`nHost: $env:COMPUTERNAME | User: $env:USERNAME`nCenario: $(Split-Path $scenarioDir -Leaf) | Run: #$currentRunId`nSetupRoot: $SetupRoot`nTestsRoot: $TestsRoot`nTracesDir: $traceRunDir`nLogsDir: $logRunDir`nResultados: $resultadosCenarioDir`n$('-'*62)"
+$logHeader = "WINTESTHUB -- $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`nHost: $env:COMPUTERNAME | User: $env:USERNAME`nCenario: $(Split-Path $scenarioDir -Leaf) | Run: #$currentRunId`nSetupRoot: $SetupRoot`nTestsRoot: $TestsRoot`nTracesDir: $traceRunDir`nLogsDir: $logRunDir`nResultados: $resultadosCenarioDir`n$('-'*62)"
 Add-Content -Path $logFile -Value $logHeader -Encoding UTF8
 
 # ==== FASE 1: PREPARACAO =====================================================

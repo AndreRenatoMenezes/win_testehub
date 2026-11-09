@@ -12,6 +12,7 @@ Requer o pacote "markdown" (pip install markdown).
 """
 
 import argparse
+import base64
 import html
 import re
 import sys
@@ -21,6 +22,7 @@ import markdown
 
 DOCS = Path(__file__).resolve().parent
 CSS = DOCS / "assets" / "estilo.css"
+MARCA = DOCS / "assets" / "brand"
 DOCUMENTOS = ["manual-de-execucao.md", "metodologia-de-testes.md"]
 
 MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
@@ -33,9 +35,20 @@ TAGS = {"Técnico": "tecnico", "Gestão": "gestao", "Operador": "operador"}
 FONTES = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500'
-    '&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">'
+    '<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700'
+    '&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">'
 )
+
+
+def logo():
+    """Logo (fundo claro) embutido no cabeçalho, sem depender de arquivo externo."""
+    svg = (MARCA / "logo-light.svg").read_text(encoding="utf-8").strip()
+    return svg.replace("<svg ", '<svg class="doc-logo" ', 1)
+
+
+def favicon():
+    dados = base64.b64encode((MARCA / "icon.svg").read_bytes().replace(b"\r\n", b"\n")).decode("ascii")
+    return f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,{dados}">'
 
 
 def slug_github(texto, separador="-"):
@@ -166,6 +179,7 @@ def gerar(origem: Path) -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{html.escape(titulo_pagina)}</title>
+{favicon()}
 {FONTES}
 <style>
 {css}
@@ -175,6 +189,7 @@ def gerar(origem: Path) -> str:
 <div class="container">
 
 <div class="doc-header">
+{logo()}
 <h1>{html.escape(nome)}</h1>
 <div class="subtitle">{html.escape(subtitulo)}</div>
 <div class="doc-meta">{meta_html}</div>
