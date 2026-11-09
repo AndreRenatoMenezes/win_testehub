@@ -23,6 +23,9 @@ O **Hardware Test Hub** padroniza a homologação de notebooks e desktops Window
 
 Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `ComAgentes`). Assim dá para comparar a mesma máquina em configurações diferentes, retomar uma bateria de testes em outro dia e reexecutar só o que falhou, sem perder nenhuma evidência.
 
+![Cenário existente sendo retomado, com o status PASS/FAIL e a duração de cada script de preparação](docs/assets/screenshots/05-cenario-existente.png)
+<br><sub>*Retomando um cenário (run #2): o menu mostra o último resultado e a duração de cada script.*</sub>
+
 ### Destaques
 
 - **Menu interativo**: seleção múltipla por setas e espaço. Os testes pendentes já vêm marcados, `A` marca todos e `P` volta a marcar só os pendentes.
@@ -45,6 +48,9 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 | 4 | Boot e Shutdown | `4_boot_shutdown_auto.py` | 5 reinícios automáticos e análise dos eventos 100/200 do `Diagnostics-Performance` | ~30–40 min | nenhum boot ou shutdown crítico (> 60 s) no dia |
 | 5 | Bateria | `5_teste_bateria.py` | 60 min ociosa + 60 min de escritório na bateria, com pré-voo de padronização, WPR, SRUM e relatório de energia | ~2h20–2h40 | a coleta é válida nas duas fases |
 | 6 | Wi-Fi Fast Transition | `6_teste_fast_transition.py` | Roaming 802.11r durante uma caminhada de 5 min, com painel ao vivo e inventário de APs | ~7 min | ≥ 1 troca de AP com FT |
+
+![Menu da Fase 2 com os nove módulos de teste agrupados por categoria](docs/assets/screenshots/03-fase2-testes.png)
+<br><sub>*Fase 2: os módulos aparecem agrupados por pasta, todos marcados na primeira execução.*</sub>
 
 > Os módulos 5 e 6 precisam de um operador presente: desconectar o carregador, no 5, e andar com o notebook, no 6. O passo a passo está no [manual](docs/manual-de-execucao.md#46-teste-de-bateria-módulo-5--passo-a-passo-do-operador).
 
@@ -109,8 +115,17 @@ notepad config.local.json
 
 3. Copie os perfis WPA internos para as pastas dos módulos 1 e 5 (veja [Arquivos não versionados](#arquivos-não-versionados)).
 4. Dê dois cliques em **`hub.bat`** e aceite o UAC.
+
+   ![Tela inicial do hub pedindo o nome do cenário](docs/assets/screenshots/01-inicio.png)
+
 5. Na primeira execução, crie um cenário (`N`), marque **todos** os scripts de preparação (`A`) e confirme com `Enter`.
+
+   ![Fase 1 com o cenário recém-criado e os dez scripts de preparação pendentes](docs/assets/screenshots/02-fase1-preparacao.png)
+
 6. Na fase de testes, escolha os módulos e acompanhe o progresso no console.
+
+   ![Execução em andamento: um teste com FAIL e a causa, a pergunta para continuar e o overlay de progresso do teste de disco](docs/assets/screenshots/04-execucao.png)
+   <br><sub>*Quando um teste falha, o hub mostra a causa e pergunta se deve continuar. O overlay "Monitor de Disco" não captura cliques.*</sub>
 
 <details>
 <summary>Executar direto pelo PowerShell (já como administrador)</summary>
@@ -131,6 +146,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\TesteHub\hub.ps1
 | `P` | Marcar só os pendentes (nunca executados no cenário) |
 | `Enter` | Confirmar |
 | `Esc` | Cancelar |
+
+![Fase 2 com o status de cada teste no cenário e seleção parcial](docs/assets/screenshots/06-fase2-status.png)
+<br><sub>*Numa reexecução, cada teste mostra o último status (PASS, FAIL ou pendente) e dá para marcar só os que interessam.*</sub>
 
 ## Configuração
 
