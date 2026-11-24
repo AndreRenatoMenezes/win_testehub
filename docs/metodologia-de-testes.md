@@ -825,7 +825,7 @@ Os cinco módulos são independentes (um por linguagem ou ferramenta) e podem se
 2. **Repositórios:** clona (ou reaproveita) cada repositório na pasta de trabalho (`%USERPROFILE%\wintestehub-dev-work`, configurável por `DevWorkDir` no `config.local.json`), faz checkout da tag fixa e limpa a árvore (`git reset --hard` + `git clean -fdx`). Fora da medição.
 3. **Preparo (1x por carga):** downloads e builds de aquecimento que a carga pressupõe (ex.: `go mod download`, pull das imagens). Fora da medição.
 4. **Execuções (3 por carga):** `setup` → **`command` cronometrado** → `cleanup`. O `setup` deixa o estado inicial igual em toda execução (ex.: apaga `bin/obj`, limpa o cache do Go, recria o venv); o `cleanup` desfaz o que a carga criou.
-5. **Monitoramento contínuo:** a cada 0,5 s o módulo confere o limite de tempo e o Ctrl+Q; a cada 2 s, a tomada. Desconectar a tomada ou apertar Ctrl+Q interrompe a carga em curso, roda o `cleanup` e encerra o módulo com FAIL.
+5. **Monitoramento contínuo:** a cada 0,5 s o módulo confere o limite de tempo e o Ctrl+Q; a cada 2 s, a tomada. Desconectar a tomada ou apertar Ctrl+Q interrompe a carga em curso, roda o `cleanup` e encerra o módulo com FAIL. O Ctrl+Q também para a fila do hub: os módulos seguintes não rodam. Já a tomada desconectada só encerra o módulo atual.
 6. **Registro:** versões das ferramentas, plano de energia, tomada, commit dos repositórios e digests das imagens de container entram no JSON do módulo.
 
 ### 10.4 Referência e Limite de Tempo

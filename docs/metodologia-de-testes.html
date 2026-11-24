@@ -2128,7 +2128,7 @@ li {
 <li><strong>Repositórios:</strong> clona (ou reaproveita) cada repositório na pasta de trabalho (<code>%USERPROFILE%\wintestehub-dev-work</code>, configurável por <code>DevWorkDir</code> no <code>config.local.json</code>), faz checkout da tag fixa e limpa a árvore (<code>git reset --hard</code> + <code>git clean -fdx</code>). Fora da medição.</li>
 <li><strong>Preparo (1x por carga):</strong> downloads e builds de aquecimento que a carga pressupõe (ex.: <code>go mod download</code>, pull das imagens). Fora da medição.</li>
 <li><strong>Execuções (3 por carga):</strong> <code>setup</code> → <strong><code>command</code> cronometrado</strong> → <code>cleanup</code>. O <code>setup</code> deixa o estado inicial igual em toda execução (ex.: apaga <code>bin/obj</code>, limpa o cache do Go, recria o venv); o <code>cleanup</code> desfaz o que a carga criou.</li>
-<li><strong>Monitoramento contínuo:</strong> a cada 0,5 s o módulo confere o limite de tempo e o Ctrl+Q; a cada 2 s, a tomada. Desconectar a tomada ou apertar Ctrl+Q interrompe a carga em curso, roda o <code>cleanup</code> e encerra o módulo com FAIL.</li>
+<li><strong>Monitoramento contínuo:</strong> a cada 0,5 s o módulo confere o limite de tempo e o Ctrl+Q; a cada 2 s, a tomada. Desconectar a tomada ou apertar Ctrl+Q interrompe a carga em curso, roda o <code>cleanup</code> e encerra o módulo com FAIL. O Ctrl+Q também para a fila do hub: os módulos seguintes não rodam. Já a tomada desconectada só encerra o módulo atual.</li>
 <li><strong>Registro:</strong> versões das ferramentas, plano de energia, tomada, commit dos repositórios e digests das imagens de container entram no JSON do módulo.</li>
 </ol>
 <h3 id="104-referência-e-limite-de-tempo">10.4 Referência e Limite de Tempo</h3>

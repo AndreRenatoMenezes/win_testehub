@@ -1320,10 +1320,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File hub.ps1
 <tr>
 <td><code>Ctrl+Q</code></td>
 <td>CPU &amp; Memória, Bateria, Cargas dev (7 a 11)</td>
-<td>Interromper teste de forma segura</td>
+<td>Interromper o teste de forma segura e <strong>parar a fila</strong>: os testes seguintes ficam como <em>cancelado</em> e o hub gera o relatório com o que já rodou</td>
 </tr>
 </tbody>
 </table>
+<p>O Ctrl+Q vale para a execução inteira, não só para o teste em andamento. Para pular só um teste com falha, não use o Ctrl+Q: espere a pergunta "Teste falhou. Deseja continuar?" e responda <code>S</code>. Teclas apertadas durante o teste são descartadas antes dessa pergunta, então elas não respondem por você.</p>
 <div class="callout callout-info"><strong>Nota sobre imagens</strong>Os placeholders <code>img/placeholder-*.png</code> devem ser substituídos por screenshots reais capturados durante a execução do hub. Crie a pasta <code>docs/img/</code> e salve as imagens com os nomes indicados.</div>
 </div>
 

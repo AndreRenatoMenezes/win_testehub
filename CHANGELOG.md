@@ -12,9 +12,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Setups `7_install_devtools_dev` (Git, .NET SDK 10, Go, uv, docker-compose), `10_preparar_podman` (WSL2, Podman CLI e `podman machine` rootful) e `11_ca_corporativa_dev` (opcional; só age em rede com inspeção TLS).
 - CSVs temáticos `dev_dotnet.csv`, `dev_go.csv`, `dev_python.csv`, `dev_containers.csv` e `dev_git_arquivos.csv` copiados para `Resultados/`.
 - Teste de regressão da ordem do menu (`Test-GetScriptsOrder.ps1`) no CI.
+- Teste de regressão da parada da fila por Ctrl+Q (`Test-StopSignal.ps1`) no CI.
 
 ### Alterado
 
+- **Ctrl+Q para a fila inteira:** nos testes com parada segura (1, 1.1, 2.1, 5 e 7 a 11), o Ctrl+Q agora interrompe o teste atual **e** os testes seguintes, que aparecem como *cancelado*. O relatório é gerado com o que já rodou. Antes, o hub seguia para o próximo teste. O hub também descarta as teclas apertadas durante um teste antes de perguntar "Deseja continuar?".
 - **Menu do hub:** ordenação numérica natural dos scripts (`10_` depois de `9_`). Na Fase de Setup, `12_remover_appx_bloatware` e `13_remover_onedrive` passam a aparecer no fim da lista, e não mais antes do `1_`.
 
 ### Corrigido

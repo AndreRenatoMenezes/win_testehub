@@ -743,6 +743,18 @@ class Overlay:
         self.root.mainloop()
 
 
+def _sinalizar_parada_hub():
+    """Ctrl+Q: pede ao hub que pare a fila inteira (arquivo-sinal em HUB_STOP_FILE).
+    Fora do hub a variavel nao existe e nada acontece."""
+    caminho = os.environ.get("HUB_STOP_FILE")
+    if caminho:
+        try:
+            with open(caminho, "w", encoding="utf-8") as f:
+                f.write("ctrl+q")
+        except OSError:
+            pass
+
+
 def _iniciar_ctrl_q(ctx):
     try:
         from pynput import keyboard as kb
@@ -757,6 +769,7 @@ def _iniciar_ctrl_q(ctx):
         elif estado["ctrl"] and getattr(key, "char", None) in ("q", "Q", "\x11"):
             log("Parada segura solicitada (Ctrl+Q).")
             ctx.pedir_parada("parada solicitada pelo operador (Ctrl+Q)")
+            _sinalizar_parada_hub()
 
     def on_release(key):
         if key in (kb.Key.ctrl_l, kb.Key.ctrl_r):
