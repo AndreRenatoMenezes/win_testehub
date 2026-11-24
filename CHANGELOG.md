@@ -16,6 +16,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Alterado
 
+- **Janela flutuante das cargas dev:** o cronômetro agora anda em todas as fases. Fora da medição (preparo, setup, cleanup e download dos repositórios), ele aparece em amarelo com o nome da fase. Uma linha extra mostra a CPU da máquina e a última saída do comando, para o operador saber que o teste não travou. Antes, no preparo longo do A5c, a janela ficava parada com a carga anterior.
 - **Ctrl+Q para a fila inteira:** nos testes com parada segura (1, 1.1, 2.1, 5 e 7 a 11), o Ctrl+Q agora interrompe o teste atual **e** os testes seguintes, que aparecem como *cancelado*. O relatório é gerado com o que já rodou. Antes, o hub seguia para o próximo teste. O hub também descarta as teclas apertadas durante um teste antes de perguntar "Deseja continuar?".
 - **Menu do hub:** ordenação numérica natural dos scripts (`10_` depois de `9_`). Na Fase de Setup, `12_remover_appx_bloatware` e `13_remover_onedrive` passam a aparecer no fim da lista, e não mais antes do `1_`.
 

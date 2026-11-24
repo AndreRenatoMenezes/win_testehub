@@ -347,7 +347,7 @@ Depois dos setups, **feche e reabra o hub** para o PATH novo valer.
 
 **3. Selecione os módulos**
 
-No menu, marque os módulos desejados (seções **Dev Dotnet**, **Dev Go**, **Dev Python**, **Dev Containers** e **Dev Git Arquivos**). Uma janela flutuante mostra a carga atual, a execução (1 a 3), o cronômetro e o limite. **Ctrl+Q** interrompe com segurança (a carga é encerrada, o `cleanup` roda e o módulo termina com FAIL).
+No menu, marque os módulos desejados (seções **Dev Dotnet**, **Dev Go**, **Dev Python**, **Dev Containers** e **Dev Git Arquivos**). Uma janela flutuante mostra a carga atual, a execução (1 a 3) e o limite. O cronômetro fica em azul ("medindo") durante a medição. Em amarelo, ele mostra as fases fora da medição: download do repositório, preparo, setup e cleanup. O preparo pode levar mais de 10 minutos na primeira vez, por exemplo para compilar os testes do Hugo. A última linha da janela mostra o uso de CPU da máquina e a última saída do comando em curso, com há quantos segundos ela apareceu. Se o cronômetro anda e a CPU está alta, o teste está trabalhando. Alguns comandos ficam vários minutos sem escrever nada, como o `podman build`. **Ctrl+Q** interrompe com segurança: a carga é encerrada, o `cleanup` roda, o módulo termina com FAIL e o hub para a fila.
 
 **4. Veja o resultado**
 

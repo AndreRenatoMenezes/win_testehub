@@ -291,6 +291,11 @@ class Contexto:
             raise TempoExcedido()
 
 
+# Atividade atual (log do passo em curso), lida pela janela flutuante para mostrar
+# que o teste continua vivo mesmo nas fases longas sem cronometro de medicao.
+ATIVIDADE = {"log": None}
+
+
 class Executor:
     def __init__(self, ctx):
         self.ctx = ctx
@@ -323,6 +328,7 @@ class Executor:
         argv[0] = self._resolver_exe(argv[0], cwd, env)
         arq_log.write(f"$ {' '.join(argv)}\n".encode("utf-8"))
         arq_log.flush()
+        ATIVIDADE["log"] = getattr(arq_log, "name", None)
         try:
             proc = subprocess.Popen(argv, cwd=cwd, env=env, stdout=arq_log, stderr=subprocess.STDOUT,
                                     stdin=subprocess.DEVNULL)
@@ -348,6 +354,7 @@ class Executor:
         nome = passo.get("acao")
         arq_log.write(f"$ [acao] {json.dumps(passo, ensure_ascii=False)}\n".encode("utf-8"))
         arq_log.flush()
+        ATIVIDADE["log"] = getattr(arq_log, "name", None)
         if nome == "apagar":
             for rel in passo.get("caminhos", []):
                 _remover_arvore(os.path.join(cwd, rel))
@@ -463,6 +470,7 @@ def preparar_repos(definicao, ctx, executor, pasta_logs):
             destino = work / repo["nome"]
             ref = repo["ref"]
             ctx.ui.status(f"Preparando repositorio {repo['nome']} @ {ref}")
+            ctx.ui.fase(f"repositorio {repo['nome']}")
             log(f"Repositorio {repo['nome']} @ {ref}")
             git = ["git", "-c", "core.longpaths=true", "-c", "credential.helper="]
             eh_hash = re.fullmatch(r"[0-9a-f]{40}", ref) is not None
@@ -553,14 +561,17 @@ def medir_carga(carga, definicao, ctx, executor, pasta_logs, runs, limite_s, lim
                   .encode("utf-8"))
         try:
             Path(cwd).mkdir(parents=True, exist_ok=True)
+            ctx.ui.carga(cid, None, runs, None)
             if carga.get("preparo"):
                 ctx.ui.status(f"{cid}: preparo")
+                ctx.ui.fase("preparo")
                 _rodar_fase(executor, carga["preparo"], cwd, env, arq, "preparo",
                             time.monotonic() + timeout_setup)
             for i in range(1, runs + 1):
                 limite_run = limite_fria_s if i == 1 else limite_s
                 ctx.ui.carga(cid, i, runs, limite_run)
                 fase.update(nome=f"setup run {i}", medindo=False)
+                ctx.ui.fase(f"setup run {i}")
                 _rodar_fase(executor, carga.get("setup", []), cwd, env, arq, f"setup run {i}",
                             time.monotonic() + timeout_setup)
                 ctx.ui.status(f"{cid}: medindo (run {i}/{runs})")
@@ -581,6 +592,7 @@ def medir_carga(carga, definicao, ctx, executor, pasta_logs, runs, limite_s, lim
                 log(f"  {cid} run {i}: {dur:.1f}s")
                 ctx.ui.ultimo(f"run {i}: {dur:.1f}s")
                 fase.update(nome=f"cleanup run {i}", medindo=False)
+                ctx.ui.fase(f"cleanup run {i}")
                 _rodar_fase(executor, carga.get("cleanup", []), cwd, env, arq, f"cleanup run {i}",
                             time.monotonic() + timeout_setup)
         except TempoExcedido:
@@ -654,11 +666,42 @@ def gravar_referencia(pasta_modulo, resultado, runs):
 # =============================================================================
 # Interface: overlay Tkinter + Ctrl+Q
 # =============================================================================
+def _ultima_linha(caminho, limite=58):
+    """Ultima linha nao vazia do log do passo em curso e ha quantos segundos ele mudou."""
+    try:
+        idade = max(0, int(time.time() - os.path.getmtime(caminho)))
+        with open(caminho, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            f.seek(max(0, f.tell() - 2048))
+            linhas = [l.strip() for l in f.read().decode("utf-8", "replace").replace("\r", "\n").split("\n")]
+    except OSError:
+        return None, None
+    ultima = next((l for l in reversed(linhas) if l), "")
+    if len(ultima) > limite:
+        ultima = ultima[:limite - 3] + "..."
+    return ultima, idade
+
+
+def _texto_atividade():
+    try:
+        import psutil
+        cpu = f"CPU {psutil.cpu_percent(None):3.0f}%"
+    except Exception:
+        cpu = "CPU  --"
+    caminho = ATIVIDADE.get("log")
+    ultima, idade = _ultima_linha(caminho) if caminho else (None, None)
+    if ultima is None:
+        return cpu
+    quando = f"{idade}s" if idade < 120 else f"{idade // 60} min"
+    return f"{cpu} | log ha {quando}: {ultima}"
+
+
 class _SemUI:
     def status(self, _t): pass
     def carga(self, *_a): pass
     def ultimo(self, _t): pass
     def cronometro(self, _inicio): pass
+    def fase(self, _nome): pass
     def aviso(self, _t): pass
     def fechar(self): pass
 
@@ -674,10 +717,15 @@ class Overlay:
         self.tk = tk
         self.fila = queue.Queue()
         self.inicio = None
+        self.fase_nome = None
+        self.fase_inicio = None
+        self.status_txt = ""
+        self.ultimo_txt = ""
+        self._prox_atividade = 0.0
         self.root = tk.Tk()
         self.root.title(titulo)
         largura = self.root.winfo_screenwidth()
-        self.root.geometry(f"380x150+{largura - 410}+30")
+        self.root.geometry(f"400x172+{largura - 430}+30")
         self.root.attributes("-topmost", True)
         self.root.overrideredirect(True)
         self.root.configure(bg="#1e1e1e")
@@ -688,8 +736,12 @@ class Overlay:
         self.lbl_tempo = tk.Label(self.root, text="", fg="#00d2ff", bg="#1e1e1e", font=("Consolas", 11))
         self.lbl_tempo.pack(pady=2)
         self.lbl_status = tk.Label(self.root, text="", fg="#bbbbbb", bg="#1e1e1e", font=("Segoe UI", 9),
-                                   wraplength=360)
+                                   wraplength=380)
         self.lbl_status.pack()
+        # Sinal de vida: CPU da maquina (inclui a VM do Podman) e ultima linha do log
+        self.lbl_ativ = tk.Label(self.root, text="", fg="#8a8a8a", bg="#1e1e1e", font=("Consolas", 8),
+                                 wraplength=380, justify="left")
+        self.lbl_ativ.pack(pady=(2, 0))
         tk.Label(self.root, text="Ctrl+Q: parada segura", fg="#777777", bg="#1e1e1e",
                  font=("Segoe UI", 8)).pack(pady=(2, 4))
         self.root.update_idletasks()
@@ -714,28 +766,49 @@ class Overlay:
                     return
                 if tipo == "cronometro":
                     self.inicio = valor
+                elif tipo == "fase":
+                    self.fase_nome, self.fase_inicio = valor, time.monotonic()
                 elif tipo == "carga":
                     self.lbl_carga.config(text=valor)
                 elif tipo == "status":
-                    self.lbl_status.config(text=valor, fg="#bbbbbb")
+                    self.status_txt = valor
+                    self._mostrar_status("#bbbbbb")
                 elif tipo == "aviso":
-                    self.lbl_status.config(text=valor, fg="#ff5555")
+                    self.status_txt = valor
+                    self._mostrar_status("#ff5555")
                 elif tipo == "ultimo":
-                    self.lbl_tempo.config(text=valor)
+                    self.ultimo_txt = valor
+                    self._mostrar_status("#bbbbbb")
         except queue.Empty:
             pass
+        agora = time.monotonic()
         if self.inicio is not None:
-            self.lbl_tempo.config(text=f"{time.monotonic() - self.inicio:7.1f}s")
+            self.lbl_tempo.config(text=f"medindo {agora - self.inicio:.1f}s", fg="#00d2ff")
+        elif self.fase_inicio is not None:
+            seg = int(agora - self.fase_inicio)
+            self.lbl_tempo.config(text=f"{self.fase_nome}: {seg // 60:02d}:{seg % 60:02d} (fora da medicao)",
+                                  fg="#e0c060")
+        if agora >= self._prox_atividade:
+            self._prox_atividade = agora + 1.0
+            self.lbl_ativ.config(text=_texto_atividade())
         self.root.after(200, self._processar)
+
+    def _mostrar_status(self, cor):
+        texto = self.status_txt + (f"  |  ultima: {self.ultimo_txt}" if self.ultimo_txt else "")
+        self.lbl_status.config(text=texto, fg=cor)
 
     # API usada pela thread de trabalho
     def status(self, texto): self.fila.put(("status", texto))
     def aviso(self, texto): self.fila.put(("aviso", texto))
     def ultimo(self, texto): self.fila.put(("ultimo", texto))
     def cronometro(self, inicio): self.fila.put(("cronometro", inicio))
+    def fase(self, nome): self.fila.put(("fase", nome))
     def fechar(self): self.fila.put(("fechar", None))
 
     def carga(self, cid, i, n, limite):
+        if i is None:
+            self.fila.put(("carga", f"{cid}  (preparo)"))
+            return
         lim = f" | limite {limite}s" if limite else ""
         self.fila.put(("carga", f"{cid}  (run {i}/{n}{lim})"))
 
