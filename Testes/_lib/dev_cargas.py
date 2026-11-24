@@ -454,14 +454,17 @@ def preparar_repos(definicao, ctx, executor, pasta_logs):
         return
     work = Path(ctx.tokens["work"])
     env = dict(os.environ)
-    env["GIT_TERMINAL_PROMPT"] = "0"  # repo sem credencial falha em vez de travar esperando senha
+    # Repos sao publicos e clonados sem login. Se algum passar a pedir credencial (removido,
+    # renomeado, limite de API), o clone falha na hora em vez de travar o hub numa janela de login.
+    env["GIT_TERMINAL_PROMPT"] = "0"  # sem prompt no terminal
+    env["GCM_INTERACTIVE"] = "never"  # sem janela do Git Credential Manager
     with open(pasta_logs / "_repos.log", "ab") as arq:
         for repo in definicao["repos"]:
             destino = work / repo["nome"]
             ref = repo["ref"]
             ctx.ui.status(f"Preparando repositorio {repo['nome']} @ {ref}")
             log(f"Repositorio {repo['nome']} @ {ref}")
-            git = ["git", "-c", "core.longpaths=true"]
+            git = ["git", "-c", "core.longpaths=true", "-c", "credential.helper="]
             eh_hash = re.fullmatch(r"[0-9a-f]{40}", ref) is not None
             if not (destino / ".git").exists():
                 if destino.exists():
