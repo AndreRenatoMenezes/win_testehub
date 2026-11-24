@@ -3,7 +3,7 @@
     "Paths": {
         "SetupRoot": "Setup",
         "TestsRoot": "Testes",
-        "ResultadosDir": "Resultados",
+        "ExportarDir": "Exportar",
         "ExecucoesDir": "Execucoes"
     },
     "Settings": {

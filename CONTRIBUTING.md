@@ -54,9 +54,11 @@ Nunca grave arquivos na raiz do projeto. Para permitir execução avulsa (fora d
 OUTPUT_PATH = os.environ.get("HUB_EVIDENCE_DIR", os.path.dirname(os.path.abspath(__file__)))
 ```
 
+Ao fim da execução, o hub copia `Traces/` para `Exportar/<cenário>/<modelo> - <patrimônio>/`, que é a pasta que vai para o Drive. Ficam de fora os arquivos `.etl`, os arquivos `.log`, as pastas chamadas `logs` e as pastas vazias. Portanto, **nenhum dado de análise pode existir só num `.log` ou `.etl`**: grave métricas e conclusões em CSV, JSON ou HTML.
+
 ### 3. CSV temático (opcional)
 
-Se o teste gerar um CSV-resumo, registre-o no mapa `$expectedCSVs` da função `Copy-ThematicCSVs` no `hub.ps1`. Ao final da execução, o hub copia esse arquivo para `Resultados/<cenário>/`.
+Se o teste gerar um CSV-resumo, registre-o no mapa `$expectedCSVs` da função `Test-ThematicCSVs` no `hub.ps1`. Ao final da execução, o hub avisa quando o teste rodou e não gerou o CSV. O arquivo fica em `Traces/<módulo>/` e segue na pasta `Exportar/`.
 
 ```powershell
 "7_gpu" = "gpu.csv"
@@ -67,9 +69,9 @@ Se o teste gerar um CSV-resumo, registre-o no mapa `$expectedCSVs` da função `
 O hub dá a todos os scripts de uma pasta o mesmo `HUB_EVIDENCE_DIR`. Uma variante que divide a pasta com o módulo principal, como a `1-1` dentro de `1_cpu_memo`, deve:
 
 - gravar numa **subpasta própria** de `HUB_EVIDENCE_DIR` (a `1-1` usa `dlp_usb/`). Caso contrário, os dois testes sobrescrevem os arquivos um do outro, e globs como `CSV_*` misturam os resultados;
-- usar um nome de CSV temático próprio e registrá-lo no mapa `$variantCSVs` da `Copy-ThematicCSVs`, que copia esses CSVs para `Resultados/` só quando eles existem.
+- usar um nome de CSV temático próprio e registrá-lo no mapa `$variantCSVs` da `Test-ThematicCSVs`, que só os lista quando eles existem (sem aviso quando ausentes).
 
-O teste `.github/scripts/Test-CopyThematicCSVs.ps1`, executado no CI, cobre esse comportamento.
+O teste `.github/scripts/Test-ThematicCSVs.ps1`, executado no CI, cobre esse comportamento.
 
 ### 5. Execução não interativa
 
@@ -90,7 +92,7 @@ O `referencia.json` do módulo (gerado com `--calibrar` no notebook de referênc
 - [ ] Exit code `0` somente em PASS
 - [ ] Evidências em `HUB_EVIDENCE_DIR`
 - [ ] Parada segura (`Ctrl+Q`) em testes longos
-- [ ] CSV temático registrado em `Copy-ThematicCSVs` (se houver)
+- [ ] CSV temático registrado em `Test-ThematicCSVs` (se houver)
 - [ ] Dependências Python novas adicionadas a `Setup/environment/5_install_py_dependencies.ps1`
 - [ ] Seção nova em `docs/metodologia-de-testes.md` (objetivo, procedimento, métricas e critério de aprovação) e passo a passo no `docs/manual-de-execucao.md`
 - [ ] HTML da documentação regenerado com `python docs/gerar_html.py`

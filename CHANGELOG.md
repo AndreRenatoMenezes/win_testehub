@@ -8,13 +8,24 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- **Pasta `Exportar/` pronta para o Drive:** ao fim de cada execução, o hub gera `Exportar/<cenário>/<modelo> - <patrimônio>/`, uma cópia de `Traces/` sem os arquivos `.etl` (200 a 400 MB cada), sem `.log`, sem pastas `logs/` e sem pastas vazias. `Traces/` não é alterada. O hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora. Isso substitui a limpeza manual antes de subir as evidências.
+- **Modelo e patrimônio/serial na criação do cenário:** além do nome, o hub pergunta o modelo e o patrimônio da máquina, que ficam no `_state.json`, nomeiam a pasta de exportação e aparecem no `_relatorio.json`/`.html` e no `maquina.csv`. Cenários antigos perguntam os dois uma única vez.
+- Teste de regressão da exportação (`Test-ExportTraces.ps1`) no CI.
+
 - **Módulos 7 a 11 — cargas de desenvolvimento** (origem: homologação de notebooks para desenvolvimento): `7_dev_dotnet` (build limpo, incremental e testes de unidade), `8_dev_go` (`go build` e `go test`), `9_dev_python` (`pip install` e `pytest -n auto`), `10_dev_containers` (`podman build` multi-stage e stack SQL Server + RabbitMQ + Redis até `healthy`) e `11_dev_git_arquivos` (20 mil arquivos pequenos e `git clone --local` + `git status`). Só repositórios open source fixados por tag e imagens públicas; cargas internas opcionais no `workloads.local.json` (não versionado). Mediana de 3 execuções; **FAIL** se a carga quebrar, passar de 10x a referência do `referencia.json` (1ª execução contra a fria, demais contra a mediana; gerado com `--calibrar` no notebook de referência), faltar ferramenta ou a máquina estiver na bateria. Biblioteca comum em `Testes/_lib/dev_cargas.py`.
 - Setups `7_install_devtools_dev` (Git, .NET SDK 10, Go, uv, docker-compose), `10_preparar_podman` (WSL2, Podman CLI e `podman machine` rootful) e `11_ca_corporativa_dev` (opcional; só age em rede com inspeção TLS).
-- CSVs temáticos `dev_dotnet.csv`, `dev_go.csv`, `dev_python.csv`, `dev_containers.csv` e `dev_git_arquivos.csv` copiados para `Resultados/`.
+- CSVs temáticos `dev_dotnet.csv`, `dev_go.csv`, `dev_python.csv`, `dev_containers.csv` e `dev_git_arquivos.csv`.
 - Teste de regressão da ordem do menu (`Test-GetScriptsOrder.ps1`) no CI.
 - Teste de regressão da parada da fila por Ctrl+Q (`Test-StopSignal.ps1`) no CI.
 
 ### Alterado
+
+- **Fim da pasta `Resultados/`:** o hub não gera mais `Resultados/<cenário>/`. A chave `Paths.ResultadosDir` do `config.json` vira `Paths.ExportarDir` (um `config.json` antigo continua funcionando, com `Exportar` como padrão).
+  - `maquina.csv` passa a ser gravado em `Traces/`, com o modelo e o patrimônio informados. Ele é o único lugar com fabricante, modelo e serial do equipamento.
+  - `cenario.csv` deixa de existir: os mesmos dados estão em `_relatorio.csv`/`.json` e `_state.json`. A coluna "Exit Code" dele gravava o número da run por engano.
+  - Os CSVs temáticos não são mais copiados: ficam em `Traces/<módulo>/` e seguem na exportação. A função `Copy-ThematicCSVs` vira `Test-ThematicCSVs`, que só avisa quando um teste rodou sem gerar o CSV; o contador "ausente" não inclui mais os testes não executados.
+- **ZIP e opção `[E]`:** o ZIP compacta só a pasta exportada da máquina (`<modelo> - <patrimônio>.zip`, ao lado dela) e **não apaga mais** a pasta do cenário em `Execucoes/`. A opção `[E]` regera a exportação de um cenário existente e oferece o ZIP.
+- **Nome do cenário:** caracteres inválidos em nome de pasta, além de `[` e `]`, são removidos do nome do cenário, do modelo e do patrimônio.
 
 - **Janela flutuante das cargas dev:** o cronômetro agora anda em todas as fases. Fora da medição (preparo, setup, cleanup e download dos repositórios), ele aparece em amarelo com o nome da fase. Uma linha extra mostra a CPU da máquina e a última saída do comando, para o operador saber que o teste não travou. Antes, no preparo longo do A5c, a janela ficava parada com a carga anterior.
 - **Ctrl+Q para a fila inteira:** nos testes com parada segura (1, 1.1, 2.1, 5 e 7 a 11), o Ctrl+Q agora interrompe o teste atual **e** os testes seguintes, que aparecem como *cancelado*. O relatório é gerado com o que já rodou. Antes, o hub seguia para o próximo teste. O hub também descarta as teclas apertadas durante um teste antes de perguntar "Deseja continuar?".

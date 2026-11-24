@@ -38,7 +38,7 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 - **Cenários persistentes**: o histórico de execuções fica em `_state.json`. Numa reexecução, as evidências anteriores vão para `_anterior/` em vez de serem sobrescritas.
 - **Relatórios em vários formatos**: HTML, CSV, JSON e log completo, por execução e consolidados por cenário, além de CSVs temáticos prontos para BI.
 - **Extensível por convenção**: qualquer `.py` ou `.ps1` colocado em `Testes/` vira um item do menu.
-- **Feito para o operador**: overlays de progresso que não capturam cliques, parada segura com `Ctrl+Q` e exportação do cenário para ZIP validado.
+- **Feito para o operador**: overlays de progresso que não capturam cliques, parada segura com `Ctrl+Q` e pasta de exportação pronta para o Drive (sem `.etl` nem logs) e ZIP validado.
 
 ## Módulos de teste
 
@@ -91,8 +91,8 @@ flowchart LR
     cen --> setup["Fase 1 · Preparação<br/>Setup/"]
     setup --> testes["Fase 2 · Testes<br/>Testes/"]
     testes -- "exit 0 = PASS<br/>exit ≠ 0 = FAIL" --> exec[("Execucoes/‹cenário›<br/>Logs · Traces · _state.json")]
-    exec --> res[("Resultados/‹cenário›<br/>maquina.csv · cenario.csv · CSVs temáticos")]
-    exec -.-> zip["ZIP do cenário"]
+    exec --> res[("Exportar/‹cenário›/‹modelo› - ‹patrimônio›<br/>Traces sem .etl, logs e pastas vazias")]
+    res -.-> zip["ZIP da máquina"]
 ```
 
 Antes de cada script, o hub injeta `HUB_EVIDENCE_DIR` (onde gravar as evidências) e `HUB_TRACE_ROOT` (a raiz do cenário). Toda a saída é capturada para o log da execução. O contrato completo está no [CONTRIBUTING.md](CONTRIBUTING.md#contrato-de-um-script).
@@ -171,7 +171,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\TesteHub\hub.ps1
 | `Paths.SetupRoot` | `Setup` | Pasta dos scripts de preparação |
 | `Paths.TestsRoot` | `Testes` | Pasta dos módulos de teste |
 | `Paths.ExecucoesDir` | `Execucoes` | Logs, traces e estado de cada cenário |
-| `Paths.ResultadosDir` | `Resultados` | Resultados estruturados (CSVs) de cada cenário |
+| `Paths.ExportarDir` | `Exportar` | Pasta pronta para subir ao Drive: `Traces/` de cada cenário sem `.etl`, logs e pastas vazias |
 | `Settings.PythonVenvName` | `.venv` | Ambiente virtual usado para os testes `.py` |
 | `Settings.HtmlReportTitle` | `WinTestHub - Relatório Final` | Título dos relatórios HTML |
 
@@ -208,25 +208,27 @@ Execucoes/
         ├── _state.json                      # histórico de todas as execuções
         ├── _relatorio.{html,csv,json}       # consolidado: último status de cada teste
         ├── informacoes_maquina.csv          # inventário do setup 1
+        ├── maquina.csv                      # modelo, série, CPU, RAM, disco, SO + modelo/patrimônio informados
         └── 2_disco/                         # evidências de cada teste
             └── _anterior/run1_…/            # evidências substituídas numa reexecução
-Resultados/
-└── ImagemLimpa_DESKTOP-ABC_2026-04-15/
-    ├── maquina.csv                          # modelo, série, CPU, RAM, disco, SO
-    ├── cenario.csv                          # status consolidado do cenário
-    ├── cpu_memoria.csv, disco.csv, rede.csv, rede_internet.csv,
-    │   boot_shutdown.csv, bateria.csv, wifi_ft.csv
-    └── cpu_memoria_dlp.csv, disco_usb.csv   # variantes 1.1 e 2.1, quando executadas
+Exportar/
+└── ImagemLimpa/                             # nome do cenário
+    ├── 3440 - 050221/                       # {modelo} - {patrimônio}: cópia de Traces/
+    │                                        # sem .etl, sem .log, sem pastas logs/ e sem pastas vazias
+    └── 3440 - 050221.zip                    # opcional, ao fim da execução ou pela opção [E]
 ```
+
+A pasta `Exportar/<cenário>/<modelo> - <patrimônio>/` é regerada ao fim de cada execução e pode ser arrastada direto para a pasta do projeto no Drive. `Traces/` não é alterada: os `.etl` originais continuam em `Execucoes/` para abrir no WPA.
 
 | Preciso de… | Use |
 |-------------|-----|
 | Apresentar o resultado | `Traces/_relatorio.html` |
-| Alimentar planilha ou BI | `Resultados/<cenário>/*.csv` |
+| Subir as evidências para o Drive | `Exportar/<cenário>/<modelo> - <patrimônio>/` |
+| Alimentar planilha ou BI | CSVs temáticos de cada módulo (`Traces/<módulo>/*.csv`, também na exportação) |
 | Auditar uma execução | `Logs/run_*.json` |
 | Investigar uma falha | `Logs/run_*.log` e a pasta de evidências do teste |
 
-No menu inicial, a opção **`E`** compacta um cenário em ZIP, confere a contagem de arquivos e só então remove a pasta original.
+Ao criar um cenário, o hub pergunta o **nome do cenário**, o **modelo** e o **patrimônio/serial** da máquina. No menu inicial, a opção **`E`** regera a exportação de um cenário existente e oferece o ZIP, validado pela contagem de arquivos. Nenhuma pasta é apagada.
 
 ## Estrutura do repositório
 

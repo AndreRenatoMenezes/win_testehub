@@ -90,7 +90,7 @@ O hub opera em **duas fases sequenciais**:
 │                       ▼                             │
 │  ┌─── Saídas ───────────────────────────────────┐   │
 │  │ Execucoes/  → logs, traces e estado          │   │
-│  │ Resultados/ → CSVs estruturados              │   │
+│  │ Exportar/   → traces prontos p/ o Drive      │   │
 │  └──────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────┘
 ```
@@ -243,7 +243,7 @@ O script `1-1_automacao_performance_dlp.py` mede o custo de CPU e memória do **
 
 Um bloqueio do DLP durante a cópia fica registrado como aviso no log e não interrompe o ciclo.
 
-**Evidências:** subpasta `1_cpu_memo/dlp_usb/`, separada das do Módulo 1, com os traces `Trace_DLP_*.etl`, os CSVs exportados, `Resultados_Consolidados/` e `cpu_memoria_dlp.csv`, que o hub copia para `Resultados/`.
+**Evidências:** subpasta `1_cpu_memo/dlp_usb/`, separada das do Módulo 1, com os traces `Trace_DLP_*.etl`, os CSVs exportados, `Resultados_Consolidados/` e `cpu_memoria_dlp.csv`.
 
 | Condição | Resultado |
 |----------|-----------|
@@ -341,7 +341,7 @@ O script `2-1_teste_disco_dlp.py` mede a velocidade de escrita e leitura num pen
 
 Se o DLP bloquear a escrita, apagar o arquivo do pendrive ou negar a leitura, a bateria registra 0,0 MB/s na operação afetada, e o log descreve o bloqueio.
 
-**Evidências:** `2_disco/` com `resultado_validacao_usb_*.csv`, `teste_usb_nativo_*.log` e `disco_usb.csv`, que o hub copia para `Resultados/`.
+**Evidências:** `2_disco/` com `resultado_validacao_usb_*.csv`, `teste_usb_nativo_*.log` e `disco_usb.csv`.
 
 | Condição | Resultado |
 |----------|-----------|
@@ -459,7 +459,7 @@ Na pasta `3_rede_internet/` do cenário:
 
 - `teste_rede_internet_<data_hora>.log` — log completo da execução
 - `resultado_afericoes_internet.csv` — uma linha por aferição (separador `;`, decimal com vírgula): `Afericao;Data_Hora;Download;Upload;Ping;Latencia_Carga;Local_Cliente;IP_Saida;Servidores;Status;Print`
-- `rede_internet.csv` — CSV temático (`Metrica,Valor,Unidade`) com aferições executadas/válidas, médias, mínimos e máximos, local, IP de saída e servidores; é copiado para `Resultados/`
+- `rede_internet.csv` — CSV temático (`Metrica,Valor,Unidade`) com aferições executadas/válidas, médias, mínimos e máximos, local, IP de saída e servidores
 - `Evidencia_Internet_Afericao_N_<data_hora>.png` — screenshot de cada aferição
 - `Evidencia_Internet_Bloqueio_<data_hora>.png` — somente quando o site está inacessível ou bloqueado
 
@@ -682,7 +682,7 @@ Na pasta `5_bateria/` do cenário:
 - `CSV_Ociosa_<data_hora>/` e `CSV_Escritorio_<data_hora>/` — exportação dos traces pelo perfil WPA de bateria
 - `bateria_srum.csv` — relatório SRUM (`powercfg /srumutil`)
 - `bateria_relatorio_energia.html` — relatório de energia (`powercfg /energy`, 60 s)
-- `bateria.csv` — CSV temático (`Metrica,Valor,Unidade`), copiado para `Resultados/`. É gravado sempre que a medição começou, inclusive em encerramento antecipado
+- `bateria.csv` — CSV temático (`Metrica,Valor,Unidade`). É gravado sempre que a medição começou, inclusive em encerramento antecipado
 
 Nada é gravado em `C:\BATERIA`, em `C:\Traces` nem na raiz do projeto.
 
@@ -771,7 +771,7 @@ O `wifi_ft.csv` (formato `Metrica,Valor,Unidade`) traz: SSID, autenticação, ci
 | Arquivo | Conteúdo |
 |---------|----------|
 | `wifi_ft_relatorio.html` | Relatório com gráficos (RSSI × tempo com marcadores de roaming, linha do tempo de APs, latência/perda, tempo de troca e interrupção por roaming), tabelas de roamings, achados de compatibilidade, APs e informações técnicas. Abre sem internet |
-| `wifi_ft.csv` | CSV temático (copiado para `Resultados/`) |
+| `wifi_ft.csv` | CSV temático |
 | `wifi_ft_roamings.csv` | Uma linha por troca de AP |
 | `wifi_ft_amostras.csv` | Série de 250 ms: BSSID, RSSI, qualidade, canal, taxas |
 | `wifi_ft_pings.csv` | Todos os pings (gateway e internet) |
@@ -850,7 +850,7 @@ O limite de cada carga é **10 vezes o tempo medido no notebook de referência**
 
 | Arquivo | Conteúdo |
 |---------|----------|
-| `dev_<modulo>.csv` | CSV temático (copiado para `Resultados/`): `carga;status;mediana_s;fria_s;limite_s;execucoes_s;sensivel_rede;motivo` |
+| `dev_<modulo>.csv` | CSV temático: `carga;status;mediana_s;fria_s;limite_s;execucoes_s;sensivel_rede;motivo` |
 | `dev_<modulo>.json` | Contexto completo: host, data, CPU, RAM, plano de energia, tomada, versões, referência usada, registros (commits, digests), resultado por carga com todas as execuções e o motivo de cada falha |
 | `logs/<carga>.log` | Saída de cada fase (`preparo`, `setup run N`, `command run N`, `cleanup run N`) e o tempo de cada execução |
 | `logs/_repos.log` | Clone e checkout dos repositórios |
@@ -886,7 +886,7 @@ Uma carga que falha não impede as próximas do mesmo módulo (o resultado parci
 
 ### 11.1 Estrutura de Armazenamento
 
-Toda execução gera evidências organizadas por cenário, em duas pastas: `Execucoes/` (logs, evidências e estado) e `Resultados/` (CSVs estruturados).
+Toda execução gera evidências organizadas por cenário, em duas pastas: `Execucoes/` (logs, evidências completas e estado) e `Exportar/` (cópia de `Traces/` sem `.etl`, logs e pastas vazias, pronta para o Drive).
 
 ```
 Execucoes/
@@ -900,6 +900,7 @@ Execucoes/
         ├── _relatorio.csv
         ├── _relatorio.json
         ├── informacoes_maquina.csv              ← inventário do setup 1
+        ├── maquina.csv                          ← inventário do hub + modelo/patrimônio informados
         ├── 1_cpu_memo/                          ← evidências do teste de CPU
         │   ├── automacao_*.log
         │   ├── Trace_*_Run1.etl … Trace_*_Run5.etl
@@ -961,16 +962,14 @@ Execucoes/
             ├── run1_2026-04-15T09-30-00/
             └── run2_2026-04-15T14-00-00/
 
-Resultados/
-└── ImagemLimpa_DESKTOP-ABC_2026-04-15/
-    ├── maquina.csv                          ← modelo, série, CPU, RAM, disco, SO
-    ├── cenario.csv                          ← status consolidado de cada teste
-    └── cpu_memoria.csv, disco.csv, rede.csv, rede_internet.csv,
-        boot_shutdown.csv, bateria.csv, wifi_ft.csv,
-        dev_dotnet.csv, dev_go.csv, dev_python.csv,
-        dev_containers.csv, dev_git_arquivos.csv,
-        cpu_memoria_dlp.csv, disco_usb.csv   ← CSVs temáticos (variantes, quando executadas)
+Exportar/
+└── ImagemLimpa/                             ← nome do cenário
+    ├── 3440 - 050221/                       ← {modelo} - {patrimônio}: cópia de Traces/
+    │                                           sem *.etl, *.log, pastas logs/ e pastas vazias
+    └── 3440 - 050221.zip                    ← opcional
 ```
+
+A pasta de exportação é regerada ao fim de cada execução (e pela opção `[E]` do menu). `Traces/` não é alterada: os `.etl` continuam disponíveis em `Execucoes/` para análise no WPA. Os dados de análise de cada módulo ficam em CSV, JSON ou HTML, então nada que sustente um resultado se perde na exportação.
 
 > ![Estrutura de Pastas](img/placeholder-estrutura-traces.png)  
 > *Insira aqui: screenshot do Windows Explorer mostrando a estrutura de pastas de um cenário real*
@@ -1019,12 +1018,12 @@ Para auditar uma execução e validar a integridade dos resultados:
 
 | Etapa de auditoria | O que verificar | Onde encontrar |
 |---------------------|----------------|----------------|
-| **1. Identificação** | Máquina, data, operador | `_state.json` → `machine`, `createdAt` |
+| **1. Identificação** | Máquina, data, operador | `_state.json` → `machine`, `modelo`, `patrimonio`, `createdAt` |
 | **2. Escopo** | Quais testes foram executados | `_state.json` → `runs[].tests[]` |
 | **3. Resultados** | PASS/FAIL de cada teste | `_relatorio.html` ou `_state.json` |
 | **4. Evidências** | Dados brutos que suportam o resultado | Subpastas do cenário (CSVs, screenshots, logs) |
 | **5. Histórico** | Re-execuções e tentativas anteriores | `_anterior/` e múltiplas entries em `runs[]` |
-| **6. Ambiente** | Configuração da máquina no momento do teste | `Traces/informacoes_maquina.csv` (gerado pelo setup 1) e `Resultados/<cenário>/maquina.csv` (gerado pelo hub) |
+| **6. Ambiente** | Configuração da máquina no momento do teste | `Traces/informacoes_maquina.csv` (gerado pelo setup 1) e `Traces/maquina.csv` (gerado pelo hub) |
 
 ---
 
@@ -1058,7 +1057,7 @@ Dados tabulares com uma linha por teste. Ideal para importação em Excel ou fer
 | TraceCount | Quantidade de arquivos de evidência |
 | TraceDir | Caminho da pasta de evidências |
 
-O consolidado `Traces/_relatorio.csv` tem as colunas `Nome`, `Status`, `Duracao_s`, `Run`, `Reexecucao` e `Pasta`, com o último resultado de cada teste. Em `Resultados/<cenário>/`, o `cenario.csv` traz o mesmo status consolidado com o nome do cenário, o hostname e a data de cada run, e o `maquina.csv` traz o inventário da máquina.
+O consolidado `Traces/_relatorio.csv` tem as colunas `Nome`, `Status`, `Duracao_s`, `Run`, `Reexecucao` e `Pasta`, com o último resultado de cada teste. O `_relatorio.json` traz o mesmo status com o nome do cenário, o hostname, o modelo e o patrimônio; a data de cada run está no `_state.json`. O `Traces/maquina.csv` traz o inventário da máquina.
 
 ### 12.3 Relatório JSON
 
@@ -1086,7 +1085,7 @@ Dados estruturados com metadados completos. Ideal para integração com APIs e s
 | Apresentar resultado a stakeholders | **HTML** (`_relatorio.html`) |
 | Alimentar planilha de acompanhamento | **CSV** (`_relatorio.csv`) |
 | Integrar com sistema de gestão de ativos | **JSON** (`_relatorio.json`) |
-| Alimentar BI com métricas de cada módulo | **CSV** (`Resultados/<cenário>/*.csv`) |
+| Alimentar BI com métricas de cada módulo | **CSV** (CSVs temáticos em `Traces/<módulo>/`, também em `Exportar/`) |
 | Investigar causa de falha | **LOG** (`Logs/run_*.log`) |
 | Auditoria de processo | **JSON** (`_state.json`) + evidências |
 

@@ -414,7 +414,7 @@ def consolidate_results(ui):
     # --- CSV para o Hub ---
     cpu_freq = psutil.cpu_freq()
     mem = psutil.virtual_memory()
-    # Nome distinto do CSV tematico do Modulo 1: o hub copia os dois para Resultados/
+    # Nome distinto do CSV tematico do Modulo 1: o hub verifica os dois em Traces/ e ambos seguem na exportacao
     cpu_memo_csv_path = os.path.join(OUTPUT_PATH, "cpu_memoria_dlp.csv")
     with open(cpu_memo_csv_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)

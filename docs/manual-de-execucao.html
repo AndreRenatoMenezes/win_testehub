@@ -460,7 +460,7 @@ li {
 ├── Setup\environment\   # Scripts de setup (13 scripts)
 ├── Testes\              # Módulos de teste (11 módulos + 2 variantes DLP/USB; _lib\ = biblioteca dos módulos 7 a 11)
 ├── Execucoes\           # Logs, evidências e estado de cada cenário (criada pelo hub)
-└── Resultados\          # CSVs estruturados de cada cenário (criada pelo hub)
+└── Exportar\            # Traces de cada cenário prontos para o Drive, sem .etl nem logs (criada pelo hub)
 </code></pre>
 <div class="callout callout-warning"><strong>Importante</strong>O hub espera estar em <code>C:\TesteHub</code>. Caso utilize outro caminho, ajuste a referência no <code>hub.bat</code>.</div>
 </div>
@@ -559,11 +559,23 @@ li {
 <h3 id="41-selecionar-ou-criar-um-cenário">4.1 Selecionar ou Criar um Cenário</h3>
 <p>Ao iniciar, o hub exibe os 5 cenários mais recentes (se houver) e oferece três opções:</p>
 <ul>
-<li><strong><code>[N]</code></strong> — Criar um novo cenário (será solicitado um nome, ex: <code>ImagemLimpa</code>)</li>
-<li><strong><code>[1-5]</code></strong> — Continuar um cenário existente</li>
-<li><strong><code>[E]</code></strong> — Exportar um cenário para ZIP: o hub compacta a pasta do cenário, confere se o ZIP tem o mesmo número de arquivos e só então remove a pasta original. Ao final de cada execução, o hub também pergunta se deseja exportar o cenário.</li>
+<li>
+<p><strong><code>[N]</code></strong> — Criar um novo cenário. O hub pergunta:</p>
+<ol>
+<li>o <strong>nome do cenário</strong> (ex.: <code>SDWAN 108.11.4.734 - Stack</code>; Enter = <code>Execucao</code>);</li>
+<li>o <strong>modelo</strong> da máquina (ex.: <code>3440</code>);</li>
+<li>o <strong>patrimônio/serial</strong> (ex.: <code>050221</code>).</li>
+</ol>
+<p>O modelo e o patrimônio são obrigatórios e nomeiam a pasta de exportação (<code>3440 - 050221</code>). Caracteres inválidos em nome de pasta (<code>\ / : * ? " &lt; &gt; |</code>, além de <code>[</code> e <code>]</code>) são removidos.</p>
+</li>
+<li>
+<p><strong><code>[1-5]</code></strong> — Continuar um cenário existente. Se o cenário foi criado antes desta versão e não tem modelo e patrimônio, o hub pergunta os dois uma única vez.</p>
+</li>
+<li>
+<p><strong><code>[E]</code></strong> — Exportar um cenário existente: o hub regera a pasta <code>Exportar/</code> desse cenário (ver <a href="#65-pasta-de-exportação">6.5</a>) e pergunta se deseja compactá-la em ZIP.</p>
+</li>
 </ul>
-<p>O nome do cenário é combinado com o hostname e a data, resultando em algo como: <code>ImagemLimpa_DESKTOP-ABC_2026-04-15</code></p>
+<p>O nome do cenário é combinado com o hostname e a data na pasta de execução, resultando em algo como: <code>ImagemLimpa_DESKTOP-ABC_2026-04-15</code></p>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot da tela de seleção/criação de cenário<br><em>Salvar como: img/placeholder-selecao-cenario.png</em></div>
 <h3 id="42-navegar-o-menu-de-testes">4.2 Navegar o Menu de Testes</h3>
 <p>Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupados pelo nome da pasta, sem o prefixo numérico, e os que nunca rodaram no cenário (<strong>pendentes</strong>) já vêm marcados:</p>
@@ -730,7 +742,7 @@ li {
 <p>Não toque no mouse nem no teclado — na fase de escritório o teste está usando os dois. Levar o mouse a um canto da tela aciona a parada segura. <strong>Não reconecte o carregador</strong> antes do aviso: isso invalida a medição.</p>
 <p><strong>6. Reconecte quando o aviso pedir</strong></p>
 <p>A janela <strong>"Teste de bateria — medição encerrada"</strong> (e o overlay "O carregador já pode ser reconectado") indica o fim da medição. Reconecte o carregador. O teste ainda converte os traces e gera o SRUM e o relatório de energia (~5–20 min), restaura as configurações e devolve o resultado ao hub.</p>
-<p>O resultado detalhado fica em <code>5_bateria/bateria.csv</code> (copiado para <code>Resultados/</code>): <code>Coleta_Valida = sim</code> indica uma execução que serve para comparar baseline × agente.</p>
+<p>O resultado detalhado fica em <code>5_bateria/bateria.csv</code>: <code>Coleta_Valida = sim</code> indica uma execução que serve para comparar baseline × agente.</p>
 <h3 id="47-teste-de-wi-fi-fast-transition-módulo-6--passo-a-passo-do-operador">4.7 Teste de Wi-Fi Fast Transition (Módulo 6) — Passo a Passo do Operador</h3>
 <p>O teste leva <strong>~7 min</strong> (1 min de coleta + 5 min de caminhada + 1 min de processamento) e precisa do operador <strong>andando com o notebook</strong> durante a caminhada. Execute-o <strong>sozinho</strong> na seleção, numa máquina que você possa levar pelo escritório.</p>
 <p><strong>1. Prepare a máquina</strong></p>
@@ -777,7 +789,7 @@ li {
 </table>
 <p>A cada troca de AP aparece um destaque grande na tela (verde = FT, vermelho = Não FT, amarelo = lendo a AKM). <strong>Encerrar agora</strong> termina antes do tempo e ainda gera o relatório. Fechar o painel não interrompe o teste.</p>
 <p><strong>5. Veja o resultado</strong></p>
-<p>Ao fim, o painel mostra PASS/FAIL e abre o relatório <code>6_wifi_fast_transition/wifi_ft_relatorio.html</code>, com gráficos e informações técnicas. O <code>wifi_ft.csv</code> é copiado para <code>Resultados/</code>.</p>
+<p>Ao fim, o painel mostra PASS/FAIL e abre o relatório <code>6_wifi_fast_transition/wifi_ft_relatorio.html</code>, com gráficos e informações técnicas. O <code>wifi_ft.csv</code> fica na mesma pasta e segue na exportação.</p>
 <h3 id="48-cargas-de-desenvolvimento-módulos-7-a-11--passo-a-passo-do-operador">4.8 Cargas de Desenvolvimento (Módulos 7 a 11) — Passo a Passo do Operador</h3>
 <p>Os módulos 7 a 11 cronometram tarefas reais de desenvolvimento (build, testes, <code>pip install</code>, containers, git). Cada um leva de 3 a 30 min (o 11 é o mais curto; o 8 e o 10, os mais longos), conforme a máquina e o primeiro download dos repositórios e imagens. A metodologia completa está na seção 10 da <em>Metodologia de Testes</em>.</p>
 <p><strong>1. Prepare a máquina (uma vez)</strong></p>
@@ -814,7 +826,7 @@ li {
 <p><strong>3. Selecione os módulos</strong></p>
 <p>No menu, marque os módulos desejados (seções <strong>Dev Dotnet</strong>, <strong>Dev Go</strong>, <strong>Dev Python</strong>, <strong>Dev Containers</strong> e <strong>Dev Git Arquivos</strong>). Uma janela flutuante mostra a carga atual, a execução (1 a 3) e o limite. O cronômetro fica em azul ("medindo") durante a medição. Em amarelo, ele mostra as fases fora da medição: download do repositório, preparo, setup e cleanup. O preparo pode levar mais de 10 minutos na primeira vez, por exemplo para compilar os testes do Hugo. A última linha da janela mostra o uso de CPU da máquina e a última saída do comando em curso, com há quantos segundos ela apareceu. Se o cronômetro anda e a CPU está alta, o teste está trabalhando. Alguns comandos ficam vários minutos sem escrever nada, como o <code>podman build</code>. <strong>Ctrl+Q</strong> interrompe com segurança: a carga é encerrada, o <code>cleanup</code> roda, o módulo termina com FAIL e o hub para a fila.</p>
 <p><strong>4. Veja o resultado</strong></p>
-<p>Cada módulo grava em <code>Traces/&lt;módulo&gt;/</code> o <code>dev_&lt;módulo&gt;.csv</code> (copiado para <code>Resultados/</code>), o <code>dev_&lt;módulo&gt;.json</code> e os logs em <code>logs/</code>. O módulo dá <strong>PASS</strong> quando todas as cargas terminam OK; dá <strong>FAIL</strong> se alguma quebrar, passar de <strong>10x o tempo da referência</strong>, se faltar ferramenta ou se a máquina estiver na bateria.</p>
+<p>Cada módulo grava em <code>Traces/&lt;módulo&gt;/</code> o <code>dev_&lt;módulo&gt;.csv</code>, o <code>dev_&lt;módulo&gt;.json</code> e os logs em <code>logs/</code> (que não vão para a pasta de exportação). O módulo dá <strong>PASS</strong> quando todas as cargas terminam OK; dá <strong>FAIL</strong> se alguma quebrar, passar de <strong>10x o tempo da referência</strong>, se faltar ferramenta ou se a máquina estiver na bateria.</p>
 <p><strong>Calibração da referência <span class="tag tag-tecnico">Técnico</span></strong></p>
 <p>O limite de 10x vem do <code>referencia.json</code> de cada módulo, gerado no <strong>notebook de referência</strong> (o atual da frota). Para gerar ou atualizar, nessa máquina, com o <code>.venv</code> do hub:</p>
 <pre><code class="language-bat">cd C:\TesteHub
@@ -833,7 +845,7 @@ li {
 <div class="section">
 <h2 id="5-cenários-e-re-execução">5. Cenários e Re-execução</h2>
 <h3 id="51-o-que-é-um-cenário">5.1 O que é um Cenário</h3>
-<p>Um <strong>cenário</strong> é uma sessão de testes associada a uma máquina e data. Ele agrupa todas as execuções (runs) e suas evidências em uma única pasta dentro de <code>Execucoes/</code>, com os resultados estruturados numa pasta de mesmo nome em <code>Resultados/</code>. Isso permite:</p>
+<p>Um <strong>cenário</strong> é uma sessão de testes associada a uma máquina e data. Ele agrupa todas as execuções (runs) e suas evidências em uma única pasta dentro de <code>Execucoes/</code>. Ao fim de cada execução, uma cópia enxuta das evidências é gerada em <code>Exportar/&lt;cenário&gt;/&lt;modelo&gt; - &lt;patrimônio&gt;/</code>. Isso permite:</p>
 <ul>
 <li>Executar testes em diferentes momentos (dias) e consolidar resultados</li>
 <li>Re-executar apenas os testes que falharam</li>
@@ -860,6 +872,7 @@ li {
         ├── _state.json                      # Estado e histórico de todas as runs
         ├── _relatorio.{html,csv,json}       # Relatório consolidado
         ├── informacoes_maquina.csv          # Inventário gerado pelo setup 1
+        ├── maquina.csv                      # Modelo, série, CPU, RAM, disco, SO + modelo/patrimônio informados
         ├── 1_cpu_memo/                      # Evidências do Módulo 1
         │   └── dlp_usb/                     # Evidências da variante 1-1
         ├── 2_disco/                         # Evidências do Módulo 2 e da variante 2-1
@@ -872,11 +885,10 @@ li {
             ├── run1_2026-04-15T09-30-00/
             └── run2_2026-04-15T14-00-00/
 
-Resultados/
-└── ImagemLimpa_DESKTOP-ABC_2026-04-15/
-    ├── maquina.csv                          # Modelo, série, CPU, RAM, disco, SO
-    ├── cenario.csv                          # Status consolidado de cada teste
-    └── cpu_memoria.csv, disco.csv, ...      # CSVs temáticos de cada módulo
+Exportar/
+└── ImagemLimpa/                             # Nome do cenário
+    ├── 3440 - 050221/                       # {modelo} - {patrimônio}: cópia de Traces/ sem .etl, logs e pastas vazias
+    └── 3440 - 050221.zip                    # Opcional
 </code></pre>
 </div>
 
@@ -903,9 +915,9 @@ Resultados/
 <td>Visão completa de um ciclo de testes</td>
 </tr>
 <tr>
-<td><code>Resultados/{cenário}/</code></td>
-<td>Inventário da máquina, status do cenário e CSVs temáticos de cada módulo (<code>cpu_memoria.csv</code>, <code>disco.csv</code>, <code>rede.csv</code>, <code>rede_internet.csv</code>, <code>boot_shutdown.csv</code>, <code>bateria.csv</code>, <code>wifi_ft.csv</code> e, quando executadas, <code>cpu_memoria_dlp.csv</code> e <code>disco_usb.csv</code>)</td>
-<td>Planilhas e BI</td>
+<td><code>Exportar/{cenário}/{modelo} - {patrimônio}/</code></td>
+<td>Cópia de <code>Traces/</code> sem <code>.etl</code>, logs e pastas vazias, com o inventário (<code>maquina.csv</code>), o relatório consolidado e os CSVs temáticos de cada módulo</td>
+<td>Subir para o Drive, planilhas e BI</td>
 </tr>
 </tbody>
 </table>
@@ -973,8 +985,44 @@ Resultados/
 <td>Investigar falha em um teste</td>
 <td><code>run_*.log</code> (saída completa do script)</td>
 </tr>
+<tr>
+<td>Subir as evidências para o Drive</td>
+<td><code>Exportar/&lt;cenário&gt;/&lt;modelo&gt; - &lt;patrimônio&gt;/</code></td>
+</tr>
 </tbody>
 </table>
+<h3 id="65-pasta-de-exportação">6.5 Pasta de Exportação</h3>
+<p>Ao fim de cada execução, o hub regera <code>Exportar/&lt;cenário&gt;/&lt;modelo&gt; - &lt;patrimônio&gt;/</code>, uma cópia de <code>Traces/</code> pronta para arrastar para a pasta do projeto no Drive (ex.: <code>Netskope SD-WAN 108.11.4.734/Windows/SDWAN 108.11.4.734 - Stack/</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Fica de fora</th>
+<th>Motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Arquivos <code>.etl</code> (traces do WPR, 200 a 400 MB cada)</td>
+<td>Os CSVs exportados pelo WPA ficam</td>
+</tr>
+<tr>
+<td>Arquivos <code>.log</code> e pastas <code>logs/</code></td>
+<td>Não são usados na análise nem na conferência</td>
+</tr>
+<tr>
+<td>Pastas que ficam vazias</td>
+<td>Ruído</td>
+</tr>
+</tbody>
+</table>
+<p>Todo o resto vai: relatórios <code>_relatorio.*</code>, <code>_state.json</code>, <code>maquina.csv</code>, <code>informacoes_maquina.csv</code>, CSVs temáticos, CSVs do WPA, evidências PNG/HTML/XML e as pastas <code>_anterior/</code> (já filtradas).</p>
+<ul>
+<li><strong><code>Traces/</code> não é alterada.</strong> Os <code>.etl</code> e logs originais continuam em <code>Execucoes/</code> para abrir no WPA ou investigar falhas.</li>
+<li><strong>A pasta é recriada a cada execução</strong> e reflete o estado atual do cenário. Arquivos colocados à mão nela são perdidos, e um ZIP anterior dela é removido por estar desatualizado.</li>
+<li>Ao final, o hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora (ex.: <code>12 .etl, 3600 MB</code>).</li>
+<li>Em seguida, pergunta se deseja <strong>compactar em ZIP</strong>. O ZIP fica ao lado da pasta (<code>3440 - 050221.zip</code>), contém a pasta como raiz e é validado pela contagem de arquivos. Nenhuma pasta é apagada.</li>
+<li>A opção <strong><code>[E]</code></strong> do menu inicial faz o mesmo para um cenário existente, sem rodar testes.</li>
+</ul>
 </div>
 
 <div class="section">
@@ -1208,7 +1256,7 @@ Resultados/
     &quot;Paths&quot;: {
         &quot;SetupRoot&quot;: &quot;Setup&quot;,
         &quot;TestsRoot&quot;: &quot;Testes&quot;,
-        &quot;ResultadosDir&quot;: &quot;Resultados&quot;,
+        &quot;ExportarDir&quot;: &quot;Exportar&quot;,
         &quot;ExecucoesDir&quot;: &quot;Execucoes&quot;
     },
     &quot;Settings&quot;: {
