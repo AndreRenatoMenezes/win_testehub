@@ -6,6 +6,20 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+### Adicionado
+
+- **Módulos 7 a 11 — cargas de desenvolvimento** (origem: homologação de notebooks para desenvolvimento): `7_dev_dotnet` (build limpo, incremental e testes de unidade), `8_dev_go` (`go build` e `go test`), `9_dev_python` (`pip install` e `pytest -n auto`), `10_dev_containers` (`podman build` multi-stage e stack SQL Server + RabbitMQ + Redis até `healthy`) e `11_dev_git_arquivos` (20 mil arquivos pequenos e `git clone --local` + `git status`). Só repositórios open source fixados por tag e imagens públicas; cargas internas opcionais no `workloads.local.json` (não versionado). Mediana de 3 execuções; **FAIL** se a carga quebrar, passar de 10x a referência do `referencia.json` (1ª execução contra a fria, demais contra a mediana; gerado com `--calibrar` no notebook de referência), faltar ferramenta ou a máquina estiver na bateria. Biblioteca comum em `Testes/_lib/dev_cargas.py`.
+- Setups `7_install_devtools_dev` (Git, .NET SDK 10, Go, uv, docker-compose), `10_preparar_podman` (WSL2, Podman CLI e `podman machine` rootful) e `11_ca_corporativa_dev` (opcional; só age em rede com inspeção TLS).
+- CSVs temáticos `dev_dotnet.csv`, `dev_go.csv`, `dev_python.csv`, `dev_containers.csv` e `dev_git_arquivos.csv` copiados para `Resultados/`.
+- Teste de regressão da ordem do menu (`Test-GetScriptsOrder.ps1`) no CI.
+- Teste de regressão da parada da fila por Ctrl+Q (`Test-StopSignal.ps1`) no CI.
+
+### Alterado
+
+- **Janela flutuante das cargas dev:** o cronômetro agora anda em todas as fases. Fora da medição (preparo, setup, cleanup e download dos repositórios), ele aparece em amarelo com o nome da fase. Uma linha extra mostra a CPU da máquina e a última saída do comando, para o operador saber que o teste não travou. Antes, no preparo longo do A5c, a janela ficava parada com a carga anterior.
+- **Ctrl+Q para a fila inteira:** nos testes com parada segura (1, 1.1, 2.1, 5 e 7 a 11), o Ctrl+Q agora interrompe o teste atual **e** os testes seguintes, que aparecem como *cancelado*. O relatório é gerado com o que já rodou. Antes, o hub seguia para o próximo teste. O hub também descarta as teclas apertadas durante um teste antes de perguntar "Deseja continuar?".
+- **Menu do hub:** ordenação numérica natural dos scripts (`10_` depois de `9_`). Na Fase de Setup, `12_remover_appx_bloatware` e `13_remover_onedrive` passam a aparecer no fim da lista, e não mais antes do `1_`.
+
 ### Corrigido
 
 - **Módulo 3 (Rede interna):** falhas de pré-requisito (navegador ou driver ausente) encerravam só a thread de trabalho, e o teste saía com código 0, registrando **PASS** sem medir nada. Agora elas resultam em **FAIL**, com o motivo no log.

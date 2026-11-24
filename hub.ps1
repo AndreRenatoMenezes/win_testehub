@@ -83,6 +83,11 @@ $BrandCss = @'
 
 # ---- Descoberta de scripts ---------------------------------------------------
 
+function Get-NaturalSortKey {
+    param([string]$Name)
+    return [regex]::Replace($Name, '\d+', { param($m) $m.Value.PadLeft(8, '0') })
+}
+
 function Get-Scripts {
     param([string]$Root, [string]$Kind)
     $scripts = [System.Collections.Generic.List[PSCustomObject]]::new()
@@ -92,7 +97,11 @@ function Get-Scripts {
         New-Item -ItemType Directory -Path $Root -Force | Out-Null
     }
 
-    $files = Get-ChildItem -Path $Root -Recurse -Include "*.ps1","*.py" -Exclude "boot_shutdown_duration.ps1" -ErrorAction SilentlyContinue | Sort-Object Name
+    # Ordenacao natural: numeros com zeros a esquerda na chave, para "10_x" vir
+    # depois de "9_x" (Sort-Object Name puro colocaria "10_" antes de "1_").
+    # dev_cargas.py e a biblioteca comum dos modulos 7 a 11, nao um teste.
+    $files = Get-ChildItem -Path $Root -Recurse -Include "*.ps1","*.py" -Exclude "boot_shutdown_duration.ps1","dev_cargas.py" -ErrorAction SilentlyContinue |
+        Sort-Object { Get-NaturalSortKey $_.Name }
 
     foreach ($f in $files) {
         $scripts.Add([PSCustomObject]@{
@@ -583,9 +592,30 @@ function Update-ProgressLine {
             $line = "  !!  $Name.$Type  [$($Type.ToUpper())]    ERROR   $Detail"
             Write-PaddedLine -Text $line -Color Yellow -Width $width
         }
+        "CANCEL" {
+            $line = "  --  $Name.$Type  [$($Type.ToUpper())]    cancelado $Detail"
+            Write-PaddedLine -Text $line -Color DarkGray -Width $width
+        }
     }
 
     Safe-SetCursorPosition -X 0 -Y $savedPos
+}
+
+# ---- Parada da fila (Ctrl+Q) -------------------------------------------------
+# Os testes com Ctrl+Q gravam o arquivo HUB_STOP_FILE ao receber a tecla; o hub
+# confere o arquivo ao fim de cada teste e, se existir, para a fila inteira.
+
+function Test-StopSignal {
+    param([string]$StopFile)
+    if ([string]::IsNullOrEmpty($StopFile) -or -not (Test-Path -LiteralPath $StopFile)) { return $false }
+    Remove-Item -LiteralPath $StopFile -Force -ErrorAction SilentlyContinue
+    return $true
+}
+
+# Descarta teclas que ficaram no buffer do console durante o teste (ex.: o proprio
+# Ctrl+Q), para que nao respondam sozinhas a proxima pergunta do hub.
+function Clear-KeyBuffer {
+    try { while ([Console]::KeyAvailable) { [void][Console]::ReadKey($true) } } catch {}
 }
 
 # ---- Execucao de cada script -------------------------------------------------
@@ -955,6 +985,11 @@ function Copy-ThematicCSVs {
         "4_boot_shutdown"  = "boot_shutdown.csv"
         "5_bateria"        = "bateria.csv"
         "6_wifi_fast_transition" = "wifi_ft.csv"
+        "7_dev_dotnet"           = "dev_dotnet.csv"
+        "8_dev_go"               = "dev_go.csv"
+        "9_dev_python"           = "dev_python.csv"
+        "10_dev_containers"      = "dev_containers.csv"
+        "11_dev_git_arquivos"    = "dev_git_arquivos.csv"
     }
 
     # CSVs das variantes DLP/USB (1-1 e 2-1): opcionais -- copiados quando
@@ -967,7 +1002,7 @@ function Copy-ThematicCSVs {
     $copied  = 0
     $missing = 0
 
-    foreach ($folder in ($expectedCSVs.Keys | Sort-Object)) {
+    foreach ($folder in ($expectedCSVs.Keys | Sort-Object { Get-NaturalSortKey $_ })) {
         $csvName = $expectedCSVs[$folder]
         $sourcePath = Join-Path $TraceRunDir (Join-Path $folder $csvName)
 
@@ -1223,6 +1258,7 @@ if (-not $SkipSetup) {
 
                 if ($res.Status -ne "PASS") {
                     Write-Host "  [!] Script de preparacao falhou. Deseja continuar? (S para continuar)" -ForegroundColor Yellow
+                    Clear-KeyBuffer
                     $confirm = [Console]::ReadKey($true)
                     if ($confirm.KeyChar -ne 's' -and $confirm.KeyChar -ne 'S') {
                         Write-Host "`n  Execucao abortada.`n" -ForegroundColor Red
@@ -1284,6 +1320,10 @@ Add-Content -Path $logFile -Value "`n-- TESTES ($($toRun.Count) script(s)) --" -
 # Painel de progresso
 $progressY = Show-ExecutionProgress -TestsToRun $toRun -RunId $currentRunId
 
+$stopFile = Join-Path $env:TEMP "wintesthub_parada_$PID.flag"
+Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
+$env:HUB_STOP_FILE = $stopFile
+
 for ($idx = 0; $idx -lt $toRun.Count; $idx++) {
     $test = $toRun[$idx]
     Update-ProgressLine -Y $progressY -TestIndex $idx -Name $test.Name -Type $test.Type -Status "running" -Detail "" -Current ($idx + 1) -Total $toRun.Count
@@ -1300,9 +1340,22 @@ for ($idx = 0; $idx -lt $toRun.Count; $idx++) {
     }
     Update-ProgressLine -Y $progressY -TestIndex $idx -Name $test.Name -Type $test.Type -Status $res.Status -Detail $detail -Current ($idx + 1) -Total $toRun.Count
 
+    if (Test-StopSignal -StopFile $stopFile) {
+        for ($j = $idx + 1; $j -lt $toRun.Count; $j++) {
+            Update-ProgressLine -Y $progressY -TestIndex $j -Name $toRun[$j].Name -Type $toRun[$j].Type -Status "CANCEL" -Detail "(Ctrl+Q)" -Current ($idx + 1) -Total $toRun.Count
+        }
+        $restantes = $toRun.Count - $idx - 1
+        Add-Content -Path $logFile -Value "`n[!] Fila interrompida pelo operador (Ctrl+Q) em $($test.Name). $restantes teste(s) nao executado(s)." -Encoding UTF8
+        Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 1)
+        Write-Host "  [!] Ctrl+Q: fila interrompida em $($test.Name). $restantes teste(s) cancelado(s)." -ForegroundColor Yellow
+        Clear-KeyBuffer
+        break
+    }
+
     if ($res.Status -ne "PASS") {
         Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 1)
         Write-Host "  [!] Teste falhou. Deseja continuar? (S para continuar)" -ForegroundColor Yellow
+        Clear-KeyBuffer
         $confirm = [Console]::ReadKey($true)
         if ($confirm.KeyChar -ne 's' -and $confirm.KeyChar -ne 'S') {
             Write-Host "`n  Execucao abortada.`n" -ForegroundColor Red
@@ -1310,6 +1363,9 @@ for ($idx = 0; $idx -lt $toRun.Count; $idx++) {
         }
     }
 }
+
+$env:HUB_STOP_FILE = ""
+Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
 
 # Posicionar cursor abaixo do painel
 Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 2)

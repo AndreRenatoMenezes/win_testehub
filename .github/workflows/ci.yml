@@ -22,7 +22,7 @@ jobs:
 
       - name: Bloqueia arquivos internos e binários não redistribuíveis
         run: |
-          blocked=$(git ls-files -- '*.wpaProfile' 'config.local.json' '*msedgedriver.exe' '*chromedriver.exe' '*.pdb' '*.etl')
+          blocked=$(git ls-files -- '*.wpaProfile' 'config.local.json' 'workloads.local.json' '*msedgedriver.exe' '*chromedriver.exe' '*.pdb' '*.etl')
           if [ -n "$blocked" ]; then
             echo "::error::Arquivos que não devem ser versionados (veja README > Arquivos não versionados):"
             echo "$blocked"
@@ -106,6 +106,18 @@ jobs:
         shell: pwsh
         run: |
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-CopyThematicCSVs.ps1
+          exit $LASTEXITCODE
+
+      - name: Teste de regressão do hub (Get-Scripts)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-GetScriptsOrder.ps1
+          exit $LASTEXITCODE
+
+      - name: Teste de regressão do hub (parada da fila por Ctrl+Q)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-StopSignal.ps1
           exit $LASTEXITCODE
 
       - name: PSScriptAnalyzer (severidade Error)

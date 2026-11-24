@@ -20,9 +20,9 @@ O `hub.ps1` procura **recursivamente** por arquivos `*.ps1` e `*.py` em duas pas
 | `Setup/` | Fase 1 — Preparação | Configura a máquina antes dos testes |
 | `Testes/` | Fase 2 — Testes | Mede o hardware e decide PASS/FAIL |
 
-- Os scripts aparecem no menu ordenados pelo nome do arquivo e agrupados pela pasta-mãe.
+- Os scripts aparecem no menu ordenados pelo nome do arquivo, em **ordem numérica natural** (`9_` antes de `10_`), e agrupados pela pasta-mãe.
 - O rótulo do grupo vem do nome da pasta, sem o prefixo numérico: `5_bateria` → **Bateria**.
-- **Todo** `.ps1`/`.py` dessas pastas vira item do menu. Um script auxiliar (chamado por outro, e não pelo operador) precisa entrar na lista `-Exclude` da função `Get-Scripts` no `hub.ps1`, como já acontece com `boot_shutdown_duration.ps1`.
+- **Todo** `.ps1`/`.py` dessas pastas vira item do menu. Um script auxiliar (chamado por outro, e não pelo operador) precisa entrar na lista `-Exclude` da função `Get-Scripts` no `hub.ps1`, como já acontece com `boot_shutdown_duration.ps1` e com a biblioteca `Testes/_lib/dev_cargas.py`.
 
 ## Contrato de um script
 
@@ -74,6 +74,15 @@ O teste `.github/scripts/Test-CopyThematicCSVs.ps1`, executado no CI, cobre esse
 ### 5. Execução não interativa
 
 Scripts `.ps1` rodam com `-NonInteractive`, e a saída de todos é capturada para o log. Quando o teste precisar do operador, use uma janela própria (Tkinter, por exemplo), como fazem os módulos 5 e 6.
+
+### 6. Módulos de cargas de dev (7 a 11)
+
+Os módulos de cargas de desenvolvimento não têm lógica própria: o script só chama `executar_modulo(__file__)` da biblioteca `Testes/_lib/dev_cargas.py`, e o que é medido fica no `cargas.json` da pasta do módulo:
+
+- `ferramentas` (comando, como ler a versão e a versão mínima), `repos` (URL pública e tag ou hash fixo), `env` e `registrar` (versões e digests gravados no JSON);
+- `cargas`: cada uma com `preparo` (1x), `setup`, `command` (o único trecho cronometrado) e `cleanup`. Um passo é uma lista de argumentos (sem shell) ou uma ação embutida: `apagar`, `escrever`, `arquivos_pequenos`, `esperar_healthy`. Tokens: `{work}`, `{modulo}`, `{evidencias}`.
+
+O `referencia.json` do módulo (gerado com `--calibrar` no notebook de referência e versionado) define o limite de 10x por carga. Para uma carga nova, regenere a referência. Repositórios internos nunca entram no `cargas.json`: vão para o `workloads.local.json`, que não é versionado.
 
 ## Checklist para um novo módulo
 

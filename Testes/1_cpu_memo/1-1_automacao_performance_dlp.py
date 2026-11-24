@@ -74,6 +74,18 @@ logger.addHandler(_ch)
 _stop_requested = threading.Event()
 _ctrl_pressed = False
 
+def _sinalizar_parada_hub():
+    """Ctrl+Q: pede ao hub que pare a fila inteira (arquivo-sinal em HUB_STOP_FILE).
+    Fora do hub a variavel nao existe e nada acontece."""
+    caminho = os.environ.get("HUB_STOP_FILE")
+    if caminho:
+        try:
+            with open(caminho, "w", encoding="utf-8") as f:
+                f.write("ctrl+q")
+        except OSError:
+            pass
+
+
 def _on_key_press(key):
     global _ctrl_pressed
     if key in (kb.Key.ctrl_l, kb.Key.ctrl_r):
@@ -81,6 +93,7 @@ def _on_key_press(key):
     if _ctrl_pressed and hasattr(key, 'char') and key.char in ('q', 'Q', '\x11'):
         logger.warning("Parada segura solicitada pelo usuário (Ctrl+Q).")
         _stop_requested.set()
+        _sinalizar_parada_hub()
 
 def _on_key_release(key):
     global _ctrl_pressed

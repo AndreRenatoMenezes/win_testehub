@@ -1,0 +1,25 @@
+{
+  "gerado_em": "2026-11-23T20:09:21",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-1365U",
+  "ram_gb": 31.7,
+  "runs": 3,
+  "fator": 10,
+  "versoes": {
+    "git": "git version 2.56.1.windows.1",
+    "go": "go version go1.27.0 windows/amd64"
+  },
+  "cargas": {
+    "A5a-go-build-limpo-hugo": {
+      "mediana_s": 68.11,
+      "limite_s": 682,
+      "fria_s": 124.5,
+      "limite_fria_s": 1245
+    },
+    "A5c-go-test-hugo": {
+      "mediana_s": 114.99,
+      "limite_s": 1150,
+      "fria_s": 191.4,
+      "limite_fria_s": 1914
+    }
+  }
+}

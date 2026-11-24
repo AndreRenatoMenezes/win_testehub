@@ -1,0 +1,47 @@
+{
+  "_comentario": "Modulo 8 (origem: homologacao de notebooks para dev, A5a e A5c). Hugo v0.169.0 exige go 1.27; GOTOOLCHAIN fixa a mesma toolchain em todas as maquinas (o go instalado so precisa ser >= 1.21 e baixa a toolchain sozinho). setup/cleanup/preparo NAO sao cronometrados.",
+  "modulo": "8_dev_go",
+  "csv": "dev_go.csv",
+  "env": {
+    "GOTOOLCHAIN": "go1.27.0"
+  },
+  "ferramentas": [
+    {"cmd": "go", "versao": ["go", "version"], "minima": "1.21"}
+  ],
+  "repos": [
+    {"nome": "hugo", "url": "https://github.com/gohugoio/hugo", "ref": "v0.169.0", "profundidade": 1}
+  ],
+  "registrar": [
+    {"nome": "go-toolchain", "cmd": ["go", "version"], "cwd": "{work}/hugo"}
+  ],
+  "cargas": [
+    {
+      "id": "A5a-go-build-limpo-hugo",
+      "descricao": "go build do Hugo com o cache de build limpo (go clean -cache); modulos ja baixados no preparo.",
+      "enabled": true,
+      "cwd": "{work}/hugo",
+      "preparo": [
+        ["go", "mod", "download"]
+      ],
+      "setup": [
+        ["go", "clean", "-cache"]
+      ],
+      "command": [
+        ["go", "build", "-o", "NUL", "."]
+      ]
+    },
+    {
+      "id": "A5c-go-test-hugo",
+      "descricao": "go test de todos os pacotes do Hugo com o cache de build quente; -count=1 ignora o cache de teste. Pula TestCommands/mod: baixa modulos Hugo da internet (hugo mod graph/verify) e falha por mensagem de rede no stderr, independente da maquina.",
+      "enabled": true,
+      "cwd": "{work}/hugo",
+      "preparo": [
+        ["go", "build", "./..."],
+        ["go", "test", "-count=1", "-run", "^$", "./..."]
+      ],
+      "command": [
+        ["go", "test", "-count=1", "-skip", "^TestCommands$/^mod$", "./..."]
+      ]
+    }
+  ]
+}

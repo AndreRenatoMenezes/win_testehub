@@ -1,0 +1,68 @@
+# Dependencias de teste do pydantic v2.14.4, travadas (carga A6a do modulo 9).
+# Gerado na tag v2.14.4 com:
+#   uv export --frozen --no-hashes --no-emit-project --no-header --no-annotate --python 3.12 --group dev --group testing-extra
+#   + tzdata==2025.1 (extra 'timezone' do pydantic, travado no uv.lock): o Windows nao tem a base IANA de fusos.
+# Ajustes manuais:
+#   - "-e ./pydantic-core" (membro do workspace, em Rust) trocado pela wheel publicada pydantic-core==2.50.5,
+#     a versao que o pyproject.toml da tag exige: a carga mede pip install, nao compilacao Rust.
+#   - pytest-xdist e execnet acrescentados (pytest -n auto da carga A6b).
+annotated-types==0.7.0
+ansi2html==1.9.2
+asttokens==2.4.1
+attrs==24.3.0
+black==26.5.1
+click==8.4.2
+cloudpickle==3.1.2
+colorama==0.4.6 ; sys_platform == 'win32'
+coverage==7.13.5
+devtools==0.12.2
+dirty-equals==0.9.0
+exceptiongroup==1.2.2 ; python_full_version < '3.11'
+executing==2.2.0
+faker==35.0.0
+greenlet==3.5.6 ; python_full_version < '3.14' and (platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64')
+iniconfig==2.0.0
+jinja2==3.1.6 ; python_full_version < '3.15' and platform_python_implementation == 'CPython' and sys_platform != 'win32'
+jsonschema==4.26.0
+jsonschema-specifications==2024.10.1
+linkify-it-py==2.0.3 ; python_full_version < '3.15' and platform_python_implementation == 'CPython' and sys_platform != 'win32'
+markdown-it-py==3.0.0
+markupsafe==3.0.3 ; python_full_version < '3.15' and platform_python_implementation == 'CPython' and sys_platform != 'win32'
+mdit-py-plugins==0.4.2 ; python_full_version < '3.15' and platform_python_implementation == 'CPython' and sys_platform != 'win32'
+mdurl==0.1.2
+memray==1.19.3 ; python_full_version < '3.15' and platform_python_implementation == 'CPython' and sys_platform != 'win32'
+mypy-extensions==1.0.0
+packaging==26.3
+pathspec==1.1.1
+platformdirs==4.3.6
+pluggy==1.5.0
+py-cpuinfo==9.0.0
+pygments==2.20.0
+pytest==9.1.1
+pytest-benchmark==5.1.0
+pytest-codspeed==5.0.4
+pytest-examples==0.0.15
+pytest-memray==1.7.0 ; python_full_version < '3.15' and platform_python_implementation == 'CPython' and sys_platform != 'win32'
+pytest-mock==3.14.0
+pytest-pretty==1.2.0
+pytest-run-parallel==0.7.1
+python-dateutil==2.9.0.post0
+pytokens==0.4.1
+pytz==2024.2
+referencing==0.36.1
+rich==15.0.0
+rpds-py==0.30.0 ; python_full_version < '3.11'
+rpds-py==2026.9.1 ; python_full_version >= '3.11'
+ruff==0.17.3
+six==1.17.0
+sqlalchemy==2.0.37
+textual==1.0.0 ; python_full_version < '3.15' and platform_python_implementation == 'CPython' and sys_platform != 'win32'
+time-machine==3.3.0 ; platform_python_implementation != 'PyPy'
+tomli==2.2.1 ; python_full_version <= '3.11'
+typing-extensions==4.16.0
+typing-inspection==0.4.5
+uc-micro-py==1.0.3 ; python_full_version < '3.15' and platform_python_implementation == 'CPython' and sys_platform != 'win32'
+pydantic-core==2.50.5
+pytest-xdist==3.8.0
+execnet==2.1.2
+tzdata==2025.1
