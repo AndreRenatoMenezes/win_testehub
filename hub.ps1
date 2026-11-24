@@ -83,6 +83,11 @@ $BrandCss = @'
 
 # ---- Descoberta de scripts ---------------------------------------------------
 
+function Get-NaturalSortKey {
+    param([string]$Name)
+    return [regex]::Replace($Name, '\d+', { param($m) $m.Value.PadLeft(8, '0') })
+}
+
 function Get-Scripts {
     param([string]$Root, [string]$Kind)
     $scripts = [System.Collections.Generic.List[PSCustomObject]]::new()
@@ -92,7 +97,11 @@ function Get-Scripts {
         New-Item -ItemType Directory -Path $Root -Force | Out-Null
     }
 
-    $files = Get-ChildItem -Path $Root -Recurse -Include "*.ps1","*.py" -Exclude "boot_shutdown_duration.ps1" -ErrorAction SilentlyContinue | Sort-Object Name
+    # Ordenacao natural: numeros com zeros a esquerda na chave, para "10_x" vir
+    # depois de "9_x" (Sort-Object Name puro colocaria "10_" antes de "1_").
+    # dev_cargas.py e a biblioteca comum dos modulos 7 a 11, nao um teste.
+    $files = Get-ChildItem -Path $Root -Recurse -Include "*.ps1","*.py" -Exclude "boot_shutdown_duration.ps1","dev_cargas.py" -ErrorAction SilentlyContinue |
+        Sort-Object { Get-NaturalSortKey $_.Name }
 
     foreach ($f in $files) {
         $scripts.Add([PSCustomObject]@{
@@ -955,6 +964,11 @@ function Copy-ThematicCSVs {
         "4_boot_shutdown"  = "boot_shutdown.csv"
         "5_bateria"        = "bateria.csv"
         "6_wifi_fast_transition" = "wifi_ft.csv"
+        "7_dev_dotnet"           = "dev_dotnet.csv"
+        "8_dev_go"               = "dev_go.csv"
+        "9_dev_python"           = "dev_python.csv"
+        "10_dev_containers"      = "dev_containers.csv"
+        "11_dev_git_arquivos"    = "dev_git_arquivos.csv"
     }
 
     # CSVs das variantes DLP/USB (1-1 e 2-1): opcionais -- copiados quando
@@ -967,7 +981,7 @@ function Copy-ThematicCSVs {
     $copied  = 0
     $missing = 0
 
-    foreach ($folder in ($expectedCSVs.Keys | Sort-Object)) {
+    foreach ($folder in ($expectedCSVs.Keys | Sort-Object { Get-NaturalSortKey $_ })) {
         $csvName = $expectedCSVs[$folder]
         $sourcePath = Join-Path $TraceRunDir (Join-Path $folder $csvName)
 

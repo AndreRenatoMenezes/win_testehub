@@ -6,6 +6,17 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+### Adicionado
+
+- **Módulos 7 a 11 — cargas de desenvolvimento** (origem: homologação de notebooks para desenvolvimento): `7_dev_dotnet` (build limpo, incremental e testes de unidade), `8_dev_go` (`go build` e `go test`), `9_dev_python` (`pip install` e `pytest -n auto`), `10_dev_containers` (`podman build` multi-stage e stack SQL Server + RabbitMQ + Redis até `healthy`) e `11_dev_git_arquivos` (20 mil arquivos pequenos e `git clone --local` + `git status`). Só repositórios open source fixados por tag e imagens públicas; cargas internas opcionais no `workloads.local.json` (não versionado). Mediana de 3 execuções; **FAIL** se a carga quebrar, passar de 10x a referência do `referencia.json` (1ª execução contra a fria, demais contra a mediana; gerado com `--calibrar` no notebook de referência), faltar ferramenta ou a máquina estiver na bateria. Biblioteca comum em `Testes/_lib/dev_cargas.py`.
+- Setups `7_install_devtools_dev` (Git, .NET SDK 10, Go, uv, docker-compose), `10_preparar_podman` (WSL2, Podman CLI e `podman machine` rootful) e `11_ca_corporativa_dev` (opcional; só age em rede com inspeção TLS).
+- CSVs temáticos `dev_dotnet.csv`, `dev_go.csv`, `dev_python.csv`, `dev_containers.csv` e `dev_git_arquivos.csv` copiados para `Resultados/`.
+- Teste de regressão da ordem do menu (`Test-GetScriptsOrder.ps1`) no CI.
+
+### Alterado
+
+- **Menu do hub:** ordenação numérica natural dos scripts (`10_` depois de `9_`). Na Fase de Setup, `12_remover_appx_bloatware` e `13_remover_onedrive` passam a aparecer no fim da lista, e não mais antes do `1_`.
+
 ### Corrigido
 
 - **Módulo 3 (Rede interna):** falhas de pré-requisito (navegador ou driver ausente) encerravam só a thread de trabalho, e o teste saía com código 0, registrando **PASS** sem medir nada. Agora elas resultam em **FAIL**, com o motivo no log.

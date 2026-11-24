@@ -53,6 +53,11 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 | 4 | Boot e Shutdown | `4_boot_shutdown_auto.py` | 5 reinícios automáticos e análise dos eventos 100/200 do `Diagnostics-Performance` | ~30–40 min | nenhum boot ou shutdown crítico (> 60 s) no dia |
 | 5 | Bateria | `5_teste_bateria.py` | 60 min ociosa + 60 min de escritório na bateria, com pré-voo de padronização, WPR, SRUM e relatório de energia | ~2h20–2h40 | a coleta é válida nas duas fases |
 | 6 | Wi-Fi Fast Transition | `6_teste_fast_transition.py` | Roaming 802.11r durante uma caminhada de 5 min, com painel ao vivo e inventário de APs | ~7 min | ≥ 1 troca de AP com FT |
+| 7 | Dev .NET | `7_dev_dotnet.py` | Build limpo, build incremental e testes de unidade do `jasontaylordev/CleanArchitecture` v11.0.0 (.NET 10), 3 execuções | ~5–15 min | todas as cargas OK e ≤ 10x a referência |
+| 8 | Dev Go | `8_dev_go.py` | `go build` limpo e `go test` do Hugo v0.169.0, 3 execuções | ~10–30 min | todas as cargas OK e ≤ 10x a referência |
+| 9 | Dev Python | `9_dev_python.py` | `pip install` de dependências travadas e `pytest -n auto` do pydantic v2.14.4, 3 execuções | ~5–15 min | todas as cargas OK e ≤ 10x a referência |
+| 10 | Dev Containers | `10_dev_containers.py` | `podman build --no-cache` multi-stage e stack SQL Server + RabbitMQ + Redis até `healthy`, 3 execuções | ~10–20 min | todas as cargas OK e ≤ 10x a referência |
+| 11 | Dev Git e arquivos | `11_dev_git_arquivos.py` | 20 mil arquivos de 4 KB (overhead de EDR) e `git clone --local` + `git status` do `home-assistant/core`, 3 execuções | ~3–5 min | todas as cargas OK e ≤ 10x a referência |
 
 ![Menu da Fase 2 com os nove módulos de teste agrupados por categoria](docs/assets/screenshots/03-fase2-testes.png)
 <br><sub>*Fase 2: os módulos aparecem agrupados por pasta, todos marcados na primeira execução.*</sub>
@@ -105,6 +110,7 @@ Antes de cada script, o hub injeta `HUB_EVIDENCE_DIR` (onde gravar as evidência
 | Módulos 1.1 e 2.1 | Pendrive montado como `E:\` (configurável no topo de cada script) |
 | Módulo 5 | Notebook com bateria reconhecida e carregada a ≥ 95% |
 | Módulo 6 | Wi-Fi conectado à rede testada, com 2 ou mais APs do mesmo SSID no percurso |
+| Módulos 7 a 11 | Na tomada; ferramentas dos setups `7_install_devtools_dev` (Git, .NET SDK 10, Go, uv, docker-compose) e `10_preparar_podman` (WSL2 e Podman, módulo 10); virtualização na BIOS para o módulo 10 |
 
 ## Início rápido
 
@@ -176,6 +182,7 @@ Guarda os valores internos do ambiente. Use o [`config.local.example.json`](conf
 | Chave | Variável de ambiente equivalente | Uso |
 |-------|----------------------------------|-----|
 | `SpeedtestUrl` | `HUB_SPEEDTEST_URL` (tem prioridade) | URL do speedtest interno usado no Módulo 3 |
+| `DevWorkDir` | — | Pasta de trabalho dos módulos 7 a 11 (padrão `%USERPROFILE%\wintestehub-dev-work`) |
 
 ### Arquivos não versionados
 
@@ -186,6 +193,7 @@ Por segurança ou por licença, alguns arquivos ficam fora do Git e são distrib
 | `config.local.json` | raiz | Contém a URL interna do speedtest | O Módulo 3 falha com uma mensagem de configuração |
 | `Agentes_SI_Profile.wpaProfile` | `Testes/1_cpu_memo/` | Lista os processos dos agentes monitorados | O trace WPR é capturado, mas a exportação CSV é pulada |
 | `Agentes_SI_Bateria_Profile.wpaProfile` | `Testes/5_bateria/` | Mesmo motivo, no Módulo 5 | Idem |
+| `workloads.local.json` *(opcional)* | raiz | Cargas dos módulos 7 a 11 com repositórios internos (modelo em `workloads.local.example.json`) | Só as cargas públicas rodam |
 | `msedgedriver.exe` *(opcional)* | `Testes/1_cpu_memo/` | A licença não permite redistribuição | O Selenium Manager baixa o driver compatível sozinho |
 
 ## Saídas e relatórios
@@ -236,7 +244,9 @@ No menu inicial, a opção **`E`** compacta um cenário em ZIP, confere a contag
 │   ├── 3_rede_internet/
 │   ├── 4_boot_shutdown/
 │   ├── 5_bateria/
-│   └── 6_wifi_fast_transition/
+│   ├── 6_wifi_fast_transition/
+│   ├── 7_dev_dotnet/ … 11_dev_git_arquivos/   # cargas de dev (cargas.json + referencia.json)
+│   └── _lib/                  # biblioteca comum dos módulos 7 a 11 (fora do menu)
 ├── docs/                      # manual e metodologia (.md = fonte; .html gerado por gerar_html.py)
 │   └── assets/brand/          # logo, ícone, favicon e imagem de prévia do repositório
 └── .github/                   # CI, Dependabot e modelos de issue e de PR
@@ -244,7 +254,7 @@ No menu inicial, a opção **`E`** compacta um cenário em ZIP, confere a contag
 
 ## Adicionando um novo teste
 
-1. Crie `Testes/7_categoria/7_meu_teste.py` (ou `.ps1`).
+1. Crie `Testes/12_categoria/12_meu_teste.py` (ou `.ps1`). O menu ordena pelo número (`9_` antes de `10_`).
 2. Grave as evidências em `os.environ["HUB_EVIDENCE_DIR"]`.
 3. Saia com `0` para PASS e com qualquer outro código para FAIL.
 

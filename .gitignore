@@ -17,6 +17,10 @@ __pycache__/
 # ---------------------------------------------------------------------------
 # URL do speedtest interno e outros valores do ambiente
 config.local.json
+# Cargas de dev com repositorios internos (modulos 7 a 11)
+workloads.local.json
+# Specs de desenvolvimento (SDD): citam repositorios e caminhos internos
+.claude/
 # Perfis WPA: listam os processos dos agentes monitorados
 *.wpaProfile
 
@@ -39,6 +43,8 @@ Testes/**/*.png
 # (100 MB a 2 GB: acima do limite de 100 MB por arquivo do GitHub)
 Testes/**/*.xlsx
 Testes/**/*.dat
+# Saida avulsa dos modulos de cargas de dev (fora do hub)
+Testes/**/_saida/
 
 # ---------------------------------------------------------------------------
 # Sistema operacional / Google Drive / editores

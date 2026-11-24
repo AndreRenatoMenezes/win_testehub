@@ -1,0 +1,26 @@
+{
+  "gerado_em": "2026-11-23T19:44:10",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-1365U",
+  "ram_gb": 31.7,
+  "runs": 3,
+  "fator": 10,
+  "versoes": {
+    "git": "git version 2.56.1.windows.1",
+    "podman": "podman.EXE version 6.2.0",
+    "docker-compose": "5.8.0"
+  },
+  "cargas": {
+    "A7a-podman-build-hugo": {
+      "mediana_s": 164.64,
+      "limite_s": 1647,
+      "fria_s": 164.64,
+      "limite_fria_s": 1647
+    },
+    "A7b-podman-compose-healthy": {
+      "mediana_s": 13.85,
+      "limite_s": 139,
+      "fria_s": 15.71,
+      "limite_fria_s": 158
+    }
+  }
+}

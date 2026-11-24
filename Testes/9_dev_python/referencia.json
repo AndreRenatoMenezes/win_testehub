@@ -1,0 +1,25 @@
+{
+  "gerado_em": "2026-11-23T19:34:18",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-1365U",
+  "ram_gb": 31.7,
+  "runs": 3,
+  "fator": 10,
+  "versoes": {
+    "git": "git version 2.56.1.windows.1",
+    "uv": "uv 0.13.9 (6b2d39dcc 2026-11-17 x86_64-pc-windows-msvc)"
+  },
+  "cargas": {
+    "A6a-python-pip-install": {
+      "mediana_s": 52.94,
+      "limite_s": 530,
+      "fria_s": 84.32,
+      "limite_fria_s": 844
+    },
+    "A6b-python-pytest": {
+      "mediana_s": 42.1,
+      "limite_s": 421,
+      "fria_s": 46.14,
+      "limite_fria_s": 462
+    }
+  }
+}

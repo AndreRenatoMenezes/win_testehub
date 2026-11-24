@@ -1,0 +1,31 @@
+{
+  "gerado_em": "2026-11-23T19:28:53",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-1365U",
+  "ram_gb": 31.7,
+  "runs": 3,
+  "fator": 10,
+  "versoes": {
+    "git": "git version 2.56.1.windows.1",
+    "dotnet": "10.0.404"
+  },
+  "cargas": {
+    "A4a-dotnet-build-limpo": {
+      "mediana_s": 26.64,
+      "limite_s": 267,
+      "fria_s": 42.03,
+      "limite_fria_s": 421
+    },
+    "A4b-dotnet-build-incremental": {
+      "mediana_s": 4.5,
+      "limite_s": 45,
+      "fria_s": 9.74,
+      "limite_fria_s": 98
+    },
+    "A4c-dotnet-test-unit": {
+      "mediana_s": 2.38,
+      "limite_s": 24,
+      "fria_s": 16.71,
+      "limite_fria_s": 168
+    }
+  }
+}

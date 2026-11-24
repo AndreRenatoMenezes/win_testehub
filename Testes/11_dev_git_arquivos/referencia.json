@@ -1,0 +1,24 @@
+{
+  "gerado_em": "2026-11-23T19:26:05",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-1365U",
+  "ram_gb": 31.7,
+  "runs": 3,
+  "fator": 10,
+  "versoes": {
+    "git": "git version 2.56.1.windows.1"
+  },
+  "cargas": {
+    "B1-arquivos-pequenos": {
+      "mediana_s": 23.05,
+      "limite_s": 231,
+      "fria_s": 23.05,
+      "limite_fria_s": 231
+    },
+    "B3-git-clone-local-status": {
+      "mediana_s": 12.54,
+      "limite_s": 126,
+      "fria_s": 12.54,
+      "limite_fria_s": 126
+    }
+  }
+}

@@ -1,7 +1,7 @@
 # Metodologia de Testes — Hardware Test Hub
 
-**Versão:** 1.1  
-**Data:** 2026-11-06  
+**Versão:** 1.2  
+**Data:** 2026-11-23  
 **Público-alvo:** Equipe técnica, gestores, auditoria
 
 ---
@@ -17,9 +17,10 @@
 7. [Módulo 4 — Boot e Shutdown](#7-módulo-4--boot-e-shutdown)
 8. [Módulo 5 — Bateria](#8-módulo-5--bateria)
 9. [Módulo 6 — Wi-Fi Fast Transition (802.11r)](#9-módulo-6--wi-fi-fast-transition-80211r)
-10. [Rastreabilidade e Evidências](#10-rastreabilidade-e-evidências)
-11. [Formatos de Relatório](#11-formatos-de-relatório)
-12. [Glossário](#12-glossário)
+10. [Módulos 7 a 11 — Cargas de Desenvolvimento](#10-módulos-7-a-11--cargas-de-desenvolvimento)
+11. [Rastreabilidade e Evidências](#11-rastreabilidade-e-evidências)
+12. [Formatos de Relatório](#12-formatos-de-relatório)
+13. [Glossário](#13-glossário)
 
 ---
 
@@ -38,6 +39,7 @@ O **WinTestHub** (Hardware Test Hub) é um framework de validação de hardware 
 - Tempo de inicialização (boot) e desligamento (shutdown) do Windows
 - Consumo de energia na bateria (máquina ociosa e sob carga de escritório) e autonomia projetada
 - Roaming Wi-Fi entre APs com Fast Transition (802.11r) e compatibilidade de adaptador, driver e BIOS
+- Tempo de tarefas reais de desenvolvimento (build .NET e Go, testes, `pip install`, containers, git e arquivos pequenos) com repositórios open source fixados
 
 **O que NÃO é testado:**
 - Periféricos (teclado, mouse, webcam, impressora)
@@ -52,7 +54,7 @@ Este documento descreve o **procedimento padronizado** de cada teste. Para audit
 1. Identifique o **cenário** em `Execucoes/` (pasta com nome, hostname e data)
 2. Abra o `Traces/_relatorio.html` do cenário para ver o resumo de resultados
 3. Compare os procedimentos descritos neste documento com as evidências coletadas
-4. Verifique a cadeia de custódia usando o `_state.json` (seção 10)
+4. Verifique a cadeia de custódia usando o `_state.json` (seção 11)
 
 ---
 
@@ -75,13 +77,13 @@ O hub opera em **duas fases sequenciais**:
 ├─────────────────────────────────────────────────────┤
 │                                                     │
 │  ┌─── Fase 1: Setup ────────────────────────────┐   │
-│  │ Preparação do ambiente (10 scripts)          │   │
+│  │ Preparação do ambiente (13 scripts)          │   │
 │  │ Pode ser ignorada via config.json            │   │
 │  └──────────────────────────────────────────────┘   │
 │                       │                             │
 │                       ▼                             │
 │  ┌─── Fase 2: Testes ───────────────────────────┐   │
-│  │ 6 módulos de teste + 2 variantes             │   │
+│  │ 11 módulos de teste + 2 variantes            │   │
 │  │ Seleção via menu checkbox interativo         │   │
 │  └──────────────────────────────────────────────┘   │
 │                       │                             │
@@ -149,8 +151,11 @@ Padronizar a configuração da máquina de teste antes da execução dos módulo
 | `4_install_python` | Instala o Python 3.12 oficial e remove o alias da Microsoft Store | Pré-requisito para os scripts de teste em Python |
 | `5_install_py_dependencies` | Cria `.venv` e instala pacotes Python | Isola dependências e garante versões corretas |
 | `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias | Evita downloads e reinicializações durante testes |
+| `7_install_devtools_dev` | Instala via winget Git, .NET SDK 10, Go, uv e docker-compose (idempotente) | Ferramentas exigidas pelos módulos 7 a 11 |
 | `8_enable_diagnostics` | Desativa a Inicialização Rápida e habilita os serviços DPS e SysMain e a política WDI de diagnóstico de boot | Necessário para o teste de boot/shutdown (eventos 100 e 200 no Event Log) |
 | `9_AdicionarTecladoUSInt` | Adiciona o layout de teclado EUA-Internacional ao idioma pt-BR | Padronização de ambiente |
+| `10_preparar_podman` | Confere a virtualização, ativa o WSL2 (pede reinício quando preciso), instala o Podman CLI e liga a `podman machine` rootful | Pré-requisito do módulo 10 (containers) |
+| `11_ca_corporativa_dev` | Opcional: detecta inspeção TLS; só se houver, exporta a cadeia confiável do Windows para PEM, define as variáveis de CA e instala o PEM na VM do Podman | Em redes sem inspeção (como a do laboratório) não altera nada |
 | `12_remover_appx_bloatware` | Remove aplicativos pré-instalados (Xbox, Copilot, Teams, Notícias, Solitaire, LinkedIn, WhatsApp, To Do) | Reduz processos em segundo plano que variam entre imagens |
 | `13_remover_onedrive` | Desinstala o OneDrive e bloqueia a reinstalação por política | Evita sincronização em segundo plano durante as medições |
 
@@ -792,9 +797,94 @@ Tempo de troca e perda de pacotes são registrados, mas não reprovam. Ping para
 
 ---
 
-## 10. Rastreabilidade e Evidências
+## 10. Módulos 7 a 11 — Cargas de Desenvolvimento
 
-### 10.1 Estrutura de Armazenamento
+### 10.1 Objetivo
+
+Medir quanto tempo um desenvolvedor espera nas tarefas reais do dia a dia (compilar, rodar testes, instalar dependências, subir containers, operar o git) e, com isso, o impacto combinado do hardware e da imagem corporativa (EDR, DLP, antivírus) sobre o trabalho de desenvolvimento. As cargas vêm do processo de homologação de notebooks para desenvolvimento e usam **repositórios open source fixados por tag**, para que qualquer máquina meça exatamente o mesmo código.
+
+Os cinco módulos são independentes (um por linguagem ou ferramenta) e podem ser escolhidos separadamente no menu:
+
+| Módulo | Pasta | Cargas | Repositório (tag fixa) |
+|--------|-------|--------|------------------------|
+| 7 — .NET | `7_dev_dotnet` | A4a build limpo, A4b build incremental (1 arquivo alterado no Domain), A4c testes de unidade | `jasontaylordev/CleanArchitecture` `v11.0.0` (.NET 10, 13 projetos) |
+| 8 — Go | `8_dev_go` | A5a `go build` com cache limpo, A5c `go test` de todos os pacotes | `gohugoio/hugo` `v0.169.0` (toolchain `go1.27.0` fixada por `GOTOOLCHAIN`) |
+| 9 — Python | `9_dev_python` | A6a `pip install` de dependências travadas num venv novo, A6b `pytest -n auto` | `pydantic/pydantic` `v2.14.4` (CPython 3.12 gerenciado pelo `uv`) |
+| 10 — Containers | `10_dev_containers` | A7a `podman build --no-cache` multi-stage, A7b `podman compose up` até `healthy` | Dockerfile do Hugo `v0.169.0`; stack pública SQL Server + RabbitMQ + Redis |
+| 11 — Git e arquivos | `11_dev_git_arquivos` | B1 criar/ler/apagar 20 mil arquivos de 4 KB, B3 `git clone --local` + `git status` | `home-assistant/core` `2026.11.2` (~31 mil arquivos) |
+
+### 10.2 Ferramentas Utilizadas
+
+- **Biblioteca comum `Testes/_lib/dev_cargas.py`**: executa as cargas descritas no `cargas.json` de cada módulo, cronometra só o comando medido (`time.perf_counter`), aplica o limite de tempo, monitora tomada e Ctrl+Q e grava as evidências. Não aparece no menu.
+- **Ferramentas de desenvolvimento** instaladas pelos setups `7_install_devtools_dev` (Git, .NET SDK 10, Go, uv, docker-compose) e `10_preparar_podman` (WSL2, Podman CLI e `podman machine` rootful).
+- **`psutil`** para ler a tomada e encerrar a árvore de processos de uma carga (msbuild, go, podman).
+
+### 10.3 Procedimento
+
+1. **Pré-checagem:** o módulo exige a máquina **na tomada** (na bateria, não mede nada e reprova) e confere cada ferramenta do módulo e a versão mínima. Ferramenta ausente reprova o módulo antes de qualquer medição.
+2. **Repositórios:** clona (ou reaproveita) cada repositório na pasta de trabalho (`%USERPROFILE%\wintestehub-dev-work`, configurável por `DevWorkDir` no `config.local.json`), faz checkout da tag fixa e limpa a árvore (`git reset --hard` + `git clean -fdx`). Fora da medição.
+3. **Preparo (1x por carga):** downloads e builds de aquecimento que a carga pressupõe (ex.: `go mod download`, pull das imagens). Fora da medição.
+4. **Execuções (3 por carga):** `setup` → **`command` cronometrado** → `cleanup`. O `setup` deixa o estado inicial igual em toda execução (ex.: apaga `bin/obj`, limpa o cache do Go, recria o venv); o `cleanup` desfaz o que a carga criou.
+5. **Monitoramento contínuo:** a cada 0,5 s o módulo confere o limite de tempo e o Ctrl+Q; a cada 2 s, a tomada. Desconectar a tomada ou apertar Ctrl+Q interrompe a carga em curso, roda o `cleanup` e encerra o módulo com FAIL.
+6. **Registro:** versões das ferramentas, plano de energia, tomada, commit dos repositórios e digests das imagens de container entram no JSON do módulo.
+
+### 10.4 Referência e Limite de Tempo
+
+O limite de cada carga é **10 vezes o tempo medido no notebook de referência** (o notebook atual da frota), comparando frio com frio: a 1ª execução (caches do sistema vazios) é limitada a 10x a execução fria da referência, e as seguintes a 10x a mediana. Sem essa separação, cargas com aquecimento grande (ex.: A4c, cuja execução fria é 7x a mediana) reprovariam indevidamente em máquinas só um pouco mais lentas. A referência é gerada uma vez, rodando cada módulo avulso com `--calibrar` no notebook de referência, e fica versionada no `referencia.json` do módulo (mediana, fria e os dois limites por carga, modelo de CPU, RAM, data e versões das ferramentas; sem hostname).
+
+- A carga que passa do limite é **encerrada** (processo e todos os filhos) e fica como `TEMPO_EXCEDIDO`.
+- Módulo sem `referencia.json`, ou carga sem entrada nele (ex.: cargas internas do `workloads.local.json`): roda sem limite, com aviso no log e no JSON.
+
+### 10.5 Métricas Coletadas
+
+| Métrica | Descrição |
+|---------|-----------|
+| `mediana_s` | Mediana das 3 execuções do comando medido, em segundos |
+| `fria_s` | Tempo da 1ª execução (caches de disco do SO ainda frios) |
+| `execucoes_s` | Todos os tempos medidos |
+| `limite_s` | Limite das execuções 2 e 3 (10x a mediana da referência) ou vazio; o da 1ª execução (10x a fria da referência) fica no JSON (`limite_fria_s`) |
+| Parciais do B1 | Tempos de criar, ler e apagar (linhas `B1-arquivos-pequenos:criar` etc.) |
+| `sensivel_rede` | `sim` nas cargas que dependem de rede durante a medição (A6a, A7a) |
+
+### 10.6 Evidências Geradas
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| `dev_<modulo>.csv` | CSV temático (copiado para `Resultados/`): `carga;status;mediana_s;fria_s;limite_s;execucoes_s;sensivel_rede;motivo` |
+| `dev_<modulo>.json` | Contexto completo: host, data, CPU, RAM, plano de energia, tomada, versões, referência usada, registros (commits, digests), resultado por carga com todas as execuções e o motivo de cada falha |
+| `logs/<carga>.log` | Saída de cada fase (`preparo`, `setup run N`, `command run N`, `cleanup run N`) e o tempo de cada execução |
+| `logs/_repos.log` | Clone e checkout dos repositórios |
+
+### 10.7 Critério de Aprovação
+
+| Resultado | Condição |
+|-----------|----------|
+| **PASS** | Todas as cargas habilitadas do módulo terminam `OK` |
+| **FAIL** | Máquina na bateria; ferramenta ausente ou abaixo da versão mínima; falha ao preparar um repositório; alguma carga `FALHOU` (processo caiu ou saiu com código ≠ 0), `TEMPO_EXCEDIDO` (acima de 10x a referência) ou `INTERROMPIDO` (Ctrl+Q ou tomada desconectada) |
+
+Uma carga que falha não impede as próximas do mesmo módulo (o resultado parcial fica registrado); interrupções param o módulo.
+
+### 10.8 Ressalvas `[Técnico]`
+
+- **Rede:** A6a (`pip install` do PyPI) e A7a (`go mod download` dentro do build do container) dependem de rede durante a medição. Compare máquinas na mesma rede.
+- **Tags móveis de imagens** (`mssql/server:2022-latest`, `golang:1.27-alpine3.24`): puxe no mesmo dia nas máquinas comparadas; os digests ficam no JSON.
+- **Cache de build do container:** o Dockerfile do Hugo usa `RUN --mount=type=cache`, que o `--no-cache` não limpa; o `setup` da A7a apaga esses caches dentro da VM do Podman.
+- **pydantic-core:** a A6a instala a wheel publicada do `pydantic-core` (Rust) na versão exigida pela tag, em vez de compilá-la.
+- **Recursos da VM do Podman:** a VM WSL2 usa o padrão do WSL (50% da RAM, todas as threads). Não use `.wslconfig` diferente entre as máquinas comparadas.
+- **Cargas internas:** podem ser acrescentadas no `workloads.local.json` (fora do git, exemplo em `workloads.local.example.json`); não entram no `referencia.json`.
+
+### 10.9 Como Interpretar `[Gestão]`
+
+- O número que importa é a **mediana** de cada carga comparada com a do notebook de referência: uma razão de 1,3 significa que o desenvolvedor espera 30% mais naquela tarefa.
+- **B1 alto com o restante normal** aponta para overhead de EDR/antivírus em arquivos pequenos (padrão de `node_modules`, `obj/`, `.git`), não para o disco.
+- **FAIL por TEMPO_EXCEDIDO** significa uma tarefa pelo menos 10 vezes mais lenta que na referência: inviável para uso de desenvolvimento.
+- **FAIL por ferramenta ausente ou na bateria** é de preparação, não do hardware: rode os setups 7 e 10 e repita na tomada.
+
+---
+
+## 11. Rastreabilidade e Evidências
+
+### 11.1 Estrutura de Armazenamento
 
 Toda execução gera evidências organizadas por cenário, em duas pastas: `Execucoes/` (logs, evidências e estado) e `Resultados/` (CSVs estruturados).
 
@@ -863,6 +953,10 @@ Execucoes/
         │   ├── wifi_ft_eventos_wlan.csv
         │   ├── wifi_ft_compatibilidade.json
         │   └── brutos/
+        ├── 7_dev_dotnet/ … 11_dev_git_arquivos/  ← evidências das cargas de dev
+        │   ├── dev_<modulo>.csv
+        │   ├── dev_<modulo>.json
+        │   └── logs/                            ← <carga>.log e _repos.log
         └── <pasta do teste>/_anterior/           ← evidências substituídas em reexecuções
             ├── run1_2026-04-15T09-30-00/
             └── run2_2026-04-15T14-00-00/
@@ -873,13 +967,15 @@ Resultados/
     ├── cenario.csv                          ← status consolidado de cada teste
     └── cpu_memoria.csv, disco.csv, rede.csv, rede_internet.csv,
         boot_shutdown.csv, bateria.csv, wifi_ft.csv,
+        dev_dotnet.csv, dev_go.csv, dev_python.csv,
+        dev_containers.csv, dev_git_arquivos.csv,
         cpu_memoria_dlp.csv, disco_usb.csv   ← CSVs temáticos (variantes, quando executadas)
 ```
 
 > ![Estrutura de Pastas](img/placeholder-estrutura-traces.png)  
 > *Insira aqui: screenshot do Windows Explorer mostrando a estrutura de pastas de um cenário real*
 
-### 10.2 Ciclo de Vida das Evidências
+### 11.2 Ciclo de Vida das Evidências
 
 1. **Primeira execução:** Evidências são salvas diretamente nas subpastas do cenário
 2. **Re-execução:** Evidências anteriores são movidas para `<pasta do teste>/_anterior/run{N}_{data-hora}/` e novas evidências são geradas
@@ -889,7 +985,7 @@ Resultados/
 
 > **Nota:** a pasta de evidências é a da categoria, compartilhada pelos scripts da mesma pasta. Reexecutar um teste também move para `_anterior/` as evidências atuais dos outros testes da mesma pasta (por exemplo, o Módulo 1 e a variante 1-1).
 
-### 10.3 O Arquivo _state.json `[Técnico]`
+### 11.3 O Arquivo _state.json `[Técnico]`
 
 O `_state.json` é a fonte de verdade para o estado do cenário. Exemplo de estrutura:
 
@@ -917,7 +1013,7 @@ O `_state.json` é a fonte de verdade para o estado do cenário. Exemplo de estr
 }
 ```
 
-### 10.4 Cadeia de Custódia `[Gestão]`
+### 11.4 Cadeia de Custódia `[Gestão]`
 
 Para auditar uma execução e validar a integridade dos resultados:
 
@@ -932,9 +1028,9 @@ Para auditar uma execução e validar a integridade dos resultados:
 
 ---
 
-## 11. Formatos de Relatório
+## 12. Formatos de Relatório
 
-### 11.1 Relatório HTML
+### 12.1 Relatório HTML
 
 Relatório visual com tabela formatada, badges de status coloridos e resumo estatístico. Ideal para apresentação e compartilhamento. Há dois:
 
@@ -944,7 +1040,7 @@ Relatório visual com tabela formatada, badges de status coloridos e resumo esta
 > ![Exemplo Relatório HTML](img/placeholder-relatorio-html-exemplo.png)  
 > *Insira aqui: screenshot de um relatório HTML real*
 
-### 11.2 Relatório CSV
+### 12.2 Relatório CSV
 
 Dados tabulares com uma linha por teste. Ideal para importação em Excel ou ferramentas de BI.
 
@@ -964,7 +1060,7 @@ Dados tabulares com uma linha por teste. Ideal para importação em Excel ou fer
 
 O consolidado `Traces/_relatorio.csv` tem as colunas `Nome`, `Status`, `Duracao_s`, `Run`, `Reexecucao` e `Pasta`, com o último resultado de cada teste. Em `Resultados/<cenário>/`, o `cenario.csv` traz o mesmo status consolidado com o nome do cenário, o hostname e a data de cada run, e o `maquina.csv` traz o inventário da máquina.
 
-### 11.3 Relatório JSON
+### 12.3 Relatório JSON
 
 Dados estruturados com metadados completos. Ideal para integração com APIs e sistemas de monitoramento.
 
@@ -983,7 +1079,7 @@ Dados estruturados com metadados completos. Ideal para integração com APIs e s
 }
 ```
 
-### 11.4 Qual Relatório Usar `[Gestão]`
+### 12.4 Qual Relatório Usar `[Gestão]`
 
 | Necessidade | Formato recomendado |
 |-------------|---------------------|
@@ -996,7 +1092,7 @@ Dados estruturados com metadados completos. Ideal para integração com APIs e s
 
 ---
 
-## 12. Glossário
+## 13. Glossário
 
 | Termo | Definição |
 |-------|-----------|

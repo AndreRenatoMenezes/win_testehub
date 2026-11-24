@@ -1,0 +1,48 @@
+# Stack local tipica de dev (carga A7b do modulo 10), so com imagens publicas.
+# Substitui a stack da homologacao de notebooks para dev, que usava uma imagem de SQL Server de registry privado.
+# Nenhuma porta e publicada no host (os healthchecks rodam dentro dos containers): nao
+# conflita com Redis/RabbitMQ/SQL locais do dev. A senha do SA e de LABORATORIO (container local);
+# pode ser trocada pela variavel WINTESTEHUB_SA_PASSWORD.
+name: wintestehub-dev
+
+services:
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: wintestehub-database
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${WINTESTEHUB_SA_PASSWORD:-Lab-WinTestHub-2026!}"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 150
+      start_period: 5s
+
+  rabbitmq:
+    image: docker.io/library/rabbitmq:3-management-alpine
+    container_name: wintestehub-rabbitmq
+    # Via docker-compose + API do Podman, a copia do /var/lib/rabbitmq da imagem para o
+    # volume anonimo deixa o .erlang.cookie (modo 400) com dono root, e o RabbitMQ (uid 100)
+    # para com "eacces" ao le-lo. O cookie fica em $HOME: com HOME=/tmp o RabbitMQ cria
+    # um cookie proprio, legivel. A stack e local e descartavel.
+    environment:
+      HOME: /tmp
+    healthcheck:
+      # Pronto = listener AMQP aceitando conexoes. Checagem TCP (busybox nc): a CLI
+      # rabbitmq-diagnostics depende do cookie, que aqui fica so com o servidor.
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5672"]
+      interval: 2s
+      timeout: 5s
+      retries: 150
+      start_period: 5s
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: wintestehub-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 60

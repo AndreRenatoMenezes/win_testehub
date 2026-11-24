@@ -1,0 +1,52 @@
+{
+  "_comentario": "Modulo 11 (origem: homologacao de notebooks para dev, B1 e B3). setup/cleanup/preparo NAO sao cronometrados; so 'command'. Tokens: {work} = pasta de trabalho, {modulo} = esta pasta.",
+  "modulo": "11_dev_git_arquivos",
+  "csv": "dev_git_arquivos.csv",
+  "ferramentas": [
+    {"cmd": "git", "versao": ["git", "--version"], "minima": "2.40"}
+  ],
+  "repos": [
+    {"nome": "homeassistant", "url": "https://github.com/home-assistant/core", "ref": "2026.11.2", "profundidade": 1}
+  ],
+  "registrar": [
+    {"nome": "homeassistant-commit", "cmd": ["git", "-C", "{work}/homeassistant", "rev-parse", "HEAD"]}
+  ],
+  "cargas": [
+    {
+      "id": "B1-arquivos-pequenos",
+      "descricao": "Cria, le e apaga 20 mil arquivos de 4 KB. Expoe o overhead de EDR/AV sobre o fluxo do dev (node_modules, obj, .git).",
+      "enabled": true,
+      "cwd": "{work}",
+      "command": [
+        {"acao": "arquivos_pequenos", "pasta": "arquivos-pequenos", "quantidade": 20000, "tamanho": 4096}
+      ],
+      "cleanup": [
+        {"acao": "apagar", "caminhos": ["arquivos-pequenos"]}
+      ]
+    },
+    {
+      "id": "B3-git-clone-local-status",
+      "descricao": "home-assistant/core 2026.11.2 (~31 mil arquivos): clone local sem hardlinks (copia de .git/objects) + git status. Sensivel a EDR. A origem do download e rasa (--depth 1) e o git ignora --local em origem rasa; por isso o preparo monta uma origem local NAO rasa (1 commit com o conteudo da tag, compactado com gc; symlinks viram arquivos comuns, efeito desprezivel).",
+      "enabled": true,
+      "cwd": "{work}",
+      "preparo": [
+        {"acao": "apagar", "caminhos": ["homeassistant-origem"]},
+        ["git", "-c", "core.longpaths=true", "init", "-q", "{work}/homeassistant-origem"],
+        ["git", "-c", "core.longpaths=true", "-C", "{work}/homeassistant-origem", "--work-tree", "{work}/homeassistant", "add", "-A"],
+        ["git", "-c", "core.longpaths=true", "-c", "user.name=WinTestHub", "-c", "user.email=lab@exemplo.local", "-C", "{work}/homeassistant-origem", "--work-tree", "{work}/homeassistant", "commit", "-q", "-m", "home-assistant/core 2026.11.2 (arvore da tag)"],
+        ["git", "-C", "{work}/homeassistant-origem", "--work-tree", "{work}/homeassistant", "checkout", "-q", "-f"],
+        ["git", "-C", "{work}/homeassistant-origem", "gc", "-q"]
+      ],
+      "setup": [
+        {"acao": "apagar", "caminhos": ["homeassistant-copia"]}
+      ],
+      "command": [
+        ["git", "-c", "core.longpaths=true", "clone", "-q", "--local", "--no-hardlinks", "{work}/homeassistant-origem", "{work}/homeassistant-copia"],
+        ["git", "-c", "core.longpaths=true", "-C", "{work}/homeassistant-copia", "status", "--porcelain"]
+      ],
+      "cleanup": [
+        {"acao": "apagar", "caminhos": ["homeassistant-copia"]}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "_comentario": "Modulo 7 (origem: homologacao de notebooks para dev, A4a, A4b, A4c). jasontaylordev/CleanArchitecture v11.0.0: .NET 10, 13 projetos (o mesmo porte do repo interno da homologacao de notebooks para dev). Restore fora da medicao (NuGetAudit desligado: e rede, nao hardware), build-server desligado (cada run parte do zero). O npm do projeto Web so roda no publish, nao no build. setup/cleanup/preparo NAO sao cronometrados.",
+  "modulo": "7_dev_dotnet",
+  "csv": "dev_dotnet.csv",
+  "env": {
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "DOTNET_NOLOGO": "1",
+    "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1"
+  },
+  "ferramentas": [
+    {"cmd": "dotnet", "versao": ["dotnet", "--version"], "minima": "10.0"}
+  ],
+  "repos": [
+    {"nome": "cleanarchitecture", "url": "https://github.com/jasontaylordev/CleanArchitecture", "ref": "v11.0.0", "profundidade": 1}
+  ],
+  "registrar": [
+    {"nome": "dotnet-sdk-usado", "cmd": ["dotnet", "--version"], "cwd": "{work}/cleanarchitecture"}
+  ],
+  "cargas": [
+    {
+      "id": "A4a-dotnet-build-limpo",
+      "descricao": "dotnet build da solucao inteira partindo do zero (o repo usa UseArtifactsOutput: a saida fica em artifacts/, apagada no setup junto com bin/obj); restore no setup.",
+      "enabled": true,
+      "cwd": "{work}/cleanarchitecture",
+      "setup": [
+        ["dotnet", "build-server", "shutdown"],
+        {"acao": "apagar", "caminhos": ["artifacts"], "globs": ["src/*/bin", "src/*/obj", "tests/*/bin", "tests/*/obj"]},
+        ["dotnet", "restore", "CleanArchitecture.slnx", "-v", "q", "-p:NuGetAudit=false"]
+      ],
+      "command": [
+        ["dotnet", "build", "CleanArchitecture.slnx", "--no-restore", "-v", "q", "-nologo"]
+      ]
+    },
+    {
+      "id": "A4b-dotnet-build-incremental",
+      "descricao": "Build quente apos alterar 1 arquivo do Domain (recompila o Domain; os dependentes so recompilam se a API publica mudar, como num ciclo normal de edicao).",
+      "enabled": true,
+      "cwd": "{work}/cleanarchitecture",
+      "preparo": [
+        ["dotnet", "restore", "CleanArchitecture.slnx", "-v", "q", "-p:NuGetAudit=false"],
+        ["dotnet", "build", "CleanArchitecture.slnx", "--no-restore", "-v", "q", "-nologo"]
+      ],
+      "setup": [
+        {"acao": "escrever", "arquivo": "src/Domain/WinTestHubTouch.cs", "conteudo": "// wintestehub {agora}\nnamespace CleanArchitecture.Domain;\ninternal static class WinTestHubTouch { }\n"}
+      ],
+      "command": [
+        ["dotnet", "build", "CleanArchitecture.slnx", "--no-restore", "-v", "q", "-nologo"]
+      ],
+      "cleanup": [
+        {"acao": "apagar", "caminhos": ["src/Domain/WinTestHubTouch.cs"]}
+      ]
+    },
+    {
+      "id": "A4c-dotnet-test-unit",
+      "descricao": "So testes de unidade (Domain e Application); os funcionais e de integracao exigem banco/containers.",
+      "enabled": true,
+      "cwd": "{work}/cleanarchitecture",
+      "preparo": [
+        ["dotnet", "restore", "CleanArchitecture.slnx", "-v", "q", "-p:NuGetAudit=false"],
+        ["dotnet", "build", "CleanArchitecture.slnx", "--no-restore", "-v", "q", "-nologo"]
+      ],
+      "command": [
+        ["dotnet", "test", "tests/Domain.UnitTests/Domain.UnitTests.csproj", "--no-build", "-v", "q", "-nologo"],
+        ["dotnet", "test", "tests/Application.UnitTests/Application.UnitTests.csproj", "--no-build", "-v", "q", "-nologo"]
+      ]
+    }
+  ]
+}

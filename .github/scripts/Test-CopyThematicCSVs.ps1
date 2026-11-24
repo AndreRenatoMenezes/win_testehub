@@ -9,15 +9,17 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Extrai so a funcao do hub.ps1 (carregar o script inteiro executaria o hub)
+# Extrai so as funcoes necessarias do hub.ps1 (carregar o script inteiro executaria o hub)
 $hubPath = (Resolve-Path (Join-Path $PSScriptRoot "..\..\hub.ps1")).Path
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($hubPath, [ref]$null, [ref]$null)
-$fn = $ast.FindAll({
-    param($node)
-    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq "Copy-ThematicCSVs"
-}, $true) | Select-Object -First 1
-if (-not $fn) { throw "Funcao Copy-ThematicCSVs nao encontrada em $hubPath" }
-. ([scriptblock]::Create($fn.Extent.Text))
+foreach ($nome in "Get-NaturalSortKey", "Copy-ThematicCSVs") {
+    $fn = $ast.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $nome
+    }, $true) | Select-Object -First 1
+    if (-not $fn) { throw "Funcao $nome nao encontrada em $hubPath" }
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
 
 $script:falhas = 0
 
@@ -83,6 +85,23 @@ $r = Invoke-Scenario -Name "sem_variantes" -TraceFiles @{
     "1_cpu_memo\cpu_memoria.csv" = "modulo1"
 }
 Assert-Condition (((Get-ResultNames $r) -join ",") -eq "cpu_memoria.csv") "so o CSV do Modulo 1, sem erro pelas variantes ausentes"
+
+Write-Host "`nCenario 4: modulos de cargas de dev (7 a 11)"
+$devCsvs = [ordered]@{
+    "7_dev_dotnet"        = "dev_dotnet.csv"
+    "8_dev_go"            = "dev_go.csv"
+    "9_dev_python"        = "dev_python.csv"
+    "10_dev_containers"   = "dev_containers.csv"
+    "11_dev_git_arquivos" = "dev_git_arquivos.csv"
+}
+$traceFiles = @{}
+foreach ($pasta in $devCsvs.Keys) { $traceFiles["$pasta\$($devCsvs[$pasta])"] = $pasta }
+$r = Invoke-Scenario -Name "dev" -TraceFiles $traceFiles
+foreach ($pasta in $devCsvs.Keys) {
+    Assert-Condition ((Get-ResultContent $r $devCsvs[$pasta]) -eq $pasta) "$($devCsvs[$pasta]) copiado de $pasta"
+}
+$esperado = @($devCsvs.Values | Sort-Object) -join ","
+Assert-Condition (((Get-ResultNames $r) -join ",") -eq $esperado) "so os cinco CSVs de dev em Resultados"
 
 Write-Host ""
 if ($script:falhas -gt 0) {

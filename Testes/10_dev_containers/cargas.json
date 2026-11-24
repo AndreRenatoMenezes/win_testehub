@@ -1,0 +1,68 @@
+{
+  "_comentario": "Modulo 10 (origem: homologacao de notebooks para dev, A7a e A7b), so com imagens publicas. Exige a podman machine ligada (setup 10_preparar_podman) e o provider docker-compose (setup 7_install_devtools_dev). Imagens puxadas no setup, fora da medicao; digests registrados no JSON (tags moveis: puxar no mesmo dia nas maquinas comparadas).",
+  "modulo": "10_dev_containers",
+  "csv": "dev_containers.csv",
+  "ferramentas": [
+    {"cmd": "podman", "versao": ["podman", "--version"], "minima": "5.0"},
+    {"cmd": "docker-compose", "versao": ["docker-compose", "version", "--short"], "minima": "2.20"}
+  ],
+  "repos": [
+    {"nome": "hugo", "url": "https://github.com/gohugoio/hugo", "ref": "v0.169.0", "profundidade": 1}
+  ],
+  "registrar": [
+    {"nome": "podman-version", "cmd": ["podman", "version", "--format", "{{.Client.Version}} / {{.Server.Version}}"]},
+    {"nome": "podman-info", "cmd": ["podman", "info", "--format", "{{.Host.MemTotal}} bytes, {{.Host.CPUs}} CPUs"]},
+    {"nome": "digest-golang", "cmd": ["podman", "image", "inspect", "--format", "{{.Digest}}", "docker.io/library/golang:1.27-alpine3.24"]},
+    {"nome": "digest-mssql", "cmd": ["podman", "image", "inspect", "--format", "{{.Digest}}", "mcr.microsoft.com/mssql/server:2022-latest"]},
+    {"nome": "digest-rabbitmq", "cmd": ["podman", "image", "inspect", "--format", "{{.Digest}}", "docker.io/library/rabbitmq:3-management-alpine"]},
+    {"nome": "digest-redis", "cmd": ["podman", "image", "inspect", "--format", "{{.Digest}}", "docker.io/library/redis:7-alpine"]}
+  ],
+  "cargas": [
+    {
+      "id": "A7a-podman-build-hugo",
+      "descricao": "podman build --no-cache do Dockerfile multi-stage do Hugo v0.169.0 (compila Go com CGO dentro do container). O go mod download dentro do build usa rede: rodar na mesma rede nas maquinas comparadas.",
+      "enabled": true,
+      "sensivel_rede": true,
+      "cwd": "{work}/hugo",
+      "preparo": [
+        ["podman", "pull", "-q", "docker.io/tonistiigi/xx:1.5.0"],
+        ["podman", "pull", "-q", "docker.io/library/golang:1.27-alpine3.24"],
+        ["podman", "pull", "-q", "docker.io/library/alpine:3.24"]
+      ],
+      "_nota_setup": "O Dockerfile do Hugo usa RUN --mount=type=cache (go mod/go build). O --no-cache NAO limpa esses caches do buildah, que ficam em /var/tmp/buildah-cache-* dentro da VM: o setup apaga-os para cada run partir do zero.",
+      "setup": [
+        ["podman", "rmi", "-f", "--ignore", "localhost/wintestehub-hugo:teste"],
+        ["podman", "image", "prune", "-f"],
+        ["podman", "machine", "ssh", "sudo rm -rf /var/tmp/buildah-cache-*"]
+      ],
+      "command": [
+        ["podman", "build", "-q", "--no-cache", "-t", "localhost/wintestehub-hugo:teste", "."]
+      ],
+      "cleanup": [
+        ["podman", "rmi", "-f", "--ignore", "localhost/wintestehub-hugo:teste"],
+        ["podman", "machine", "ssh", "sudo rm -rf /var/tmp/buildah-cache-*"]
+      ]
+    },
+    {
+      "id": "A7b-podman-compose-healthy",
+      "descricao": "podman compose up de SQL Server + RabbitMQ + Redis ate os tres ficarem healthy (o SQL Server domina o tempo). down -v no cleanup.",
+      "enabled": true,
+      "cwd": "{modulo}",
+      "preparo": [
+        ["podman", "pull", "-q", "mcr.microsoft.com/mssql/server:2022-latest"],
+        ["podman", "pull", "-q", "docker.io/library/rabbitmq:3-management-alpine"],
+        ["podman", "pull", "-q", "docker.io/library/redis:7-alpine"]
+      ],
+      "setup": [
+        ["podman", "compose", "-f", "compose.yml", "down", "-v"]
+      ],
+      "command": [
+        ["podman", "compose", "-f", "compose.yml", "up", "-d"],
+        {"acao": "esperar_healthy", "containers": ["wintestehub-database", "wintestehub-rabbitmq", "wintestehub-redis"], "timeout_s": 600}
+      ],
+      "cleanup": [
+        ["podman", "compose", "-f", "compose.yml", "down", "-v"]
+      ]
+    }
+  ]
+}

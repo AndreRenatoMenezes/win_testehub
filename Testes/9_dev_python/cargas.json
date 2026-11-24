@@ -1,0 +1,58 @@
+{
+  "_comentario": "Modulo 9 (origem: homologacao de notebooks para dev, A6a e A6b). pydantic v2.14.4 com CPython 3.12 gerenciado pelo uv (mesmo binario em todas as maquinas), num venv da carga dentro da pasta de trabalho (nao no venv do hub). Dependencias travadas em requirements-pydantic.txt. UV_NATIVE_TLS/UV_SYSTEM_CERTS (nome antigo e novo) usam a loja de certificados do Windows. setup/cleanup/preparo NAO sao cronometrados.",
+  "modulo": "9_dev_python",
+  "csv": "dev_python.csv",
+  "env": {
+    "UV_NATIVE_TLS": "1",
+    "UV_SYSTEM_CERTS": "1",
+    "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "ferramentas": [
+    {"cmd": "uv", "versao": ["uv", "--version"], "minima": "0.5"}
+  ],
+  "repos": [
+    {"nome": "pydantic", "url": "https://github.com/pydantic/pydantic", "ref": "v2.14.4", "profundidade": 1}
+  ],
+  "registrar": [
+    {"nome": "python-da-carga", "cmd": ["{work}/pydantic/.venv/Scripts/python.exe", "--version"], "cwd": "{work}/pydantic"},
+    {"nome": "pip-da-carga", "cmd": ["{work}/pydantic/.venv/Scripts/python.exe", "-m", "pip", "--version"], "cwd": "{work}/pydantic"}
+  ],
+  "cargas": [
+    {
+      "id": "A6a-python-pip-install",
+      "descricao": "pip install das dependencias de teste travadas, num venv novo a cada run, sem cache do pip. Depende de rede (download do PyPI): rodar na mesma rede nas maquinas comparadas.",
+      "enabled": true,
+      "sensivel_rede": true,
+      "cwd": "{work}/pydantic",
+      "preparo": [
+        ["uv", "python", "install", "3.12"]
+      ],
+      "setup": [
+        {"acao": "apagar", "caminhos": [".venv"]},
+        ["uv", "venv", "-q", "--managed-python", "--python", "3.12", "--seed", ".venv"]
+      ],
+      "command": [
+        [".venv/Scripts/python", "-m", "pip", "install", "-q", "--no-cache-dir", "-r", "{modulo}/requirements-pydantic.txt"]
+      ]
+    },
+    {
+      "id": "A6b-python-pytest",
+      "descricao": "pytest -n auto da suite do pydantic (o pacote vem do checkout via PYTHONPATH; PYTHONHASHSEED=0 para todos os workers do xdist coletarem os mesmos testes parametrizados). O preparo garante o venv mesmo sem a A6a (--only A6b); se a A6a ja o criou, nao faz nada. Fora: tests/benchmarks, tests/mypy (exigem mypy/codspeed) e tests/pydantic_core (suite do pacote Rust).",
+      "enabled": true,
+      "cwd": "{work}/pydantic",
+      "env": {
+        "PYTHONPATH": "{work}/pydantic",
+        "PYTHONHASHSEED": "0"
+      },
+      "preparo": [
+        ["uv", "venv", "-q", "--managed-python", "--python", "3.12", "--seed", "--allow-existing", ".venv"],
+        ["uv", "pip", "install", "-q", "--python", ".venv/Scripts/python.exe", "-r", "{modulo}/requirements-pydantic.txt"]
+      ],
+      "command": [
+        [".venv/Scripts/python", "-m", "pytest", "-q", "-n", "auto", "-p", "no:cacheprovider", "tests",
+         "--ignore=tests/benchmarks", "--ignore=tests/mypy", "--ignore=tests/pydantic_core"]
+      ]
+    }
+  ]
+}

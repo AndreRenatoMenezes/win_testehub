@@ -1,7 +1,7 @@
 # Manual de Execução — Hardware Test Hub
 
-**Versão:** 1.1  
-**Data:** 2026-11-06  
+**Versão:** 1.2  
+**Data:** 2026-11-23  
 **Público-alvo:** Operadores de campo, equipe técnica, gestores
 
 ---
@@ -21,7 +21,7 @@
 
 ## 1. Visão Geral
 
-O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (CPU, memória, disco, rede, boot/shutdown e bateria) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.
+O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (CPU, memória, disco, rede, boot/shutdown, bateria, Wi-Fi e cargas reais de desenvolvimento) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.
 
 ---
 
@@ -36,6 +36,7 @@ O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de
 | Conexão de rede | Necessária para testes de rede e instalação de dependências |
 | Espaço em disco | Mínimo 10 GB livres (o teste de disco cria arquivo temporário de 8 GB) |
 | Bateria (Módulo 5) | Notebook com bateria reconhecida pelo Windows, carregada a pelo menos **95%** no início. Desative durante a homologação o limite de carga do fabricante (ex.: Dell "Primarily AC" ou carga adaptativa), que impede chegar a 95% |
+| Cargas de dev (Módulos 7 a 11) | Notebook **na tomada**; ~20 GB livres na pasta de trabalho (repositórios, caches e imagens); virtualização habilitada na BIOS para o módulo 10 (Podman/WSL2) |
 | Wi-Fi Fast Transition (Módulo 6) | Notebook com Wi-Fi **conectado à rede a testar** antes de iniciar; rede com 2 ou mais APs do mesmo SSID no percurso da caminhada |
 
 ### 2.2 Software
@@ -52,6 +53,8 @@ Para o **teste de bateria (Módulo 5)**, além disso:
 - **Microsoft Edge com a conta Google já logada** (Google Docs e Sheets), como no Módulo 1
 - **Feche o Edge antes de iniciar**: o teste encerra o Edge e reabre só com as páginas dele
 
+Para as **cargas de desenvolvimento (Módulos 7 a 11)**, os setups `7_install_devtools_dev` e `10_preparar_podman` instalam Git, .NET SDK 10, Go, uv, docker-compose, WSL2 e Podman (veja a seção 4.8).
+
 ### 2.3 Rede `[Técnico]`
 
 - O teste de rede acessa o servidor de speedtest interno, cuja URL fica fora do repositório: chave `SpeedtestUrl` do `config.local.json` na raiz do hub (modelo em `config.local.example.json`) ou variável de ambiente `HUB_SPEEDTEST_URL`. Verifique se a máquina tem acesso a essa URL antes de executar o módulo de rede.
@@ -66,8 +69,8 @@ C:\TesteHub\
 ├── hub.ps1              # Orquestrador principal
 ├── config.json          # Configurações
 ├── config.local.json    # Valores internos, como a URL do speedtest (não versionado)
-├── Setup\environment\   # Scripts de setup (10 scripts)
-├── Testes\              # Módulos de teste (6 módulos + 2 variantes DLP/USB)
+├── Setup\environment\   # Scripts de setup (13 scripts)
+├── Testes\              # Módulos de teste (11 módulos + 2 variantes DLP/USB; _lib\ = biblioteca dos módulos 7 a 11)
 ├── Execucoes\           # Logs, evidências e estado de cada cenário (criada pelo hub)
 └── Resultados\          # CSVs estruturados de cada cenário (criada pelo hub)
 ```
@@ -106,8 +109,11 @@ Na primeira execução, a **Fase de Setup** será apresentada automaticamente. E
 | `4_install_python` | Instala o Python 3.12 |
 | `5_install_py_dependencies` | Cria o ambiente virtual e instala os pacotes Python |
 | `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias (evita interferência nos testes) |
+| `7_install_devtools_dev` | Instala Git, .NET SDK 10, Go, uv e docker-compose (módulos 7 a 11) |
 | `8_enable_diagnostics` | Habilita os diagnósticos de boot/shutdown do Windows |
 | `9_AdicionarTecladoUSInt` | Adiciona o layout de teclado EUA-Internacional |
+| `10_preparar_podman` | Ativa o WSL2, instala o Podman e liga a `podman machine` (módulo 10; pode pedir reinício) |
+| `11_ca_corporativa_dev` | Opcional: CA corporativa para redes com inspeção TLS (sem inspeção, não altera nada) |
 | `12_remover_appx_bloatware` | Remove aplicativos pré-instalados (Xbox, Copilot, Teams, Notícias e outros) |
 | `13_remover_onedrive` | Desinstala o OneDrive e bloqueia a reinstalação |
 
@@ -166,9 +172,19 @@ Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupad
 [X] 5_teste_bateria                [PY]   pendente
 -- Wifi Fast Transition --------------------
 [X] 6_teste_fast_transition        [PY]   pendente
+-- Dev Dotnet ------------------------------
+[X] 7_dev_dotnet                   [PY]   pendente
+-- Dev Go ----------------------------------
+[X] 8_dev_go                       [PY]   pendente
+-- Dev Python ------------------------------
+[X] 9_dev_python                   [PY]   pendente
+-- Dev Containers --------------------------
+[X] 10_dev_containers              [PY]   pendente
+-- Dev Git Arquivos ------------------------
+[X] 11_dev_git_arquivos            [PY]   pendente
 ```
 
-Desmarque com `Espaço` o que não for executar agora. Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), e as variantes DLP/USB (`1-1` e `2-1`) só fazem sentido com um pendrive em `E:\`.
+Desmarque com `Espaço` o que não for executar agora. Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (`1-1` e `2-1`) só fazem sentido com um pendrive em `E:\`.
 
 Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:
 
@@ -307,6 +323,57 @@ A cada troca de AP aparece um destaque grande na tela (verde = FT, vermelho = N�
 
 Ao fim, o painel mostra PASS/FAIL e abre o relatório `6_wifi_fast_transition/wifi_ft_relatorio.html`, com gráficos e informações técnicas. O `wifi_ft.csv` é copiado para `Resultados/`.
 
+### 4.8 Cargas de Desenvolvimento (Módulos 7 a 11) — Passo a Passo do Operador
+
+Os módulos 7 a 11 cronometram tarefas reais de desenvolvimento (build, testes, `pip install`, containers, git). Cada um leva de 3 a 30 min (o 11 é o mais curto; o 8 e o 10, os mais longos), conforme a máquina e o primeiro download dos repositórios e imagens. A metodologia completa está na seção 10 da *Metodologia de Testes*.
+
+**1. Prepare a máquina (uma vez)**
+
+Na Fase de Setup, rode:
+
+| Setup | Quando |
+|-------|--------|
+| `7_install_devtools_dev` | Sempre (Git, .NET SDK 10, Go, uv e docker-compose) |
+| `10_preparar_podman` | Para o módulo 10. Se ele pedir para **reiniciar** (ativação do WSL2), reinicie e rode de novo |
+| `11_ca_corporativa_dev` | Só em rede com inspeção TLS. Na rede do laboratório ele confere e sai sem alterar nada |
+
+Depois dos setups, **feche e reabra o hub** para o PATH novo valer.
+
+**2. Siga as regras de comparação**
+
+- Notebook **na tomada** (na bateria o módulo reprova sem medir) e plano de energia no padrão do hub (setup `2_opcoes_energia`, **Equilibrado**), o mesmo da calibração da referência. O plano em uso fica registrado no JSON do módulo.
+- Reinicie, espere 10 min ocioso e confira que Windows Update e varreduras de antivírus não estão rodando.
+- Use a mesma rede nas máquinas comparadas: A6a (`pip install`) e A7a (build do container) baixam pacotes durante a medição.
+
+**3. Selecione os módulos**
+
+No menu, marque os módulos desejados (seções **Dev Dotnet**, **Dev Go**, **Dev Python**, **Dev Containers** e **Dev Git Arquivos**). Uma janela flutuante mostra a carga atual, a execução (1 a 3), o cronômetro e o limite. **Ctrl+Q** interrompe com segurança (a carga é encerrada, o `cleanup` roda e o módulo termina com FAIL).
+
+**4. Veja o resultado**
+
+Cada módulo grava em `Traces/<módulo>/` o `dev_<módulo>.csv` (copiado para `Resultados/`), o `dev_<módulo>.json` e os logs em `logs/`. O módulo dá **PASS** quando todas as cargas terminam OK; dá **FAIL** se alguma quebrar, passar de **10x o tempo da referência**, se faltar ferramenta ou se a máquina estiver na bateria.
+
+**Calibração da referência `[Técnico]`**
+
+O limite de 10x vem do `referencia.json` de cada módulo, gerado no **notebook de referência** (o atual da frota). Para gerar ou atualizar, nessa máquina, com o `.venv` do hub:
+
+```bat
+cd C:\TesteHub
+.venv\Scripts\python Testes\7_dev_dotnet\7_dev_dotnet.py --calibrar
+.venv\Scripts\python Testes\8_dev_go\8_dev_go.py --calibrar
+.venv\Scripts\python Testes\9_dev_python\9_dev_python.py --calibrar
+.venv\Scripts\python Testes\10_dev_containers\10_dev_containers.py --calibrar
+.venv\Scripts\python Testes\11_dev_git_arquivos\11_dev_git_arquivos.py --calibrar
+```
+
+A calibração só grava o arquivo se todas as cargas terminarem OK. Versione os `referencia.json` gerados (não contêm hostname). Sem o arquivo, o módulo roda sem limite de tempo e avisa no log.
+
+Outras opções da execução avulsa: `--runs N` (padrão 3), `--only A4a,A4c` (só as cargas com esses prefixos; com `--calibrar`, atualiza só a referência dessas cargas e mantém as demais) e `--sem-overlay`. Fora do hub, as evidências vão para `_saida/` dentro da pasta do módulo.
+
+**Cargas internas `[Técnico]`**
+
+Para medir também repositórios internos, copie `workloads.local.example.json` para `workloads.local.json` (raiz do hub, fora do git) e descreva as cargas no mesmo formato do `cargas.json` do módulo. Elas rodam junto com as públicas, sem limite de tempo. Nunca coloque credenciais no arquivo: o clone usa o gerenciador de credenciais do git.
+
 ---
 
 ## 5. Cenários e Re-execução
@@ -430,6 +497,13 @@ Há dois relatórios HTML:
 | Wi-Fi FT: trocas "Indeterminado" | O driver não informa a AKM no `netsh wlan show interfaces` | Atualize o driver; a evidência bruta fica em `brutos/netsh_interfaces*.txt` |
 | Wi-Fi FT: painel não abriu | Edge bloqueado por política | Abra no navegador a URL "Painel ao vivo" registrada no log `teste_wifi_ft_*.log`; o teste roda mesmo sem o painel |
 | Wi-Fi FT: métricas de internet `N/A` | Ping para `8.8.8.8` bloqueado pelo firewall | Esperado em redes corporativas; não reprova |
+| Cargas dev: FAIL "Notebook na bateria" | Carregador desconectado | Conecte o carregador e execute de novo; o módulo não mede na bateria |
+| Cargas dev: FAIL "'go'/'dotnet'/'uv'/'podman' nao encontrado no PATH" | Setup de ferramentas não rodou, ou o hub foi aberto antes da instalação | Rode o setup `7_install_devtools_dev` (e o `10_preparar_podman` para containers), feche e reabra o hub |
+| Cargas dev: carga `TEMPO_EXCEDIDO` | A tarefa levou mais de 10x o tempo do notebook de referência | Confira no log da carga se houve espera de rede; se não, a máquina é inadequada para essa tarefa de desenvolvimento |
+| Cargas dev: carga `FALHOU` | Build/teste quebrou, rede caiu no `setup` ou a VM do Podman parou | Veja o motivo no CSV e a saída completa em `Traces/<módulo>/logs/<carga>.log` |
+| Cargas dev: aviso "sem referencia.json" | Módulo ainda não calibrado | Rode a calibração no notebook de referência (seção 4.8); até lá o módulo só reprova por falha |
+| Podman: setup pede para reiniciar | O WSL2 acabou de ser ativado | Reinicie o Windows e rode o `10_preparar_podman` de novo |
+| Podman: "Habilite a virtualização" | VT-x/AMD-V desligado na BIOS | Habilite a virtualização na BIOS/UEFI |
 | Teste de boot/shutdown não completa os 5 ciclos | Task Scheduler falhou ou máquina não reiniciou | Verifique se a tarefa agendada `HardwareTestHub_Reiniciador` existe no Agendador de Tarefas |
 | Bateria: "Este teste exige um notebook com bateria reconhecida pelo Windows" | Desktop ou bateria não reconhecida | O teste só roda em notebook; confira a bateria no Gerenciador de Dispositivos. Nada foi alterado na máquina |
 | Bateria: "Carga da bateria em X%; o mínimo para iniciar é 95%" | Bateria não carregada ou limite de carga do fabricante ativo | Carregue a bateria na tomada; desative o limite de carga do fabricante (app ou BIOS) e execute de novo |
@@ -485,6 +559,7 @@ Valores internos ficam em `config.local.json`, na raiz do hub. Esse arquivo não
 | Chave | Variável de ambiente equivalente | Uso |
 |-------|----------------------------------|-----|
 | `SpeedtestUrl` | `HUB_SPEEDTEST_URL` (tem prioridade) | URL do speedtest interno do Módulo 3 |
+| `DevWorkDir` | — | Pasta de trabalho dos módulos 7 a 11 (padrão `%USERPROFILE%\wintestehub-dev-work`) |
 
 ---
 
@@ -522,7 +597,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File hub.ps1
 
 | Atalho | Teste | Ação |
 |--------|-------|------|
-| `Ctrl+Q` | CPU & Memória, Bateria | Interromper teste de forma segura |
+| `Ctrl+Q` | CPU & Memória, Bateria, Cargas dev (7 a 11) | Interromper teste de forma segura |
 
 ---
 

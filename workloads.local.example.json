@@ -1,0 +1,23 @@
+{
+  "_comentario": "Copie para workloads.local.json (fora do git) para acrescentar cargas com repositorios internos aos modulos 7 a 11. Chave = pasta do modulo. Cargas e repos sao mesclados por 'id'/'nome' com os do cargas.json do modulo (o local substitui o publico de mesmo id). Cargas locais nao entram no referencia.json: ficam sem limite de tempo. Valores abaixo sao FICTICIOS. Nunca coloque credenciais aqui: use o gerenciador de credenciais do git.",
+  "7_dev_dotnet": {
+    "repos": [
+      {"nome": "meu-servico", "url": "https://git.exemplo.local/time/meu-servico", "ref": "0000000000000000000000000000000000000000"}
+    ],
+    "cargas": [
+      {
+        "id": "A4x-dotnet-build-limpo-meu-servico",
+        "descricao": "Build limpo de um repositorio interno (exemplo).",
+        "enabled": true,
+        "cwd": "{work}/meu-servico",
+        "setup": [
+          {"acao": "apagar", "globs": ["src/*/bin", "src/*/obj"]},
+          ["dotnet", "restore", "src/MeuServico.sln", "-v", "q", "-p:NuGetAudit=false"]
+        ],
+        "command": [
+          ["dotnet", "build", "src/MeuServico.sln", "--no-restore", "-v", "q", "-nologo"]
+        ]
+      }
+    ]
+  }
+}
