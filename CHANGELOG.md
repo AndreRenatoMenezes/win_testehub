@@ -8,7 +8,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
-- **Pasta `Exportar/` pronta para o Drive:** ao fim de cada execução, o hub gera `Exportar/<cenário>/<modelo> - <patrimônio>/`, uma cópia de `Traces/` sem os arquivos `.etl` (200 a 400 MB cada), sem `.log`, sem pastas `logs/` e sem pastas vazias. `Traces/` não é alterada. O hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora. Isso substitui a limpeza manual antes de subir as evidências.
+- **Pasta `Exportar/` pronta para o Drive:** ao fim de cada execução, o hub gera `Exportar/<cenário>/<modelo> - <patrimônio>/`, uma cópia de `Traces/` sem os arquivos `.etl` (200 a 400 MB cada), sem `.log`, sem pastas `logs/` e sem pastas vazias. `Traces/` não é alterada. O hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora, e avisa quando um módulo some da exportação por ter só `.etl` e logs (ex.: `1_cpu_memo` sem o `.wpaProfile`). Isso substitui a limpeza manual antes de subir as evidências.
 - **Modelo e patrimônio/serial na criação do cenário:** além do nome, o hub pergunta o modelo e o patrimônio da máquina, que ficam no `_state.json`, nomeiam a pasta de exportação e aparecem no `_relatorio.json`/`.html` e no `maquina.csv`. Cenários antigos perguntam os dois uma única vez.
 - Teste de regressão da exportação (`Test-ExportTraces.ps1`) no CI.
 

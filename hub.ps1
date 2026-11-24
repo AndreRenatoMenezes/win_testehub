@@ -1190,6 +1190,20 @@ function Export-ScenarioTraces {
     [long]$outBytes = 0
     foreach ($f in $outFiles) { $outBytes += $f.Length }
 
+    # Modulos que tinham arquivos em Traces/ mas sumiram da exportacao (so .etl/logs):
+    # ex.: 1_cpu_memo sem o .wpaProfile grava os .etl e pula os CSVs do WPA.
+    # Pastas de 1o nivel com arquivos na origem (reaproveita $srcFiles); 'logs' e
+    # excluida de proposito pelo robocopy, entao nao conta como modulo vazio.
+    $srcModules = @($srcFiles | ForEach-Object {
+        $rel = $_.FullName.Substring($traceRoot.Length).TrimStart('\')
+        if ($rel.Contains('\')) { $rel.Split('\')[0] }
+    } | Select-Object -Unique)
+    $emptyModules = @()
+    foreach ($m in $srcModules) {
+        if ($m -ieq 'logs') { continue }
+        if (-not (Test-Path -LiteralPath (Join-Path $dest $m))) { $emptyModules += $m }
+    }
+
     $summary = [PSCustomObject]@{
         Path          = $dest
         Files         = $outFiles.Count
@@ -1197,6 +1211,7 @@ function Export-ScenarioTraces {
         ExcludedFiles = $excluded.Count
         ExcludedEtl   = $etlCount
         ExcludedMB    = [Math]::Round($excludedBytes / 1MB, 1)
+        EmptyModules  = $emptyModules
     }
 
     Write-Host "  [OK] Exportacao pronta: $dest" -ForegroundColor Green
@@ -1204,6 +1219,10 @@ function Export-ScenarioTraces {
     Write-Host "       Fora da exportacao: $($summary.ExcludedFiles) arquivo(s) ($($summary.ExcludedEtl) .etl), $($summary.ExcludedMB) MB" -ForegroundColor DarkGray
     if ($LogFile) {
         Add-Content -Path $LogFile -Value "[INFO] Exportacao: $dest | $($summary.Files) arquivo(s), $($summary.SizeMB) MB | excluidos: $($summary.ExcludedFiles) ($($summary.ExcludedEtl) .etl), $($summary.ExcludedMB) MB" -Encoding UTF8
+    }
+    foreach ($m in $emptyModules) {
+        Write-Host "  [!] $m ficou fora da exportacao: so tinha .etl, .log ou pastas logs/. As evidencias estao apenas em Execucoes/ (verifique o teste, ex.: .wpaProfile ausente)." -ForegroundColor Yellow
+        if ($LogFile) { Add-Content -Path $LogFile -Value "[AVISO] Modulo '$m' sem nenhum arquivo na exportacao (so .etl/logs em Traces)" -Encoding UTF8 }
     }
     return $summary
 }

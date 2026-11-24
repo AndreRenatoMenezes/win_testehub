@@ -1020,6 +1020,7 @@ Exportar/
 <li><strong><code>Traces/</code> não é alterada.</strong> Os <code>.etl</code> e logs originais continuam em <code>Execucoes/</code> para abrir no WPA ou investigar falhas.</li>
 <li><strong>A pasta é recriada a cada execução</strong> e reflete o estado atual do cenário. Arquivos colocados à mão nela são perdidos, e um ZIP anterior dela é removido por estar desatualizado.</li>
 <li>Ao final, o hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora (ex.: <code>12 .etl, 3600 MB</code>).</li>
+<li>Se um módulo tinha só <code>.etl</code> e logs, ele some da exportação e o hub avisa com <code>[!] &lt;módulo&gt; ficou fora da exportacao</code>. Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o <code>.wpaProfile</code> dos módulos 1 e 5, e o WPA não exporta. As evidências continuam só em <code>Execucoes/</code>. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos <code>.etl</code>.</li>
 <li>Em seguida, pergunta se deseja <strong>compactar em ZIP</strong>. O ZIP fica ao lado da pasta (<code>3440 - 050221.zip</code>), contém a pasta como raiz e é validado pela contagem de arquivos. Nenhuma pasta é apagada.</li>
 <li>A opção <strong><code>[E]</code></strong> do menu inicial faz o mesmo para um cenário existente, sem rodar testes.</li>
 </ul>

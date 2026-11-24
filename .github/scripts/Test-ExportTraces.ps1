@@ -76,6 +76,7 @@ $files = [ordered]@{
     "2_disco\_anterior\run1_2026\trace.etl"         = "e"
     "2_disco\disco.csv"                             = "new"
     "3_rede\sub\so.log"                             = "s"
+    "6_wifi_fast_transition\Trace_Wifi.etl"         = "w"
 }
 foreach ($rel in $files.Keys) {
     $p = Join-Path $traces $rel
@@ -113,8 +114,10 @@ try {
         Assert-Condition (Test-Path -LiteralPath (Join-Path $expectedDest $keep)) "mantem $keep"
     }
     Assert-Condition ($r.Files -eq 10) "resumo conta 10 arquivos exportados (obtido: $($r.Files))"
-    Assert-Condition ($r.ExcludedEtl -eq 3) "resumo conta 3 .etl fora (obtido: $($r.ExcludedEtl))"
-    Assert-Condition ($r.ExcludedFiles -eq 7) "resumo conta 7 arquivos fora (obtido: $($r.ExcludedFiles))"
+    Assert-Condition ($r.ExcludedEtl -eq 4) "resumo conta 4 .etl fora (obtido: $($r.ExcludedEtl))"
+    Assert-Condition ($r.ExcludedFiles -eq 8) "resumo conta 8 arquivos fora (obtido: $($r.ExcludedFiles))"
+    $em = (@($r.EmptyModules) | Sort-Object) -join ","
+    Assert-Condition ($em -eq "3_rede,6_wifi_fast_transition") "modulos so com .etl/logs avisados; environment (vazia) e modulos com CSV nao (obtido: $em)"
     Assert-Condition (((Get-Tree $traces) -join "`n") -eq $tracesBefore) "Traces/ nao foi alterada"
 
     Microsoft.PowerShell.Utility\Write-Host "`nIdempotencia: segunda execucao com lixo no destino"
@@ -158,6 +161,7 @@ try {
     Set-Content -LiteralPath (Join-Path $cleanTraces "_state.json") -Value "{}"
     $r5 = Export-ScenarioTraces -TraceRunDir $cleanTraces -ExportarDir $exportar -State $otherState
     Assert-Condition ($null -ne $r5 -and $r5.Files -eq 1 -and $r5.ExcludedFiles -eq 0 -and $r5.ExcludedMB -eq 0) "exporta 1 arquivo, 0 excluidos, sem erro"
+    Assert-Condition (@($r5.EmptyModules).Count -eq 0) "sem modulos vazios quando nada e excluido"
 
     Microsoft.PowerShell.Utility\Write-Host "`nTraces vazia"
     $emptyTraces = Join-Path $root "vazio\Traces"
