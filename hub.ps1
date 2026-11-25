@@ -236,9 +236,13 @@ function Ensure-MachineIdentity {
     return $State
 }
 
+# Grava os resultados no run $RunId. Se esse run ja existe (setups gravados
+# antes da fase 2), os resultados entram nele, substituindo o mesmo script.
 function Add-RunToState {
-    param([PSCustomObject]$State, [array]$Results)
-    $runId = ($State.runs | Measure-Object).Count + 1
+    param([PSCustomObject]$State, [array]$Results, [int]$RunId = 0)
+    if ($RunId -le 0) { $RunId = ($State.runs | Measure-Object).Count + 1 }
+    $runId = $RunId
+    $existing = @($State.runs | Where-Object { $_.runId -eq $runId }) | Select-Object -First 1
     $testEntries = @()
     foreach ($r in $Results) {
         $testEntries += [PSCustomObject]@{
@@ -251,12 +255,19 @@ function Add-RunToState {
             traceCount = $r.TraceCount
         }
     }
+    $now = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+    $State.lastRunAt = $now
+    if ($null -ne $existing) {
+        $names = @($testEntries | ForEach-Object { $_.name })
+        $kept  = @($existing.tests | Where-Object { $names -notcontains $_.name })
+        $existing.tests = @($kept) + @($testEntries)
+        return $State
+    }
     $newRun = [PSCustomObject]@{
         runId     = $runId
-        timestamp = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+        timestamp = $now
         tests     = $testEntries
     }
-    $State.lastRunAt = $newRun.timestamp
     $State.runs = @($State.runs) + @($newRun)
     return $State
 }
@@ -763,8 +774,17 @@ function Clear-KeyBuffer {
 
 # ---- Execucao de cada script -------------------------------------------------
 
+# Rele o PATH do registro. Um setup que instala algo (Python no 4, git no 7)
+# so altera o registro; sem isto os scripts seguintes herdam o PATH antigo
+# do hub e nao acham o que acabou de ser instalado.
+function Update-SessionPath {
+    $env:PATH = "$([System.Environment]::GetEnvironmentVariable('Path', 'Machine'));$([System.Environment]::GetEnvironmentVariable('Path', 'User'))"
+}
+
 function Invoke-TestScript {
     param([PSCustomObject]$Test, [string]$LogFile, [string]$TraceRunDir, [switch]$Silent)
+
+    Update-SessionPath
 
     $scriptTraceDir = Join-Path $TraceRunDir "$($Test.ParentFolder)"
     New-Item -ItemType Directory -Path $scriptTraceDir -Force | Out-Null
@@ -2250,6 +2270,10 @@ if (-not $SkipSetup) {
                 $allResults.Add($res)
                 $setupResults.Add($res)
 
+                # Grava ja: sair sem rodar testes (ou fechar a janela) nao perde o setup
+                $stateObj = Add-RunToState -State $stateObj -Results @($res) -RunId $currentRunId
+                Write-StateFile -TraceRunDir $traceRunDir -State $stateObj
+
                 $statusClr = if ($res.Status -eq "PASS") { "Green" } elseif ($res.Status -eq "FAIL") { "Red" } else { "Yellow" }
                 Write-Host "  >> Resultado: $($res.Status) ($([Math]::Round($res.Duration,2))s)`n" -ForegroundColor $statusClr
 
@@ -2268,7 +2292,7 @@ if (-not $SkipSetup) {
     }
 }
 
-$env:PATH = "$([System.Environment]::GetEnvironmentVariable('Path', 'Machine'));$([System.Environment]::GetEnvironmentVariable('Path', 'User'))"
+Update-SessionPath
 
 # ==== FASE 2: TESTES =========================================================
 
@@ -2428,9 +2452,8 @@ Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
 # Posicionar cursor abaixo do painel
 Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 2)
 
-# Atualizar state file (setup + testes combinados)
-$combinedResults = @($setupResults.ToArray()) + @($testResults.ToArray())
-$stateObj = Add-RunToState -State $stateObj -Results $combinedResults
+# Atualizar state file (os setups ja foram gravados no mesmo run durante a fase 1)
+$stateObj = Add-RunToState -State $stateObj -Results @($testResults.ToArray()) -RunId $currentRunId
 Write-StateFile -TraceRunDir $traceRunDir -State $stateObj
 
 # Relatorio por run (Logs/)

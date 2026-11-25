@@ -28,6 +28,15 @@ function Test-TlsOpenSsl {
 
 Write-Host "--- CA corporativa (opcional) ---" -ForegroundColor Green
 
+# O git pode ter acabado de ser instalado pelo Setup 7: rele o PATH do registro
+# e, se ainda faltar, usa o caminho padrao do instalador.
+$env:PATH = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+            [System.Environment]::GetEnvironmentVariable("Path", "User")
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    $gitCmd = Join-Path $env:ProgramFiles "Git\cmd"
+    if (Test-Path (Join-Path $gitCmd "git.exe")) { $env:PATH += ";$gitCmd" }
+}
+
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Host "git nao encontrado: rode antes o 7_install_devtools_dev.ps1." -ForegroundColor Red
     exit 1

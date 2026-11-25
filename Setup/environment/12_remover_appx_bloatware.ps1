@@ -32,6 +32,24 @@ $houveErro = $false
 #   0x80070003 = caminho nao encontrado (provisionado ja ausente)
 $errosBenignos = "0x80073CFA|0x80070032|0x80070002|0x80070003"
 
+# A mensagem vem traduzida e sem o codigo ("O sistema nao pode encontrar o
+# arquivo especificado"), entao compara tambem o HResult da excecao.
+function Test-ErroBenigno {
+    param($ErrorRecord)
+    if ($ErrorRecord.Exception.Message -match $errosBenignos) { return $true }
+    $hr = "0x{0:X8}" -f $ErrorRecord.Exception.HResult
+    return ($hr -match $errosBenignos)
+}
+
+# Remover o pacote instalado com -AllUsers costuma desprovisiona-lo junto; o
+# Remove-AppxProvisionedPackage seguinte falha porque ele ja nao existe.
+function Test-ProvisionadoAusente {
+    param([string]$PackageName)
+    $ainda = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
+             Where-Object { $_.PackageName -eq $PackageName }
+    return (-not $ainda)
+}
+
 # Cache da lista de pacotes provisionados (consulta cara; constante por execucao)
 $provisionados = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
 
@@ -48,7 +66,7 @@ foreach ($padrao in $padroes) {
                 Remove-AppxPackage -Package $pkg.PackageFullName -AllUsers -ErrorAction Stop
                 Write-Host "  OK: removido $($pkg.Name)" -ForegroundColor Green
             } catch {
-                if ($_.Exception.Message -match $errosBenignos) {
+                if (Test-ErroBenigno $_) {
                     Write-Host "  -> $($pkg.Name) ja ausente ou componente do Windows (ignorado)." -ForegroundColor Yellow
                 } else {
                     Write-Warning "  Falha ao remover $($pkg.Name): $($_.Exception.Message)"
@@ -68,7 +86,7 @@ foreach ($padrao in $padroes) {
                 Remove-AppxProvisionedPackage -Online -PackageName $p.PackageName -ErrorAction Stop | Out-Null
                 Write-Host "  OK: provisionado removido $($p.DisplayName)" -ForegroundColor Green
             } catch {
-                if ($_.Exception.Message -match $errosBenignos) {
+                if ((Test-ErroBenigno $_) -or (Test-ProvisionadoAusente $p.PackageName)) {
                     Write-Host "  -> Provisionado $($p.DisplayName) ja ausente (ignorado)." -ForegroundColor Yellow
                 } else {
                     Write-Warning "  Falha ao remover provisionado $($p.DisplayName): $($_.Exception.Message)"
