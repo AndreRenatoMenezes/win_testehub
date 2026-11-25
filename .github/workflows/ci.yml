@@ -81,6 +81,9 @@ jobs:
       - name: Teste de regressão (cálculos do teste de rede unificado)
         run: python -I -X utf8 .github/scripts/test_rede_estatistica.py
 
+      - name: Teste de regressão (Módulo 1 com LibreOffice)
+        run: python -I -X utf8 .github/scripts/test_cpu_memo_libreoffice.py
+
       - name: HTML da documentação em sincronia com o Markdown
         run: python docs/gerar_html.py --check
 
