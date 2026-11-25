@@ -39,6 +39,8 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 - **Relatórios em vários formatos**: HTML, CSV, JSON e log completo, por execução e consolidados por cenário, além de CSVs temáticos prontos para BI.
 - **Extensível por convenção**: qualquer `.py` ou `.ps1` colocado em `Testes/` vira um item do menu.
 - **Feito para o operador**: overlays de progresso que não capturam cliques, parada segura com `Ctrl+Q` e pasta de exportação pronta para o Drive (sem `.etl` nem logs) e ZIP validado.
+- **Checagem antes da fila**: antes de soltar a fila, o hub aponta o que vai falhar (ex.: `.wpaProfile` ausente, ferramenta de dev faltando, notebook na bateria) e as sobras de testes anteriores consumindo recursos. Entre um teste e outro, limpa as sobras do teste que acabou.
+- **Avisos e frequência da CPU no relatório**: o `_relatorio.html` lista as ressalvas da rodada e o clock da CPU por módulo, com aviso de throttling.
 
 ## Módulos de teste
 
@@ -158,6 +160,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\TesteHub\hub.ps1
 | `Enter` | Confirmar |
 | `Esc` | Cancelar |
 
+No resumo pré-execução, depois da checagem: `R` tira da fila os testes que vão falhar e `C` continua mesmo assim (as duas só aparecem quando há algo que impede), `F` encerra as sobras de teste (quando há) e `Esc` volta ao menu. Detalhes no [manual, seção 4.9](docs/manual-de-execucao.md#49-checagem-antes-da-fila-e-sobras-de-teste).
+
 ![Fase 2 com o status de cada teste no cenário e seleção parcial](docs/assets/screenshots/06-fase2-status.png)
 <br><sub>*Numa reexecução, cada teste mostra o último status (PASS, FAIL ou pendente) e dá para marcar só os que interessam.*</sub>
 
@@ -174,6 +178,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\TesteHub\hub.ps1
 | `Paths.ExportarDir` | `Exportar` | Pasta pronta para subir ao Drive: `Traces/` de cada cenário sem `.etl`, logs e pastas vazias |
 | `Settings.PythonVenvName` | `.venv` | Ambiente virtual usado para os testes `.py` |
 | `Settings.HtmlReportTitle` | `WinTestHub - Relatório Final` | Título dos relatórios HTML |
+| `Preflight.MinFreeGB` | `20` | Espaço livre mínimo no disco do hub antes de avisar |
+| `Preflight.CpuAlertPct` | `10` | % de um núcleo a partir da qual um processo aparece como "usando CPU" na checagem |
+| `Preflight.InternetHost` | `www.msftconnecttest.com` | Host testado (porta 443) na checagem de internet |
+| `CpuSampler.Enabled` | `true` | Grava `frequencia_cpu.csv` em cada módulo |
+| `CpuSampler.IntervalSec` | `5` | Intervalo entre amostras (mínimo 1) |
+| `CpuSampler.ThrottleAlertPct` | `20` | Queda do clock sob carga que vira aviso de throttling |
+| `CpuSampler.LoadMinPct` | `50` | Uso de CPU a partir do qual a amostra conta como "sob carga" |
+| `CpuSampler.SkipFolders` | `["5_bateria"]` | Testes em que o amostrador não roda |
 
 ### `config.local.json` (não versionado)
 
@@ -209,6 +221,7 @@ Execucoes/
         ├── _relatorio.{html,csv,json}       # consolidado: último status de cada teste
         ├── informacoes_maquina.csv          # inventário do setup 1
         ├── maquina.csv                      # modelo, série, CPU, RAM, disco, SO + modelo/patrimônio informados
+        ├── <módulo>/frequencia_cpu.csv      # clock da CPU durante o teste (gerado pelo hub)
         └── 2_disco/                         # evidências de cada teste
             └── _anterior/run1_…/            # evidências substituídas numa reexecução
 Exportar/
@@ -222,7 +235,7 @@ A pasta `Exportar/<cenário>/<modelo> - <patrimônio>/` é regerada ao fim de ca
 
 | Preciso de… | Use |
 |-------------|-----|
-| Apresentar o resultado | `Traces/_relatorio.html` |
+| Apresentar o resultado | `Traces/_relatorio.html` (com os avisos da rodada e a frequência da CPU) |
 | Subir as evidências para o Drive | `Exportar/<cenário>/<modelo> - <patrimônio>/` |
 | Alimentar planilha ou BI | CSVs temáticos de cada módulo (`Traces/<módulo>/*.csv`, também na exportação) |
 | Auditar uma execução | `Logs/run_*.json` |

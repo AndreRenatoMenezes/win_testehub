@@ -86,6 +86,12 @@ Os módulos de cargas de desenvolvimento não têm lógica própria: o script s�
 
 O `referencia.json` do módulo (gerado com `--calibrar` no notebook de referência e versionado) define o limite de 10x por carga. Para uma carga nova, regenere a referência. Repositórios internos nunca entram no `cargas.json`: vão para o `workloads.local.json`, que não é versionado.
 
+### 7. Pré-requisitos e sobras do módulo
+
+Se o módulo depende de algo que pode faltar na máquina (arquivo não versionado, ferramenta, configuração), acrescente uma regra em `Get-PreflightFindings` (`hub.ps1`). A regra recebe só os testes selecionados, agrupados pela pasta, e devolve achados `New-PreflightFinding 'Impede'|'Atencao' <testes> <item> <ação>`. Use `Impede` só quando o teste vai falhar com certeza, e escreva a ação como instrução ao operador ("Copie X para Y", "Rode o Setup N"). Sondas do sistema (tomada, internet, disco, versão de ferramenta) ficam em funções próprias, para a CI poder substituí-las (`.github/scripts/Test-Preflight.ps1`).
+
+Se o módulo abre processos que podem sobreviver ao teste (navegador, servidor, container, sessão de captura), acrescente uma entrada em `Get-TestLeftovers` e o encerramento correspondente em `Stop-TestLeftovers`. Detecte pela linha de comando ou por uma flag que só o teste usa. Pelo nome do executável, só quando ele existe apenas por causa do teste (como `diskspd.exe`): o hub não pode encerrar processos do usuário. Se a sobra pode ser do usuário (como os build servers do .NET, que o Visual Studio também usa), trate-a como aviso sem `F` na checagem antes da fila, como em `Get-PreflightFindings`. Informe a pasta do módulo na entrada, para a limpeza entre testes só agir depois dele.
+
 ## Checklist para um novo módulo
 
 - [ ] Pasta `Testes/N_categoria/` e script `N_nome.py` (ou `.ps1`)
@@ -93,6 +99,7 @@ O `referencia.json` do módulo (gerado com `--calibrar` no notebook de referênc
 - [ ] Evidências em `HUB_EVIDENCE_DIR`
 - [ ] Parada segura (`Ctrl+Q`) em testes longos
 - [ ] CSV temático registrado em `Test-ThematicCSVs` (se houver)
+- [ ] Pré-requisitos na checagem (`Get-PreflightFindings`) e sobras em `Get-TestLeftovers` (se houver)
 - [ ] Dependências Python novas adicionadas a `Setup/environment/5_install_py_dependencies.ps1`
 - [ ] Seção nova em `docs/metodologia-de-testes.md` (objetivo, procedimento, métricas e critério de aprovação) e passo a passo no `docs/manual-de-execucao.md`
 - [ ] HTML da documentação regenerado com `python docs/gerar_html.py`

@@ -85,6 +85,9 @@ O hub opera em **duas fases sequenciais**:
 │  ┌─── Fase 2: Testes ───────────────────────────┐   │
 │  │ 11 módulos de teste + 2 variantes            │   │
 │  │ Seleção via menu checkbox interativo         │   │
+│  │ Checagem antes da fila (pré-requisitos e     │   │
+│  │ sobras de teste); sobras limpas entre testes │   │
+│  │ Frequência da CPU amostrada em cada teste    │   │
 │  └──────────────────────────────────────────────┘   │
 │                       │                             │
 │                       ▼                             │
@@ -97,6 +100,13 @@ O hub opera em **duas fases sequenciais**:
 
 > ![Diagrama de Arquitetura](img/placeholder-diagrama-arquitetura.png)  
 > *Insira aqui: diagrama visual do fluxo de execução do framework*
+
+#### Controles que protegem a medição
+
+- **Checagem antes da fila.** Antes de iniciar, o hub confere o que os testes selecionados precisam: o perfil `.wpaProfile` dos módulos 1 e 5, o Windows Performance Toolkit, a URL do speedtest, as ferramentas de dev e a `podman machine`, a tomada, a internet e o espaço em disco. O que impede um teste precisa de uma decisão explícita do operador (tirar o teste da fila ou continuar); a decisão fica registrada.
+- **Sobras de teste.** Processos que um teste abriu e não fechou (sessão do WPR, Edge da automação, `diskspd`, Python de teste, build servers do .NET, stack do Podman) consomem recursos e contaminariam o teste seguinte. A checagem aponta essas sobras, e entre um teste e outro o hub encerra as do teste que acabou. Entre testes, só são encerrados os processos que o próprio teste abriu (o hub compara com os processos que já existiam antes do teste); antes da fila, os build servers do .NET aparecem só como aviso, porque podem ser do Visual Studio do usuário. A sessão do WPR, a stack do Podman e a `podman machine` seguem a pasta do teste que as usa.
+- **Frequência da CPU.** Durante cada teste (exceto setups e o teste 5, de bateria), o hub registra a cada 5 s o uso da CPU, o desempenho relativo ao clock base, o MHz efetivo e a maior temperatura das zonas térmicas ACPI, em `<módulo>/frequencia_cpu.csv`. Uma queda do clock sob carga de 20% ou mais entre o 1º e o último minuto vira aviso de **throttling**: uma máquina que esquenta mede pior, e isso não deve ser atribuído ao agente. A leitura usa CIM (não `Get-Counter`, cujos nomes mudam no Windows pt-BR); o custo é uma consulta a cada 5 s, bem abaixo de 1% de CPU, e fica ativo também durante o módulo 1. As zonas ACPI servem para comparar máquinas sob a mesma carga, não como temperatura absoluta do processador.
+- **Avisos da rodada.** Tudo o que pode qualificar um resultado (checagem, sobras, módulo sem evidência, CSV faltando, carga de dev com falha ou sensível à rede, throttling) fica no `_state.json` e aparece no `_relatorio.html`/`.json`, junto das evidências exportadas.
 
 ### 2.2 Sistema de Cenários
 
@@ -151,7 +161,7 @@ Padronizar a configuração da máquina de teste antes da execução dos módulo
 | `4_install_python` | Instala o Python 3.12 oficial e remove o alias da Microsoft Store | Pré-requisito para os scripts de teste em Python |
 | `5_install_py_dependencies` | Cria `.venv` e instala pacotes Python | Isola dependências e garante versões corretas |
 | `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias | Evita downloads e reinicializações durante testes |
-| `7_install_devtools_dev` | Instala via winget Git, .NET SDK 10, Go, uv e docker-compose (idempotente) | Ferramentas exigidas pelos módulos 7 a 11 |
+| `7_install_devtools_dev` | Instala Git, .NET SDK 10, Go, uv e docker-compose (idempotente). Via winget; quando o winget não executa na conta (ex.: sessão elevada com outra conta) ou não resolve um item, baixa o instalador oficial e só o executa com assinatura digital válida do fabricante (Git, .NET, Go) ou com o SHA256 publicado no release (uv, docker-compose) | Ferramentas exigidas pelos módulos 7 a 11 |
 | `8_enable_diagnostics` | Desativa a Inicialização Rápida e habilita os serviços DPS e SysMain e a política WDI de diagnóstico de boot | Necessário para o teste de boot/shutdown (eventos 100 e 200 no Event Log) |
 | `9_AdicionarTecladoUSInt` | Adiciona o layout de teclado EUA-Internacional ao idioma pt-BR | Padronização de ambiente |
 | `10_preparar_podman` | Confere a virtualização, ativa o WSL2 (pede reinício quando preciso), instala o Podman CLI e liga a `podman machine` rootful | Pré-requisito do módulo 10 (containers) |
@@ -901,6 +911,7 @@ Execucoes/
         ├── _relatorio.json
         ├── informacoes_maquina.csv              ← inventário do setup 1
         ├── maquina.csv                          ← inventário do hub + modelo/patrimônio informados
+        ├── <módulo>/frequencia_cpu.csv          ← frequência da CPU durante o teste (gerado pelo hub)
         ├── 1_cpu_memo/                          ← evidências do teste de CPU
         │   ├── automacao_*.log
         │   ├── Trace_*_Run1.etl … Trace_*_Run5.etl

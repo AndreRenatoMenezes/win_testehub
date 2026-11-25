@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 $hubPath = (Resolve-Path $HubPath).Path
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($hubPath, [ref]$null, [ref]$null)
 foreach ($nome in "ConvertTo-SafeFolderName", "Get-StateField", "Get-ExportPath", "Export-ScenarioTraces",
+                "Get-NaturalSortKey", "Get-EmptyExportModules",
                 "Request-ExportZip", "Compress-And-Validate") {
     $fn = $ast.FindAll({
         param($node)

@@ -9,5 +9,17 @@
     "Settings": {
         "PythonVenvName": ".venv",
         "HtmlReportTitle": "WinTestHub - Relatório Final"
+    },
+    "Preflight": {
+        "MinFreeGB": 20,
+        "CpuAlertPct": 10,
+        "InternetHost": "www.msftconnecttest.com"
+    },
+    "CpuSampler": {
+        "Enabled": true,
+        "IntervalSec": 5,
+        "ThrottleAlertPct": 20,
+        "LoadMinPct": 50,
+        "SkipFolders": ["5_bateria"]
     }
 }

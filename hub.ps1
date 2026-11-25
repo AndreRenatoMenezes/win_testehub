@@ -4,7 +4,7 @@ $ErrorActionPreference = "Continue"
 # ---- Carregar Configuracoes (JSON) -------------------------------------------
 $configFile = Join-Path $PSScriptRoot "config.json"
 
-if (-not (Test-Path $configFile)) {
+if (-not (Test-Path -LiteralPath $configFile)) {
     Write-Host "  [!] config.json nao encontrado. Criando um com os valores padrao..." -ForegroundColor Yellow
     $defaultConfig = @{
         SkipSetup = $false
@@ -18,11 +18,23 @@ if (-not (Test-Path $configFile)) {
             PythonVenvName  = ".venv"
             HtmlReportTitle = "WinTestHub - Relatorio Final"
         }
+        Preflight = @{
+            MinFreeGB    = 20
+            CpuAlertPct  = 10
+            InternetHost = "www.msftconnecttest.com"
+        }
+        CpuSampler = @{
+            Enabled          = $true
+            IntervalSec      = 5
+            ThrottleAlertPct = 20
+            LoadMinPct       = 50
+            SkipFolders      = @("5_bateria")
+        }
     }
-    $defaultConfig | ConvertTo-Json -Depth 5 | Set-Content $configFile -Encoding UTF8
+    $defaultConfig | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configFile -Encoding UTF8
 }
 
-$config = Get-Content $configFile | ConvertFrom-Json
+$config = Get-Content -LiteralPath $configFile | ConvertFrom-Json
 
 $SetupRoot     = Join-Path $PSScriptRoot $config.Paths.SetupRoot
 $TestsRoot     = Join-Path $PSScriptRoot $config.Paths.TestsRoot
@@ -32,6 +44,23 @@ $ExportarDir   = Join-Path $PSScriptRoot $exportarRel
 $ExecucoesDir  = Join-Path $PSScriptRoot $config.Paths.ExecucoesDir
 $SkipSetup     = $config.SkipSetup
 $VenvPath      = Join-Path $PSScriptRoot $config.Settings.PythonVenvName
+
+# Secoes opcionais do config.json: um config antigo, sem a secao, usa os padroes.
+function Merge-ConfigSection {
+    param([PSCustomObject]$Config, [string]$Name, [hashtable]$Defaults)
+    $merged = New-Object PSObject -Property $Defaults
+    $sec = $Config.PSObject.Properties[$Name]
+    if ($null -ne $sec -and $null -ne $sec.Value) {
+        foreach ($p in $sec.Value.PSObject.Properties) {
+            $merged | Add-Member -NotePropertyName $p.Name -NotePropertyValue $p.Value -Force
+        }
+    }
+    return $merged
+}
+$PreflightSettings  = Merge-ConfigSection $config "Preflight"  @{ MinFreeGB = 20; CpuAlertPct = 10; InternetHost = "www.msftconnecttest.com" }
+$CpuSamplerSettings = Merge-ConfigSection $config "CpuSampler" @{ Enabled = $true; IntervalSec = 5; ThrottleAlertPct = 20; LoadMinPct = 50; SkipFolders = @("5_bateria") }
+# "Enabled": "false" (com aspas) tambem desliga
+try { $CpuSamplerSettings.Enabled = [System.Convert]::ToBoolean([string]$CpuSamplerSettings.Enabled) } catch { $CpuSamplerSettings.Enabled = $true }
 
 # ---- Banner ------------------------------------------------------------------
 
@@ -94,7 +123,7 @@ function Get-Scripts {
     param([string]$Root, [string]$Kind)
     $scripts = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-    if (-not (Test-Path $Root)) {
+    if (-not (Test-Path -LiteralPath $Root)) {
         Write-Host "  [!] Pasta '$Root' nao encontrada -- criando estrutura..." -ForegroundColor Yellow
         New-Item -ItemType Directory -Path $Root -Force | Out-Null
     }
@@ -102,7 +131,9 @@ function Get-Scripts {
     # Ordenacao natural: numeros com zeros a esquerda na chave, para "10_x" vir
     # depois de "9_x" (Sort-Object Name puro colocaria "10_" antes de "1_").
     # dev_cargas.py e a biblioteca comum dos modulos 7 a 11, nao um teste.
-    $files = Get-ChildItem -Path $Root -Recurse -Include "*.ps1","*.py" -Exclude "boot_shutdown_duration.ps1","dev_cargas.py" -ErrorAction SilentlyContinue |
+    # -LiteralPath (colchetes no caminho do hub) + filtro por extensao no lugar do -Include
+    $files = Get-ChildItem -LiteralPath $Root -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { ($_.Extension -eq ".ps1" -or $_.Extension -eq ".py") -and @("boot_shutdown_duration.ps1", "dev_cargas.py") -notcontains $_.Name } |
         Sort-Object { Get-NaturalSortKey $_.Name }
 
     foreach ($f in $files) {
@@ -124,9 +155,9 @@ function Get-Scripts {
 function Read-StateFile {
     param([string]$TraceRunDir)
     $stateFile = Join-Path $TraceRunDir "_state.json"
-    if (Test-Path $stateFile) {
+    if (Test-Path -LiteralPath $stateFile) {
         try {
-            return (Get-Content $stateFile -Raw | ConvertFrom-Json)
+            return (Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json)
         } catch {
             Write-Host "  [!] State file corrompido: $stateFile" -ForegroundColor Yellow
             return $null
@@ -138,7 +169,7 @@ function Read-StateFile {
 function Write-StateFile {
     param([string]$TraceRunDir, [PSCustomObject]$State)
     $stateFile = Join-Path $TraceRunDir "_state.json"
-    $State | ConvertTo-Json -Depth 10 | Set-Content $stateFile -Encoding UTF8
+    $State | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $stateFile -Encoding UTF8
 }
 
 function New-StateObject {
@@ -250,9 +281,9 @@ function Get-LatestTestResults {
 function Get-ExistingScenarios {
     param([string]$ExecucoesDir)
     $scenarios = [System.Collections.Generic.List[PSCustomObject]]::new()
-    if (-not (Test-Path $ExecucoesDir)) { return ,$scenarios }
+    if (-not (Test-Path -LiteralPath $ExecucoesDir)) { return ,$scenarios }
 
-    $dirs = Get-ChildItem -Path $ExecucoesDir -Directory -ErrorAction SilentlyContinue
+    $dirs = Get-ChildItem -LiteralPath $ExecucoesDir -Directory -ErrorAction SilentlyContinue
     foreach ($d in $dirs) {
         $tracesSubDir = Join-Path $d.FullName "Traces"
         $state = Read-StateFile -TraceRunDir $tracesSubDir
@@ -505,10 +536,10 @@ function Show-CheckboxMenu {
 function Move-EvidenceToAnterior {
     param([string]$ScriptTraceDir, [int]$RunId)
 
-    if (-not (Test-Path $ScriptTraceDir)) { return }
+    if (-not (Test-Path -LiteralPath $ScriptTraceDir)) { return }
 
-    $files = Get-ChildItem -Path $ScriptTraceDir -File -ErrorAction SilentlyContinue
-    $dirs  = Get-ChildItem -Path $ScriptTraceDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "_anterior" }
+    $files = Get-ChildItem -LiteralPath $ScriptTraceDir -File -ErrorAction SilentlyContinue
+    $dirs  = Get-ChildItem -LiteralPath $ScriptTraceDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "_anterior" }
 
     if (($files | Measure-Object).Count -eq 0 -and ($dirs | Measure-Object).Count -eq 0) { return }
 
@@ -518,10 +549,10 @@ function Move-EvidenceToAnterior {
     New-Item -ItemType Directory -Path $runBackup -Force | Out-Null
 
     foreach ($f in $files) {
-        Move-Item -Path $f.FullName -Destination $runBackup -Force
+        Move-Item -LiteralPath $f.FullName -Destination $runBackup -Force
     }
     foreach ($d in $dirs) {
-        Move-Item -Path $d.FullName -Destination $runBackup -Force
+        Move-Item -LiteralPath $d.FullName -Destination $runBackup -Force
     }
 }
 
@@ -533,7 +564,8 @@ function Show-PreExecutionSummary {
         [string]$ScenarioName,
         [string]$TraceRunDir,
         [int]$RunId,
-        [hashtable]$PreviousResults
+        [hashtable]$PreviousResults,
+        [array]$Findings = @()
     )
 
     Write-Host ""
@@ -571,14 +603,66 @@ function Show-PreExecutionSummary {
         Write-Host "  Evidencias anteriores serao preservadas em _anterior/" -ForegroundColor DarkYellow
     }
 
-    Write-Host ""
-    Write-Host "  Pressione ENTER para iniciar ou ESC para voltar" -ForegroundColor DarkGray
+    # Achados da checagem (Get-PreflightFindings)
+    $blocking  = @($Findings | Where-Object { $_.Nivel -eq "Impede" })
+    $attention = @($Findings | Where-Object { $_.Nivel -ne "Impede" })
+    $hasSobra  = @($Findings | Where-Object { $null -ne $_.Sobra }).Count -gt 0
 
+    Write-Host ""
+    if ($Findings.Count -eq 0) {
+        Write-Host "  Checagem: [OK] nenhum problema encontrado" -ForegroundColor Green
+    } else {
+        Write-Host "  Checagem:" -ForegroundColor White
+        foreach ($f in $blocking) {
+            Write-Host "    [X] $($f.Item)" -ForegroundColor Red
+            Write-Host "        -> $($f.Acao)  `($(($f.Testes) -join ', ')`)" -ForegroundColor DarkGray
+        }
+        foreach ($f in $attention) {
+            Write-Host "    [!] $($f.Item)" -ForegroundColor Yellow
+            Write-Host "        -> $($f.Acao)" -ForegroundColor DarkGray
+        }
+    }
+
+    Write-Host ""
+    $keys = @()
+    if ($blocking.Count -gt 0) {
+        $keys += "R = tirar da fila os testes com [X]"
+        $keys += "C = continuar mesmo assim"
+    } else {
+        $keys += "ENTER = iniciar"
+    }
+    if ($hasSobra) { $keys += "F = encerrar as sobras de teste" }
+    $keys += "ESC = voltar"
+    Write-Host "  $($keys -join '  |  ')" -ForegroundColor DarkGray
+
+    # Devolve a escolha: start | continue | remove | kill | back
     while ($true) {
         $key = [Console]::ReadKey($true)
-        if ($key.Key -eq "Enter") { return $true }
-        if ($key.Key -eq "Escape") { return $false }
+        if ($key.Key -eq "Escape") { return "back" }
+        if ($key.Key -eq "Enter") {
+            if ($blocking.Count -eq 0) { return "start" }
+            Write-Host "  [!] Ha itens que impedem testes da fila: escolha R, C ou ESC." -ForegroundColor Yellow
+            continue
+        }
+        if ($blocking.Count -gt 0 -and $key.Key -eq "R") { return "remove" }
+        if ($blocking.Count -gt 0 -and $key.Key -eq "C") { return "continue" }
+        if ($hasSobra -and $key.Key -eq "F") { return "kill" }
     }
+}
+
+# Tira da fila os testes citados em achados 'Impede'.
+function Remove-BlockedTests {
+    param([array]$Tests, [array]$Findings)
+    $blocked = @($Findings | Where-Object { $_.Nivel -eq "Impede" } | ForEach-Object { $_.Testes })
+    return @($Tests | Where-Object { $blocked -notcontains "$($_.Name).$($_.Type)" })
+}
+
+# Motivo(s) que tiraram um teste da fila: os itens dos achados 'Impede' que o citam.
+function Get-BlockReason {
+    param([string]$TestName, [array]$Findings)
+    $items = @($Findings | Where-Object { $_.Nivel -eq "Impede" -and @($_.Testes) -contains $TestName } |
+        ForEach-Object { $_.Item } | Select-Object -Unique)
+    return ($items -join "; ")
 }
 
 # ---- Progresso em tempo real -------------------------------------------------
@@ -693,6 +777,12 @@ function Invoke-TestScript {
     $output    = ""
     $exitCode  = 0
 
+    # Frequencia da CPU durante o teste (so testes, nao setups)
+    $sampling = Test-CpuSamplingEnabled -Test $Test -Settings $CpuSamplerSettings
+    if ($sampling) {
+        Start-CpuSampler -OutFile (Join-Path $scriptTraceDir "frequencia_cpu.csv") -IntervalSec ([int]$CpuSamplerSettings.IntervalSec)
+    }
+
     try {
         $capturedOut = [System.Collections.Generic.List[string]]::new()
         
@@ -707,7 +797,7 @@ function Invoke-TestScript {
         elseif ($Test.Type -eq "py") {
             # Logica de detecao do Virtual Environment (.venv)
             $venvExe = Join-Path $VenvPath "Scripts\python.exe"
-            if (Test-Path $venvExe) {
+            if (Test-Path -LiteralPath $venvExe) {
                 $pyExe = $venvExe
             } else {
                 $pyExe = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
@@ -728,6 +818,9 @@ function Invoke-TestScript {
         $status   = "ERROR"
         $output   = $_.Exception.Message
         $exitCode = -1
+    }
+    finally {
+        if ($sampling) { Stop-CpuSampler }
     }
 
     # Extrair snippet de erro (ultimas linhas relevantes do output)
@@ -752,11 +845,11 @@ function Invoke-TestScript {
     $duration = ($endTime - $startTime).TotalSeconds
     $ts       = $startTime.ToString("yyyy-MM-dd HH:mm:ss")
 
-    $traceFiles = @(Get-ChildItem -Path $scriptTraceDir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike "*\_anterior\*" })
+    $traceFiles = @(Get-ChildItem -LiteralPath $scriptTraceDir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike "*\_anterior\*" -and $_.Name -ne "frequencia_cpu.csv" })
     $traceCount = $traceFiles.Count
 
     $logEntry = "`n$('-'*62)`n[$ts]  $($Test.Kind.ToUpper()) | $($Test.Name)  [$($Test.Type.ToUpper())]`nSTATUS    : $status`nDURATION  : $([Math]::Round($duration,3))s`nEXIT CODE : $exitCode`nTRACES    : $traceCount arquivo(s) em $scriptTraceDir`nOUTPUT    :`n$output"
-    Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8
+    Add-Content -LiteralPath $LogFile -Value $logEntry -Encoding UTF8
 
     return [PSCustomObject]@{
         Display        = $Test.Display
@@ -821,12 +914,12 @@ function Show-Summary {
     $csvHeader = "Timestamp,Kind,Name,Type,Status,Duration_s,ExitCode,TraceCount,TraceDir"
     $csvLines  = @($csvHeader)
     foreach ($r in $Results) { $csvLines += "$($r.Timestamp),$($r.Kind),$($r.Name),$($r.Type),$($r.Status),$([Math]::Round($r.Duration,3)),$($r.ExitCode),$($r.TraceCount),$($r.TraceDir)" }
-    Set-Content -Path $csvPath -Value $csvLines -Encoding UTF8
+    Set-Content -LiteralPath $csvPath -Value $csvLines -Encoding UTF8
 
     # ---- Exporta JSON
     $jsonPath = "$ResultsFile.json"
     $jsonObj  = [PSCustomObject]@{ RunTimestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss"); Host = $env:COMPUTERNAME; TotalScripts = $Results.Count; Pass = $pass; Fail = $fail; Error = $err; TotalDuration = [Math]::Round($TotalSec,3); TotalTraces = $totalTraces; Scripts = $Results }
-    $jsonObj | ConvertTo-Json -Depth 5 | Set-Content -Path $jsonPath -Encoding UTF8
+    $jsonObj | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
 
     # ---- Exporta Relatorio HTML (NOVO)
     $htmlPath = "$ResultsFile.html"
@@ -872,11 +965,11 @@ $BrandCss
     </body>
     </html>
 "@
-    Set-Content -Path $htmlPath -Value $html -Encoding UTF8
+    Set-Content -LiteralPath $htmlPath -Value $html -Encoding UTF8
 
     # Appenda resumo no log
     $summaryLog = "`n$('-'*62)`nRESUMO FINAL`nTotal: $($Results.Count) | PASS: $pass | FAIL: $fail | ERROR: $err`nTempo total: $([Math]::Round($TotalSec,2))s`nTraces: $totalTraces arquivo(s)`nHTML Gerado em: $htmlPath`n$('-'*62)"
-    Add-Content -Path $LogFile -Value $summaryLog -Encoding UTF8
+    Add-Content -LiteralPath $LogFile -Value $summaryLog -Encoding UTF8
     
     Write-Host "  Relatorio HTML : $htmlPath" -ForegroundColor Magenta
     Write-Host "  Log, CSV, JSON salvos na pasta Logs." -ForegroundColor DarkCyan
@@ -915,7 +1008,30 @@ function Build-ConsolidatedReport {
         $rerun = if ($r.IsRerun) { "sim" } else { "nao" }
         $csvLines += "$($r.Name),$($r.Status),$($r.Duration),$($r.RunId),$rerun,$($r.Folder)"
     }
-    Set-Content -Path $csvPath -Value $csvLines -Encoding UTF8
+    Set-Content -LiteralPath $csvPath -Value $csvLines -Encoding UTF8
+
+    # Avisos da rodada (acumulados no _state.json) e frequencia da CPU por modulo
+    # Sort-Object do PS 5.1 nao e estavel: desempata pela ordem em que foram gravados
+    $rawWarnings = @(Get-RunWarnings -State $State)
+    $warnings = @(0..($rawWarnings.Count - 1) | Where-Object { $rawWarnings.Count -gt 0 } |
+        Sort-Object @{ e = { [int]$rawWarnings[$_].run } }, @{ e = { $_ } } | ForEach-Object { $rawWarnings[$_] })
+    $freq = @()
+    foreach ($folder in @($results | ForEach-Object { $_.Folder } | Select-Object -Unique)) {
+        if (-not $folder) { continue }
+        $fcsv = Join-Path (Join-Path $TraceRunDir $folder) "frequencia_cpu.csv"
+        $fs = Get-CpuFrequencySummary -Csv $fcsv -IntervalSec ([int]$CpuSamplerSettings.IntervalSec) -LoadMinPct ([double]$CpuSamplerSettings.LoadMinPct)
+        if ($null -ne $fs) {
+            $freq += [PSCustomObject]@{
+                Modulo    = $folder
+                Amostras  = $fs.Samples
+                MHzMedio  = $fs.AvgMHz
+                MHzInicio = $fs.StartMHz
+                MHzFim    = $fs.EndMHz
+                QuedaPct  = $fs.DropPct
+                TempMaxC  = $fs.MaxTempC
+            }
+        }
+    }
 
     # JSON
     $jsonPath = Join-Path $TraceRunDir "_relatorio.json"
@@ -933,8 +1049,10 @@ function Build-ConsolidatedReport {
         Error         = $err
         TotalDuration = [Math]::Round($totalDuration, 3)
         Tests         = $results
+        Avisos        = @($warnings)
+        FrequenciaCpu = @($freq)
     }
-    $jsonObj | ConvertTo-Json -Depth 5 | Set-Content -Path $jsonPath -Encoding UTF8
+    $jsonObj | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
 
     # HTML
     $htmlPath  = Join-Path $TraceRunDir "_relatorio.html"
@@ -952,6 +1070,37 @@ function Build-ConsolidatedReport {
                 <td>run #$($r.RunId)$rerunTag</td>
                 <td>$($r.Folder)</td>
             </tr>
+"@
+    }
+
+    $enc = { param($t) [System.Net.WebUtility]::HtmlEncode([string]$t) }
+    if ($warnings.Count -gt 0) {
+        $warnRows = ""
+        foreach ($w in $warnings) {
+            $warnRows += "            <tr><td>run #$($w.run)</td><td>$(& $enc $w.fonte)</td><td>$(& $enc $w.texto)</td></tr>`r`n"
+        }
+        $warnSection = @"
+        <h2>Avisos da rodada ($($warnings.Count))</h2>
+        <table>
+            <tr><th>Run</th><th>Fonte</th><th>Aviso</th></tr>
+$warnRows        </table>
+"@
+    } else {
+        $warnSection = "        <h2>Avisos da rodada</h2>`r`n        <p>Nenhum aviso.</p>"
+    }
+    $freqSection = ""
+    if ($freq.Count -gt 0) {
+        $dash = { param($v, $suf) if ($null -eq $v -or "$v" -eq "") { "-" } else { "$v$suf" } }
+        $freqRows = ""
+        foreach ($f in $freq) {
+            $freqRows += "            <tr><td>$(& $enc $f.Modulo)</td><td>$($f.Amostras)</td><td>$($f.MHzMedio)</td><td>$(& $dash $f.MHzInicio '') / $(& $dash $f.MHzFim '')</td><td>$(& $dash $f.QuedaPct '%')</td><td>$(& $dash $f.TempMaxC ' C')</td></tr>`r`n"
+        }
+        $freqSection = @"
+        <h2>Frequencia da CPU por modulo</h2>
+        <p>Inicio/fim e queda: mediana do 1o e do ultimo minuto com a CPU sob carga (uso &gt;= $($CpuSamplerSettings.LoadMinPct)%). Temperatura: maior zona termica ACPI, quando o firmware expoe.</p>
+        <table>
+            <tr><th>Modulo</th><th>Amostras</th><th>MHz medio</th><th>MHz inicio / fim</th><th>Queda</th><th>Temp. max.</th></tr>
+$freqRows        </table>
 "@
     }
 
@@ -981,10 +1130,12 @@ $BrandCss
             <tr><th>Teste</th><th>Status</th><th>Duracao</th><th>Run</th><th>Pasta</th></tr>
             $tableRows
         </table>
+$warnSection
+$freqSection
     </body>
     </html>
 "@
-    Set-Content -Path $htmlPath -Value $html -Encoding UTF8
+    Set-Content -LiteralPath $htmlPath -Value $html -Encoding UTF8
 
     Write-Host "  Relatorio consolidado: $htmlPath" -ForegroundColor Magenta
 }
@@ -1025,7 +1176,7 @@ function Collect-MachineInfo {
         "Modelo Informado,`"$(Get-StateField $State 'modelo')`"",
         "Patrimonio/Serial Informado,`"$(Get-StateField $State 'patrimonio')`""
     )
-    Set-Content -Path $csvPath -Value $csvLines -Encoding UTF8
+    Set-Content -LiteralPath $csvPath -Value $csvLines -Encoding UTF8
     Write-Host "  [OK] maquina.csv gerado em $OutputDir" -ForegroundColor Green
 }
 
@@ -1065,29 +1216,31 @@ function Test-ThematicCSVs {
 
     $found   = 0
     $missing = 0
+    $missingFolders = @()
 
     foreach ($folder in ($expectedCSVs.Keys | Sort-Object { Get-NaturalSortKey $_ })) {
         $csvName = $expectedCSVs[$folder]
         $sourcePath = Join-Path $TraceRunDir (Join-Path $folder $csvName)
 
-        if (Test-Path $sourcePath) {
+        if (Test-Path -LiteralPath $sourcePath) {
             Write-Host "  [OK] $csvName" -ForegroundColor Green
             $found++
         } else {
             $testFolder = Join-Path $TraceRunDir $folder
-            if (Test-Path $testFolder) {
+            if (Test-Path -LiteralPath $testFolder) {
                 Write-Host "  [!] $csvName nao encontrado -- teste executado mas CSV nao foi gerado" -ForegroundColor Yellow
-                Add-Content -Path $LogFile -Value "[AVISO] CSV tematico '$csvName' nao gerado pelo teste em '$folder'" -Encoding UTF8
+                Add-Content -LiteralPath $LogFile -Value "[AVISO] CSV tematico '$csvName' nao gerado pelo teste em '$folder'" -Encoding UTF8
                 $missing++
+                $missingFolders += $folder
             } else {
                 Write-Host "  [--] $csvName -- teste pendente `($folder nao executado`)" -ForegroundColor DarkGray
-                Add-Content -Path $LogFile -Value "[INFO] CSV tematico '$csvName' pendente -- teste '$folder' nao executado" -Encoding UTF8
+                Add-Content -LiteralPath $LogFile -Value "[INFO] CSV tematico '$csvName' pendente -- teste '$folder' nao executado" -Encoding UTF8
             }
         }
     }
 
     foreach ($relPath in $variantCSVs.Keys) {
-        if (Test-Path (Join-Path $TraceRunDir $relPath)) {
+        if (Test-Path -LiteralPath (Join-Path $TraceRunDir $relPath)) {
             Write-Host "  [OK] $($variantCSVs[$relPath])" -ForegroundColor Green
             $found++
         }
@@ -1095,7 +1248,7 @@ function Test-ThematicCSVs {
 
     if ($missing -gt 0) { $resultColor = "Yellow" } else { $resultColor = "Green" }
     Write-Host "  Resultado: ${found} encontrado`(s`), ${missing} ausente`(s`)" -ForegroundColor $resultColor
-    return [PSCustomObject]@{ Found = $found; Missing = $missing }
+    return [PSCustomObject]@{ Found = $found; Missing = $missing; MissingFolders = $missingFolders }
 }
 
 # ---- Exportacao dos traces (pasta Exportar) ----------------------------------
@@ -1140,7 +1293,7 @@ function Export-ScenarioTraces {
         Remove-Item -LiteralPath $dest -Recurse -Force -ErrorAction SilentlyContinue
         if (Test-Path -LiteralPath $dest) {
             Write-Host "  [!] Nao foi possivel limpar a exportacao anterior (arquivo aberto?). Feche os arquivos e use [E] para exportar de novo." -ForegroundColor Red
-            if ($LogFile) { Add-Content -Path $LogFile -Value "[ERRO] Exportacao anterior nao pode ser removida: $dest" -Encoding UTF8 }
+            if ($LogFile) { Add-Content -LiteralPath $LogFile -Value "[ERRO] Exportacao anterior nao pode ser removida: $dest" -Encoding UTF8 }
             return $null
         }
     }
@@ -1175,7 +1328,7 @@ function Export-ScenarioTraces {
     $rc = $LASTEXITCODE
     if ($rc -ge 8) {
         Write-Host "  [!] Falha ao copiar para a exportacao (robocopy exit $rc)." -ForegroundColor Red
-        if ($LogFile) { Add-Content -Path $LogFile -Value "[ERRO] Exportacao falhou (robocopy exit $rc): $dest" -Encoding UTF8 }
+        if ($LogFile) { Add-Content -LiteralPath $LogFile -Value "[ERRO] Exportacao falhou (robocopy exit $rc): $dest" -Encoding UTF8 }
         Remove-Item -LiteralPath $dest -Recurse -Force -ErrorAction SilentlyContinue
         return $null
     }
@@ -1190,19 +1343,10 @@ function Export-ScenarioTraces {
     [long]$outBytes = 0
     foreach ($f in $outFiles) { $outBytes += $f.Length }
 
-    # Modulos que tinham arquivos em Traces/ mas sumiram da exportacao (so .etl/logs):
-    # ex.: 1_cpu_memo sem o .wpaProfile grava os .etl e pula os CSVs do WPA.
-    # Pastas de 1o nivel com arquivos na origem (reaproveita $srcFiles); 'logs' e
-    # excluida de proposito pelo robocopy, entao nao conta como modulo vazio.
-    $srcModules = @($srcFiles | ForEach-Object {
-        $rel = $_.FullName.Substring($traceRoot.Length).TrimStart('\')
-        if ($rel.Contains('\')) { $rel.Split('\')[0] }
-    } | Select-Object -Unique)
-    $emptyModules = @()
-    foreach ($m in $srcModules) {
-        if ($m -ieq 'logs') { continue }
-        if (-not (Test-Path -LiteralPath (Join-Path $dest $m))) { $emptyModules += $m }
-    }
+    # Modulos que tinham arquivos em Traces/ mas so com .etl/logs (ex.: 1_cpu_memo
+    # sem o .wpaProfile grava os .etl e pula os CSVs do WPA). Mesma regra dos
+    # avisos da rodada; arquivos do proprio hub (frequencia_cpu.csv) nao contam.
+    $emptyModules = @(Get-EmptyExportModules -TraceRunDir $TraceRunDir)
 
     $summary = [PSCustomObject]@{
         Path          = $dest
@@ -1218,11 +1362,11 @@ function Export-ScenarioTraces {
     Write-Host "       $($summary.Files) arquivo(s), $($summary.SizeMB) MB" -ForegroundColor DarkCyan
     Write-Host "       Fora da exportacao: $($summary.ExcludedFiles) arquivo(s) ($($summary.ExcludedEtl) .etl), $($summary.ExcludedMB) MB" -ForegroundColor DarkGray
     if ($LogFile) {
-        Add-Content -Path $LogFile -Value "[INFO] Exportacao: $dest | $($summary.Files) arquivo(s), $($summary.SizeMB) MB | excluidos: $($summary.ExcludedFiles) ($($summary.ExcludedEtl) .etl), $($summary.ExcludedMB) MB" -Encoding UTF8
+        Add-Content -LiteralPath $LogFile -Value "[INFO] Exportacao: $dest | $($summary.Files) arquivo(s), $($summary.SizeMB) MB | excluidos: $($summary.ExcludedFiles) ($($summary.ExcludedEtl) .etl), $($summary.ExcludedMB) MB" -Encoding UTF8
     }
     foreach ($m in $emptyModules) {
-        Write-Host "  [!] $m ficou fora da exportacao: so tinha .etl, .log ou pastas logs/. As evidencias estao apenas em Execucoes/ (verifique o teste, ex.: .wpaProfile ausente)." -ForegroundColor Yellow
-        if ($LogFile) { Add-Content -Path $LogFile -Value "[AVISO] Modulo '$m' sem nenhum arquivo na exportacao (so .etl/logs em Traces)" -Encoding UTF8 }
+        Write-Host "  [!] $m sem evidencias do teste na exportacao: so tinha .etl, .log ou pastas logs/. Os originais estao apenas em Execucoes/ (verifique o teste, ex.: .wpaProfile ausente)." -ForegroundColor Yellow
+        if ($LogFile) { Add-Content -LiteralPath $LogFile -Value "[AVISO] Modulo '$m' sem nenhum arquivo na exportacao (so .etl/logs em Traces)" -Encoding UTF8 }
     }
     return $summary
 }
@@ -1321,15 +1465,658 @@ function Compress-And-Validate {
     }
 }
 
+# ---- Avisos da rodada (_state.json -> _relatorio) ----------------------------
+
+# Avisos ficam em $State.avisos ({ run, fonte, texto }), acumulados entre runs.
+# Devolve os itens desenrolados: o chamador usa @() (convencao do hub).
+# Fontes: checagem, sobra, modulo_vazio, csv_faltando, carga_dev, rede, throttling.
+function Get-RunWarnings {
+    param([PSCustomObject]$State)
+    $prop = $State.PSObject.Properties['avisos']
+    if ($null -eq $prop -or $null -eq $prop.Value) { return @() }
+    return @($prop.Value)
+}
+
+function Add-RunWarning {
+    param([PSCustomObject]$State, [int]$Run, [string]$Fonte, [string]$Texto)
+    $list = Get-RunWarnings -State $State
+    foreach ($w in $list) {
+        if ($w.run -eq $Run -and $w.fonte -eq $Fonte -and $w.texto -eq $Texto) { return }
+    }
+    $list = @($list) + @([PSCustomObject]@{ run = $Run; fonte = $Fonte; texto = $Texto })
+    $State | Add-Member -NotePropertyName avisos -NotePropertyValue $list -Force
+}
+
+# Modulos (pastas de 1o nivel de Traces) com arquivos, mas que ficariam vazios
+# na exportacao: tudo neles e .etl, .log ou esta numa pasta logs/.
+function Get-EmptyExportModules {
+    param([string]$TraceRunDir)
+    # Gerados pelo proprio hub em cada modulo: nao contam como evidencia do
+    # teste (um modulo so com .etl + frequencia_cpu.csv continua "vazio").
+    $hubGenerated = @("frequencia_cpu.csv")
+    if (-not (Test-Path -LiteralPath $TraceRunDir)) { return @() }
+    $root = (Resolve-Path -LiteralPath $TraceRunDir).ProviderPath.TrimEnd('\')
+    $content = @{}
+    foreach ($f in @(Get-ChildItem -LiteralPath $TraceRunDir -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+        $rel = $f.FullName.Substring($root.Length)
+        $parts = $rel.TrimStart('\').Split('\')
+        if ($parts.Count -lt 2) { continue }          # arquivo na raiz de Traces
+        $m = $parts[0]
+        if ($m -ieq 'logs') { continue }
+        if (-not $content.ContainsKey($m)) { $content[$m] = $false }
+        if ($hubGenerated -contains $f.Name) { continue }
+        $excluded = ($f.Extension -eq '.etl' -or $f.Extension -eq '.log' -or $rel -match '(?i)\\logs\\')
+        if (-not $excluded) { $content[$m] = $true }
+    }
+    return @($content.Keys | Where-Object { -not $content[$_] } | Sort-Object { Get-NaturalSortKey $_ })
+}
+
+# Cargas de dev (dev_*.csv) com status diferente de OK ou sensiveis a rede.
+# Subpartes (carga:parte) ficam de fora.
+function Get-DevCsvWarnings {
+    param([string]$TraceRunDir, [string[]]$Folders)
+    $out = [System.Collections.Generic.List[PSCustomObject]]::new()
+    foreach ($folder in $Folders) {
+        $dir = Join-Path $TraceRunDir $folder
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        foreach ($csv in @(Get-ChildItem -LiteralPath $dir -Filter "dev_*.csv" -File -ErrorAction SilentlyContinue)) {
+            try { $rows = @(Import-Csv -LiteralPath $csv.FullName -Delimiter ';' -Encoding UTF8) } catch { continue }
+            foreach ($r in $rows) {
+                $carga = [string]$r.carga
+                if (-not $carga -or $carga.Contains(':')) { continue }
+                if ([string]$r.status -ne "OK") {
+                    $motivo = if ($r.PSObject.Properties['motivo'] -and $r.motivo) { " -- $($r.motivo)" } else { "" }
+                    $out.Add([PSCustomObject]@{ Fonte = "carga_dev"; Texto = "$folder/${carga}: $($r.status)$motivo" })
+                }
+                if ($r.PSObject.Properties['sensivel_rede'] -and [string]$r.sensivel_rede -eq "sim") {
+                    $out.Add([PSCustomObject]@{ Fonte = "rede"; Texto = "$folder/${carga} depende da internet do lab (resultado sensivel a rede)" })
+                }
+            }
+        }
+    }
+    return @($out)
+}
+
+# ---- Frequencia da CPU durante os testes -------------------------------------
+
+$script:CpuSamplerJob = $null
+
+# O amostrador roda em testes (nao setups), exceto nas pastas de SkipFolders:
+# no teste 5 (bateria) ele acordaria a CPU a cada poucos segundos por horas.
+function Test-CpuSamplingEnabled {
+    param([PSCustomObject]$Test, [PSCustomObject]$Settings)
+    if ($Test.Kind -ne "test" -or -not $Settings.Enabled) { return $false }
+    $skip = @()
+    if ($Settings.PSObject.Properties['SkipFolders']) { $skip = @($Settings.SkipFolders) }
+    return ($skip -notcontains $Test.ParentFolder)
+}
+
+function Start-CpuSampler {
+    param([string]$OutFile, [int]$IntervalSec = 5)
+    Stop-CpuSampler
+    $IntervalSec = [Math]::Max(1, $IntervalSec)   # 0 viraria laco sem pausa
+    # Amostrador em segundo plano (Start-Job): a cada IntervalSec grava uso, % de
+    # desempenho (>100 = turbo), MHz efetivo e a maior zona termica ACPI. Usa CIM,
+    # nao Get-Counter (nomes de contador sao localizados no Windows pt-BR).
+    $sampler = {
+        param([string]$OutFile, [int]$IntervalSec)
+        $inv = [System.Globalization.CultureInfo]::InvariantCulture
+        $cls = 'Win32_PerfFormattedData_Counters_ProcessorInformation'
+        $tz  = 'Win32_PerfFormattedData_Counters_ThermalZoneInformation'
+        $base = [double]((Get-CimInstance Win32_Processor | Select-Object -First 1).MaxClockSpeed)
+        Set-Content -LiteralPath $OutFile -Value 'time,cpuUtilPct,perfPct,effectiveMHz,maxThermalC' -Encoding ASCII
+        $null = Get-CimInstance $cls -Filter "Name='_Total'"   # 1a leitura "formatted" vem zerada
+        $thermal = $true
+        while ($true) {
+            Start-Sleep -Seconds $IntervalSec
+            try {
+                $p = Get-CimInstance $cls -Filter "Name='_Total'"
+                $temp = ""
+                if ($thermal) {
+                    try {
+                        $z = @(Get-CimInstance $tz -ErrorAction Stop)
+                        if ($z.Count -eq 0) { $thermal = $false }
+                        else {
+                            $max = ($z | ForEach-Object { [double]$_.Temperature - 273.15 } | Measure-Object -Maximum).Maximum
+                            $temp = ([Math]::Round($max, 1)).ToString($inv)
+                        }
+                    } catch { $thermal = $false }
+                }
+                $mhz = [Math]::Round($base * [double]$p.PercentProcessorPerformance / 100)
+                $line = [string]::Format($inv, "{0},{1},{2},{3},{4}", (Get-Date -Format s), $p.PercentProcessorUtility, $p.PercentProcessorPerformance, $mhz, $temp)
+                Add-Content -LiteralPath $OutFile -Value $line -Encoding ASCII
+            } catch { }
+        }
+    }
+    try {
+        $script:CpuSamplerJob = Start-Job -ScriptBlock $sampler -ArgumentList $OutFile, $IntervalSec
+    } catch {
+        $script:CpuSamplerJob = $null
+    }
+}
+
+function Stop-CpuSampler {
+    # Get-Variable: no StrictMode, ler $script:CpuSamplerJob inexistente quebra
+    $v = Get-Variable -Name CpuSamplerJob -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $v -or $null -eq $v.Value) { return }
+    Stop-Job -Job $script:CpuSamplerJob -ErrorAction SilentlyContinue
+    Remove-Job -Job $script:CpuSamplerJob -Force -ErrorAction SilentlyContinue
+    $script:CpuSamplerJob = $null
+}
+
+function Get-Median {
+    param([double[]]$Values)
+    if ($null -eq $Values -or $Values.Count -eq 0) { return $null }
+    $sorted = @($Values | Sort-Object)
+    $mid = [int][Math]::Floor($sorted.Count / 2)
+    if ($sorted.Count % 2 -eq 1) { return [double]$sorted[$mid] }
+    return ([double]$sorted[$mid - 1] + [double]$sorted[$mid]) / 2
+}
+
+# Resumo de frequencia_cpu.csv. A queda (throttling) e medida so nas amostras
+# sob carga (uso >= LoadMinPct): em ocioso o clock cai sem ser throttling.
+# Compara a mediana do 1o minuto sob carga com a do ultimo minuto sob carga.
+function Get-CpuFrequencySummary {
+    param([string]$Csv, [int]$IntervalSec = 5, [double]$LoadMinPct = 50)
+    if (-not (Test-Path -LiteralPath $Csv)) { return $null }
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    $rows = @(Import-Csv -LiteralPath $Csv)
+    if ($rows.Count -lt 3) { return $null }
+
+    $mhz = [System.Collections.Generic.List[double]]::new()
+    $loaded = [System.Collections.Generic.List[double]]::new()
+    $temps = [System.Collections.Generic.List[double]]::new()
+    foreach ($r in $rows) {
+        $m = 0.0; $u = 0.0; $t = 0.0
+        if (-not [double]::TryParse([string]$r.effectiveMHz, [System.Globalization.NumberStyles]::Float, $inv, [ref]$m)) { continue }
+        $mhz.Add($m)
+        if ([double]::TryParse([string]$r.cpuUtilPct, [System.Globalization.NumberStyles]::Float, $inv, [ref]$u) -and $u -ge $LoadMinPct) { $loaded.Add($m) }
+        if ($r.PSObject.Properties['maxThermalC'] -and [double]::TryParse([string]$r.maxThermalC, [System.Globalization.NumberStyles]::Float, $inv, [ref]$t)) { $temps.Add($t) }
+    }
+    if ($mhz.Count -lt 3) { return $null }
+
+    [double]$sum = 0
+    foreach ($v in $mhz) { $sum += $v }
+    $n = [Math]::Max(1, [int][Math]::Ceiling(60 / [Math]::Max(1, $IntervalSec)))
+    $start = $null; $end = $null; $drop = $null
+    if ($loaded.Count -ge 2 * $n) {
+        $arr = $loaded.ToArray()
+        $start = Get-Median -Values ($arr[0..($n - 1)])
+        $end   = Get-Median -Values ($arr[($arr.Count - $n)..($arr.Count - 1)])
+        if ($start -gt 0) { $drop = [Math]::Round((1 - $end / $start) * 100, 1) }
+    }
+    $maxTemp = $null
+    if ($temps.Count -gt 0) { $maxTemp = ($temps | Measure-Object -Maximum).Maximum }
+
+    return [PSCustomObject]@{
+        Samples       = $mhz.Count
+        LoadedSamples = $loaded.Count
+        AvgMHz        = [Math]::Round($sum / $mhz.Count, 0)
+        StartMHz      = $start
+        EndMHz        = $end
+        DropPct       = $drop
+        MaxTempC      = $maxTemp
+    }
+}
+
+# Avisos de fim de rodada, so para os modulos executados nesta run.
+function Add-EndOfRunWarnings {
+    param(
+        [PSCustomObject]$State,
+        [int]$Run,
+        [string]$TraceRunDir,
+        [string[]]$Folders,
+        [string[]]$MissingCsvFolders = @(),
+        [PSCustomObject]$Sampler
+    )
+    foreach ($m in (Get-EmptyExportModules -TraceRunDir $TraceRunDir)) {
+        if ($Folders -contains $m) {
+            Add-RunWarning -State $State -Run $Run -Fonte "modulo_vazio" -Texto "$m ficaria vazio na exportacao (so .etl/.log/logs): verifique o teste (ex.: .wpaProfile ausente)"
+        }
+    }
+    foreach ($m in $MissingCsvFolders) {
+        if ($Folders -contains $m) {
+            Add-RunWarning -State $State -Run $Run -Fonte "csv_faltando" -Texto "$m executado, mas o CSV tematico nao foi gerado"
+        }
+    }
+    foreach ($w in (Get-DevCsvWarnings -TraceRunDir $TraceRunDir -Folders $Folders)) {
+        Add-RunWarning -State $State -Run $Run -Fonte $w.Fonte -Texto $w.Texto
+    }
+    if ($null -ne $Sampler -and $Sampler.Enabled) {
+        foreach ($m in $Folders) {
+            $s = Get-CpuFrequencySummary -Csv (Join-Path (Join-Path $TraceRunDir $m) "frequencia_cpu.csv") -IntervalSec ([int]$Sampler.IntervalSec) -LoadMinPct ([double]$Sampler.LoadMinPct)
+            if ($null -ne $s -and $null -ne $s.DropPct -and $s.DropPct -ge [double]$Sampler.ThrottleAlertPct) {
+                Add-RunWarning -State $State -Run $Run -Fonte "throttling" -Texto "${m}: clock sob carga caiu $($s.DropPct)% (de $($s.StartMHz) para $($s.EndMHz) MHz)"
+            }
+        }
+    }
+}
+
+# ---- Checagem antes da fila (preflight) --------------------------------------
+
+# Achado da checagem. Nivel: 'Impede' (o teste vai falhar) ou 'Atencao' (roda,
+# mas a medicao pode sair comprometida). Sobra: objeto de Get-TestLeftovers
+# quando o achado e um processo de teste que ficou aberto ([F] encerra).
+function New-PreflightFinding {
+    param([string]$Nivel, [string[]]$Testes, [string]$Item, [string]$Acao, $Sobra = $null)
+    return [PSCustomObject]@{
+        Nivel  = $Nivel
+        Testes = @($Testes)
+        Item   = $Item
+        Acao   = $Acao
+        Sobra  = $Sobra
+    }
+}
+
+# Sondas do sistema: funcoes separadas para a CI poder substitui-las.
+function Get-PowerSource {
+    # 'AC' (na tomada), 'Battery' (na bateria) ou 'Desktop' (sem bateria)
+    $bat = @(Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue)
+    if ($bat.Count -eq 0) { return "Desktop" }
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        $line = [System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus
+        if ("$line" -eq "Online") { return "AC" }
+        if ("$line" -eq "Offline") { return "Battery" }
+    } catch { }
+    # Fallback: BatteryStatus 2 = na tomada (Win32_Battery)
+    if ($bat[0].BatteryStatus -eq 2) { return "AC" }
+    return "Battery"
+}
+
+function Test-InternetReachable {
+    param([string]$HostName)
+    try {
+        $client = New-Object System.Net.Sockets.TcpClient
+        $ar = $client.BeginConnect($HostName, 443, $null, $null)
+        $ok = $ar.AsyncWaitHandle.WaitOne(3000) -and $client.Connected
+        $client.Close()
+        return [bool]$ok
+    } catch { return $false }
+}
+
+function Get-FreeSpaceGB {
+    param([string]$Path)
+    try {
+        $root = [System.IO.Path]::GetPathRoot((Resolve-Path -LiteralPath $Path).ProviderPath)
+        $drive = New-Object System.IO.DriveInfo($root)
+        return [Math]::Round($drive.AvailableFreeSpace / 1GB, 1)
+    } catch { return $null }
+}
+
+# Versao de uma ferramenta: $null se o comando nao existe; Version $null se
+# nao deu para ler. Mesma regex do Setup 7 e do dev_cargas.py.
+function Get-ToolVersion {
+    param([string]$Cmd, [string[]]$VersionArgs)
+    $c = Get-Command $Cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $c) { return $null }
+    $out = ""
+    try { $out = (& $c.Source @($VersionArgs) 2>&1 | Out-String).Trim() } catch { }
+    $ver = $null
+    if ($out -match '(\d+)\.(\d+)(\.(\d+))?') { $ver = [version]"$($Matches[1]).$($Matches[2])" }
+    return [PSCustomObject]@{ Path = $c.Source; Output = $out; Version = $ver }
+}
+
+function Test-CommandAvailable {
+    param([string]$Cmd)
+    return [bool](Get-Command $Cmd -CommandType Application -ErrorAction SilentlyContinue)
+}
+
+function Test-SpeedtestConfigured {
+    param([string]$HubRoot)
+    if (-not [string]::IsNullOrWhiteSpace($env:HUB_SPEEDTEST_URL)) { return $true }
+    $local = Join-Path $HubRoot "config.local.json"
+    if (-not (Test-Path -LiteralPath $local)) { return $false }
+    try {
+        $j = Get-Content -LiteralPath $local -Raw | ConvertFrom-Json
+        $p = $j.PSObject.Properties['SpeedtestUrl']
+        return ($null -ne $p -and -not [string]::IsNullOrWhiteSpace([string]$p.Value))
+    } catch { return $false }
+}
+
+# Ferramentas exigidas por um modulo de cargas de dev: cargas.json (+ o
+# workloads.local.json, como no dev_cargas.py); git implicito quando ha repos.
+function Get-DevModuleTools {
+    param([string]$ModuleDir, [string]$HubRoot)
+    $tools = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $file = Join-Path $ModuleDir "cargas.json"
+    if (-not (Test-Path -LiteralPath $file)) { return ,$tools }
+    try { $def = Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return ,$tools }
+    $hasRepos = $false
+    $p = $def.PSObject.Properties['repos']
+    if ($p -and @($p.Value).Count -gt 0) { $hasRepos = $true }
+    $list = @()
+    $p = $def.PSObject.Properties['ferramentas']
+    if ($p) { $list = @($p.Value) }
+
+    $localFile = Join-Path $HubRoot "workloads.local.json"
+    if (Test-Path -LiteralPath $localFile) {
+        try {
+            $local = Get-Content -LiteralPath $localFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            $mod = $local.PSObject.Properties[(Split-Path $ModuleDir -Leaf)]
+            if ($mod) {
+                $lp = $mod.Value.PSObject.Properties['ferramentas']
+                if ($lp) {
+                    foreach ($lt in @($lp.Value)) {
+                        $list = @($list | Where-Object { $_.cmd -ne $lt.cmd }) + @($lt)
+                    }
+                }
+                $lr = $mod.Value.PSObject.Properties['repos']
+                if ($lr -and @($lr.Value).Count -gt 0) { $hasRepos = $true }
+            }
+        } catch { }
+    }
+
+    if ($hasRepos -and -not @($list | Where-Object { $_.cmd -eq 'git' })) {
+        $tools.Add([PSCustomObject]@{ Cmd = "git"; VersionArgs = @("--version"); Minima = "" })
+    }
+    foreach ($t in $list) {
+        $argsV = @("--version")
+        $vp = $t.PSObject.Properties['versao']
+        if ($vp -and @($vp.Value).Count -gt 1) { $argsV = @($vp.Value)[1..(@($vp.Value).Count - 1)] }
+        $minima = ""
+        $mp = $t.PSObject.Properties['minima']
+        if ($mp) { $minima = [string]$mp.Value }
+        $tools.Add([PSCustomObject]@{ Cmd = [string]$t.cmd; VersionArgs = $argsV; Minima = $minima })
+    }
+    return ,$tools
+}
+
+# Monta os achados da checagem so para os testes selecionados. Nao interage
+# nem imprime nada (testavel na CI); a tela fica em Show-PreExecutionSummary.
+function Get-PreflightFindings {
+    param(
+        [array]$Tests,
+        [string]$TestsRoot,
+        [string]$HubRoot,
+        [PSCustomObject]$Settings,
+        [switch]$SkipLeftovers
+    )
+    $findings = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $byFolder = [ordered]@{}
+    foreach ($t in $Tests) {
+        if (-not $byFolder.Contains($t.ParentFolder)) { $byFolder[$t.ParentFolder] = @() }
+        $byFolder[$t.ParentFolder] += "$($t.Name).$($t.Type)"
+    }
+    $allNames = @($Tests | ForEach-Object { "$($_.Name).$($_.Type)" })
+
+    # Modulos com captura WPR + exportacao WPA (1 e 5): profile do WPA (nao
+    # versionado; sem ele o modulo grava so .etl, horas depois) e o WPT no PATH
+    $wpaModules = [ordered]@{ "1_cpu_memo" = "Agentes_SI_Profile.wpaProfile"; "5_bateria" = "Agentes_SI_Bateria_Profile.wpaProfile" }
+    foreach ($folder in $wpaModules.Keys) {
+        if (-not $byFolder.Contains($folder)) { continue }
+        $names = $byFolder[$folder]
+        $dir = Join-Path $TestsRoot $folder
+        $prof = Join-Path $dir $wpaModules[$folder]
+        if (-not (Test-Path -LiteralPath $prof) -and -not (Test-Path -LiteralPath "$prof.xml")) {
+            $findings.Add((New-PreflightFinding "Impede" $names "$($wpaModules[$folder]) ausente (sem ele o modulo grava so .etl e nenhum CSV do WPA)" "Copie o $($wpaModules[$folder]) para $dir"))
+        }
+        foreach ($exe in "wpr", "wpaexporter") {
+            if (-not (Test-CommandAvailable -Cmd $exe)) {
+                $findings.Add((New-PreflightFinding "Impede" $names "$exe.exe nao encontrado no PATH ($folder)" "Instale o Windows Performance Toolkit (Windows ADK) e reabra o hub"))
+            }
+        }
+    }
+
+    # Teste 3 (rede interna): URL do speedtest fora do repositorio
+    if ($byFolder.Contains("3_rede") -and -not (Test-SpeedtestConfigured -HubRoot $HubRoot)) {
+        $findings.Add((New-PreflightFinding "Impede" $byFolder["3_rede"] "URL do speedtest interno nao configurada" "Defina HUB_SPEEDTEST_URL ou SpeedtestUrl no config.local.json (veja config.local.example.json)"))
+    }
+
+    # Cargas de dev (7-11): ferramentas na versao minima do cargas.json
+    $devFolders = @($byFolder.Keys | Where-Object { Test-Path -LiteralPath (Join-Path (Join-Path $TestsRoot $_) "cargas.json") })
+    foreach ($folder in $devFolders) {
+        foreach ($tool in (Get-DevModuleTools -ModuleDir (Join-Path $TestsRoot $folder) -HubRoot $HubRoot)) {
+            $setup = if ($tool.Cmd -eq "podman") { "rode o Setup 10_preparar_podman" } else { "rode o Setup 7_install_devtools_dev" }
+            $v = Get-ToolVersion -Cmd $tool.Cmd -VersionArgs $tool.VersionArgs
+            if ($null -eq $v) {
+                $findings.Add((New-PreflightFinding "Impede" $byFolder[$folder] "'$($tool.Cmd)' nao encontrado ($folder)" "Instale: $setup"))
+            } elseif ($tool.Minima -and ($null -eq $v.Version -or $v.Version -lt [version]$tool.Minima)) {
+                $findings.Add((New-PreflightFinding "Impede" $byFolder[$folder] "'$($tool.Cmd)' abaixo da versao minima $($tool.Minima) ($folder): $(($v.Output -split "`n")[0])" "Atualize: $setup"))
+            }
+        }
+    }
+
+    # Modulo 10: a podman machine precisa estar ligada (o hub a desliga entre
+    # testes quando a fila nao precisa mais dela, e o modulo nao a liga sozinho)
+    if ($byFolder.Contains("10_dev_containers") -and (Test-CommandAvailable -Cmd "podman")) {
+        $pod = Get-PodmanState
+        if ($pod.Available -and -not $pod.MachineRunning) {
+            $findings.Add((New-PreflightFinding "Impede" $byFolder["10_dev_containers"] "podman machine desligada (o modulo 10 precisa dela ligada)" "Rode 'podman machine start' ou o Setup 10_preparar_podman"))
+        }
+    }
+
+    # Tomada: as cargas de dev dao FAIL na bateria; o teste 5 e o unico que
+    # deve rodar na bateria; o resto mede pior (plano de energia muda).
+    $power = Get-PowerSource
+    if ($power -eq "Battery") {
+        $devNames   = @($devFolders | ForEach-Object { $byFolder[$_] })
+        $otherNames = @($byFolder.Keys | Where-Object { $_ -ne "5_bateria" -and $devFolders -notcontains $_ } | ForEach-Object { $byFolder[$_] })
+        if ($devNames.Count -gt 0) {
+            $findings.Add((New-PreflightFinding "Impede" $devNames "Notebook na bateria (as cargas de dev dao FAIL fora da tomada)" "Conecte o carregador"))
+        }
+        if ($otherNames.Count -gt 0) {
+            $findings.Add((New-PreflightFinding "Atencao" $otherNames "Notebook na bateria (o plano de energia muda a medicao)" "Conecte o carregador"))
+        }
+    }
+
+    # Internet: 3.1 (fast.com) e cargas de dev (clones, pacotes, imagens)
+    $netNames = @($byFolder.Keys | Where-Object { $_ -eq "3_rede_internet" -or $devFolders -contains $_ } | ForEach-Object { $byFolder[$_] })
+    if ($netNames.Count -gt 0 -and -not (Test-InternetReachable -HostName $Settings.InternetHost)) {
+        $findings.Add((New-PreflightFinding "Atencao" $netNames "Sem acesso a internet ($($Settings.InternetHost):443)" "Verifique a rede/proxy antes de iniciar"))
+    }
+
+    # Disco do hub: evidencias (.etl do WPR chegam a 400 MB cada)
+    $free = Get-FreeSpaceGB -Path $HubRoot
+    if ($null -ne $free -and $free -lt [double]$Settings.MinFreeGB) {
+        $findings.Add((New-PreflightFinding "Atencao" $allNames "Pouco espaco livre no disco do hub: $free GB (minimo $($Settings.MinFreeGB) GB)" "Libere espaco (ex.: exporte e apague cenarios antigos em Execucoes)"))
+    }
+
+    if (-not $SkipLeftovers) {
+        # A podman machine so e sobra se nenhum teste da fila precisa dela
+        $needsPodman = @($byFolder.Keys | Where-Object { $_ -eq "10_dev_containers" }).Count -gt 0
+        foreach ($l in (Get-TestLeftovers -TestsRoot $TestsRoot -KeepPodmanMachine:$needsPodman)) {
+            if ($l.Id -eq "dotnet") {
+                # Antes da fila nao da para saber se sao do teste 7 ou do Visual
+                # Studio do usuario: so aviso, sem [F] (entre testes, o filtro por
+                # PID garante que so os do teste sao encerrados).
+                $findings.Add((New-PreflightFinding "Atencao" $allNames "Build servers do .NET ativos ($($l.Detalhe))" "Se forem de um teste anterior, rode 'dotnet build-server shutdown'; se forem do Visual Studio, ignore"))
+                continue
+            }
+            $findings.Add((New-PreflightFinding "Atencao" $allNames "Sobra de teste: $($l.Nome) ($($l.Detalhe))" "[F] encerra" -Sobra $l))
+        }
+        foreach ($h in (Get-HighCpuProcesses -ThresholdPct ([double]$Settings.CpuAlertPct))) {
+            $findings.Add((New-PreflightFinding "Atencao" $allNames "Processo usando CPU: $($h.Name) (PID $($h.Id), $($h.CpuPct)% de um nucleo)" "Feche-o se nao for necessario (o hub nao encerra processos que nao sao de teste)"))
+        }
+    }
+    return ,$findings
+}
+
+# ---- Sobras de teste (processos que nao fecharam direito) --------------------
+
+# Sondas (substituiveis na CI)
+function Get-ProcessSnapshot {
+    return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Select-Object Name, ProcessId, ParentProcessId, CommandLine)
+}
+
+function Get-WprStatus {
+    if (-not (Get-Command wpr -CommandType Application -ErrorAction SilentlyContinue)) { return $null }
+    $out = (& wpr -status 2>&1 | Out-String)
+    return [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Output = $out }
+}
+
+function Get-PodmanState {
+    $state = [PSCustomObject]@{ Available = $false; Containers = @(); MachineRunning = $false }
+    if (-not (Get-Command podman -CommandType Application -ErrorAction SilentlyContinue)) { return $state }
+    $state.Available = $true
+    try {
+        $m = (& podman machine inspect --format "{{.State}}" 2>$null | Out-String).Trim()
+        $state.MachineRunning = ($m -match '(?i)running')
+        if ($state.MachineRunning) {
+            $state.Containers = @(& podman ps --filter "name=wintestehub-" --format "{{.Names}}" 2>$null | Where-Object { $_ -match '\S' })
+        }
+    } catch { }
+    return $state
+}
+
+# WPR gravando? "WPR is not recording" (en) / "nao esta gravando" (pt) = parado.
+function Test-WprRecording {
+    param($Status)
+    if ($null -eq $Status) { return $false }
+    $o = [string]$Status.Output
+    if ($o -match '(?i)not recording|n.o est. gravando|nenhuma grava') { return $false }
+    return ($o -match '(?i)recording|gravando|grava..o em andamento')
+}
+
+# Processos abertos por testes do hub. Detecta pela linha de comando ou por
+# flags de automacao, nunca so pelo nome (o Edge e o Python do usuario ficam).
+# Testes: pastas de teste que costumam deixar a sobra (filtro entre testes).
+function Get-TestLeftovers {
+    param(
+        [string]$TestsRoot,
+        [string[]]$Folders = @(),
+        [switch]$KeepPodmanMachine,
+        [int[]]$IgnorePids = @()
+    )
+    $out = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $add = {
+        param($Id, $Nome, $Detalhe, $Pids, $Testes)
+        if ($Folders.Count -gt 0 -and $Testes -ne "*" -and -not @($Testes | Where-Object { $Folders -contains $_ })) { return }
+        $out.Add([PSCustomObject]@{ Id = $Id; Nome = $Nome; Detalhe = $Detalhe; Pids = @($Pids) })
+    }
+
+    if (Test-WprRecording (Get-WprStatus)) {
+        & $add "wpr" "sessao do WPR gravando" "wpr -status" @() @("1_cpu_memo")
+    }
+
+    # IgnorePids: processos que ja existiam antes do teste (entre testes, so o
+    # que o proprio teste abriu e sobra; o Visual Studio do usuario fica).
+    $procs = @(Get-ProcessSnapshot | Where-Object { $IgnorePids -notcontains [int]$_.ProcessId })
+    $testsRootNorm = $TestsRoot.TrimEnd('\') + '\'
+
+    $byName = {
+        param([string]$Pattern)
+        @($procs | Where-Object { $_.Name -match $Pattern })
+    }
+
+    foreach ($exe in @(@{ N = "wpaexporter"; T = @("1_cpu_memo") }, @{ N = "diskspd"; T = @("2_disco") })) {
+        $p = @(& $byName ("^" + $exe.N + "\.exe$"))
+        if ($p.Count -gt 0) { & $add $exe.N "$($exe.N).exe" "$($p.Count) processo(s)" @($p | ForEach-Object { $_.ProcessId }) $exe.T }
+    }
+
+    # Edge da automacao: msedgedriver, ou msedge com --enable-automation ou
+    # aberto pelo driver. So --remote-debugging-port nao basta (VS Code/DevTools).
+    $drv  = @(& $byName '^msedgedriver\.exe$')
+    $drvPids = @($drv | ForEach-Object { [int]$_.ProcessId })
+    $edge = @($procs | Where-Object { $_.Name -match '^msedge\.exe$' -and ([string]$_.CommandLine -match '--enable-automation' -or $drvPids -contains [int]$_.ParentProcessId) })
+    $edgePids = @($drv | ForEach-Object { $_.ProcessId }) + @($edge | ForEach-Object { $_.ProcessId })
+    if ($edgePids.Count -gt 0) {
+        & $add "edge" "Edge da automacao" "$($drv.Count) msedgedriver, $($edge.Count) msedge" $edgePids @("1_cpu_memo", "3_rede", "3_rede_internet", "5_bateria", "6_wifi_fast_transition")
+    }
+
+    # Python rodando um script de Testes\ (o hub roda um teste por vez; fora
+    # de um teste, qualquer um desses e sobra)
+    $py = @($procs | Where-Object {
+        $_.Name -match '^pythonw?(3)?(\.\d+)?\.exe$' -and [string]$_.CommandLine -and
+        ([string]$_.CommandLine).IndexOf($testsRootNorm, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    })
+    if ($py.Count -gt 0) { & $add "python" "script Python de teste" "$($py.Count) processo(s)" @($py | ForEach-Object { $_.ProcessId }) "*" }
+
+    # Build servers do .NET (node reuse do MSBuild e o compilador Roslyn)
+    $bs = @($procs | Where-Object {
+        $_.Name -match '^VBCSCompiler\.exe$' -or
+        ($_.Name -match '^(MSBuild|dotnet)\.exe$' -and [string]$_.CommandLine -match '(?i)nodeReuse:true|MSBuild\.dll.*/nodemode|VBCSCompiler')
+    })
+    if ($bs.Count -gt 0) { & $add "dotnet" "build servers do .NET" "$($bs.Count) processo(s)" @($bs | ForEach-Object { $_.ProcessId }) @("7_dev_dotnet") }
+
+    # Podman: stack do modulo 10 e a podman machine (WSL, vmmem ocupa RAM)
+    $pod = Get-PodmanState
+    if ($pod.Available) {
+        if (@($pod.Containers).Count -gt 0) {
+            & $add "compose" "stack do modulo 10 (podman compose)" ((@($pod.Containers)) -join ", ") @() @("10_dev_containers")
+        }
+        if ($pod.MachineRunning -and -not $KeepPodmanMachine) {
+            & $add "podman-machine" "podman machine ligada" "ocupa RAM (vmmem)" @() @("10_dev_containers")
+        }
+    }
+    return ,$out
+}
+
+# Encerra as sobras do jeito certo de cada uma. Devolve as descricoes do que
+# foi encerrado (para log e avisos da rodada).
+function Stop-TestLeftovers {
+    param([array]$Leftovers, [string]$TestsRoot)
+    $done = [System.Collections.Generic.List[string]]::new()
+    foreach ($l in $Leftovers) {
+        try {
+            switch ($l.Id) {
+                "wpr"            { & wpr -cancel 2>&1 | Out-Null }
+                "dotnet"         {
+                    # So os PIDs detectados (ja filtrados pelos que o teste abriu):
+                    # 'dotnet build-server shutdown' derrubaria tambem os do Visual Studio
+                    foreach ($p in $l.Pids) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }
+                }
+                "compose"        {
+                    $compose = Join-Path (Join-Path $TestsRoot "10_dev_containers") "compose.yml"
+                    & podman compose -f $compose down -v 2>&1 | Out-Null
+                }
+                "podman-machine" { & podman machine stop 2>&1 | Out-Null }
+                default          {
+                    # taskkill /T leva junto os filhos (ex.: msedge aberto pelo driver)
+                    foreach ($p in $l.Pids) { & taskkill.exe /T /F /PID $p 2>&1 | Out-Null }
+                }
+            }
+            $done.Add("$($l.Nome) ($($l.Detalhe))")
+        } catch {
+            $done.Add("$($l.Nome): falha ao encerrar ($($_.Exception.Message))")
+        }
+    }
+    return ,$done
+}
+
+# Os processos que mais usaram CPU numa janela curta (% de UM nucleo).
+# So aviso: o hub nao sabe se sao do usuario e nunca os encerra.
+function Get-HighCpuProcesses {
+    param([double]$ThresholdPct = 10, [int]$WindowSec = 3, [int]$Top = 5)
+    $first = @{}
+    foreach ($p in (Get-Process -ErrorAction SilentlyContinue)) {
+        try { if ($null -ne $p.CPU) { $first[$p.Id] = [double]$p.CPU } } catch { }
+    }
+    Start-Sleep -Seconds $WindowSec
+    $rows = @()
+    foreach ($p in (Get-Process -ErrorAction SilentlyContinue)) {
+        if ($p.Id -eq $PID -or $p.Id -eq 0 -or $p.Name -eq "Idle") { continue }
+        if (-not $first.ContainsKey($p.Id)) { continue }
+        try { $pct = (([double]$p.CPU - $first[$p.Id]) / $WindowSec) * 100 } catch { continue }
+        if ($pct -ge $ThresholdPct) { $rows += [PSCustomObject]@{ Name = $p.Name; Id = $p.Id; CpuPct = [Math]::Round($pct, 0) } }
+    }
+    return @($rows | Sort-Object CpuPct -Descending | Select-Object -First $Top)
+}
+
+# Entre testes da fila: encerra, sem perguntar, as sobras do teste que acabou
+# (a fila e desassistida). A podman machine fica se ainda vem teste do 10.
+function Clear-TestLeftovers {
+    param([PSCustomObject]$After, [array]$Remaining, [string]$TestsRoot, [string]$LogFile, [int[]]$PidsBefore = @())
+    $needsPodman = @($Remaining | Where-Object { $_.ParentFolder -eq "10_dev_containers" }).Count -gt 0
+    $left = Get-TestLeftovers -TestsRoot $TestsRoot -Folders @($After.ParentFolder) -KeepPodmanMachine:$needsPodman -IgnorePids $PidsBefore
+    if ($left.Count -eq 0) { return ,@() }
+    $done = Stop-TestLeftovers -Leftovers $left -TestsRoot $TestsRoot
+    foreach ($d in $done) {
+        if ($LogFile) { Add-Content -LiteralPath $LogFile -Value "[AVISO] Sobra de $($After.Name) encerrada antes do proximo teste: $d" -Encoding UTF8 }
+    }
+    return ,@($done)
+}
+
 # ---- MAIN -------------------------------------------------------------------
 
 Write-Header
 
 Write-Host "  [!] Removendo bloqueios de seguranca (Unblock-File)..." -ForegroundColor DarkGray
-Get-ChildItem -Path $PSScriptRoot -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 
 foreach ($dir in @($ExportarDir, $ExecucoesDir)) {
-    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 }
 
 Write-Host ""
@@ -1350,7 +2137,7 @@ if ($scenarioChoice.Mode -eq "continue") {
     $scenarioDir     = $scenarioChoice.Path
     $traceRunDir     = Join-Path $scenarioDir "Traces"
     $logRunDir       = Join-Path $scenarioDir "Logs"
-    if (-not (Test-Path $logRunDir)) { New-Item -ItemType Directory -Path $logRunDir -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $logRunDir)) { New-Item -ItemType Directory -Path $logRunDir -Force | Out-Null }
     $stateObj        = Ensure-MachineIdentity -State $scenarioChoice.State -TraceRunDir $traceRunDir
     $previousResults = Get-LatestTestResults -State $stateObj
     $currentRunId    = ($stateObj.runs | Measure-Object).Count + 1
@@ -1360,7 +2147,7 @@ if ($scenarioChoice.Mode -eq "continue") {
     $scenarioFolderName = "$($scenarioChoice.Name)_$($env:COMPUTERNAME)_$runStamp"
     $scenarioDir        = Join-Path $ExecucoesDir $scenarioFolderName
 
-    if (Test-Path $scenarioDir) {
+    if (Test-Path -LiteralPath $scenarioDir) {
         $scenarioFolderName += "_" + (Get-Date -Format "HH-mm-ss")
         $scenarioDir = Join-Path $ExecucoesDir $scenarioFolderName
     }
@@ -1383,7 +2170,7 @@ $setupResults  = [System.Collections.Generic.List[PSCustomObject]]::new()
 $runStart      = Get-Date
 
 $logHeader = "WINTESTHUB -- $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`nHost: $env:COMPUTERNAME | User: $env:USERNAME`nCenario: $(Split-Path $scenarioDir -Leaf) | Run: #$currentRunId`nSetupRoot: $SetupRoot`nTestsRoot: $TestsRoot`nTracesDir: $traceRunDir`nLogsDir: $logRunDir`nExportar: $(Get-ExportPath -ExportarDir $ExportarDir -State $stateObj)`n$('-'*62)"
-Add-Content -Path $logFile -Value $logHeader -Encoding UTF8
+Add-Content -LiteralPath $logFile -Value $logHeader -Encoding UTF8
 
 # ==== FASE 1: PREPARACAO =====================================================
 
@@ -1402,7 +2189,7 @@ if (-not $SkipSetup) {
         $setupToRun = @($afterSetup | Where-Object { $_.Selectable -and $_.Selected })
 
         if ($setupToRun.Count -gt 0) {
-            Add-Content -Path $logFile -Value "`n-- PREPARACAO ($($setupToRun.Count) script(s)) --" -Encoding UTF8
+            Add-Content -LiteralPath $logFile -Value "`n-- PREPARACAO ($($setupToRun.Count) script(s)) --" -Encoding UTF8
             Write-Host "`n  Executando $($setupToRun.Count) script(s) de preparacao...`n" -ForegroundColor DarkYellow
 
             foreach ($s in $setupToRun) {
@@ -1456,8 +2243,61 @@ while (-not $confirmed) {
         exit 0
     }
 
-    # Resumo pre-execucao
-    $confirmed = Show-PreExecutionSummary -TestsToRun $toRun -ScenarioName $scenarioChoice.Name -TraceRunDir $traceRunDir -RunId $currentRunId -PreviousResults $previousResults
+    # Checagem + resumo pre-execucao. R/F refazem a checagem; ESC volta ao menu.
+    $decided = $false
+    while (-not $decided) {
+        Write-Host "`n  Checando pre-requisitos e sobras de teste..." -ForegroundColor DarkCyan
+        $findings = Get-PreflightFindings -Tests $toRun -TestsRoot $TestsRoot -HubRoot $PSScriptRoot -Settings $PreflightSettings
+        $choice = Show-PreExecutionSummary -TestsToRun $toRun -ScenarioName $scenarioChoice.Name -TraceRunDir $traceRunDir -RunId $currentRunId -PreviousResults $previousResults -Findings $findings
+        switch ($choice) {
+            "back"   {
+                foreach ($f in $findings) { Add-Content -LiteralPath $logFile -Value "[CHECAGEM] [$($f.Nivel)] $($f.Item) -- operador voltou ao menu" -Encoding UTF8 }
+                $decided = $true
+            }
+            "kill"   {
+                $sobras = @($findings | Where-Object { $null -ne $_.Sobra } | ForEach-Object { $_.Sobra })
+                Write-Host "`n  Encerrar $($sobras.Count) sobra(s) de teste? (S/N)" -ForegroundColor Yellow
+                Clear-KeyBuffer
+                $k = [Console]::ReadKey($true)
+                if ($k.KeyChar -ne 's' -and $k.KeyChar -ne 'S') {
+                    Add-Content -LiteralPath $logFile -Value "[CHECAGEM] Operador recusou encerrar $($sobras.Count) sobra(s) de teste" -Encoding UTF8
+                }
+                if ($k.KeyChar -eq 's' -or $k.KeyChar -eq 'S') {
+                    foreach ($d in (Stop-TestLeftovers -Leftovers $sobras -TestsRoot $TestsRoot)) {
+                        Write-Host "  [OK] Encerrado: $d" -ForegroundColor Green
+                        Add-Content -LiteralPath $logFile -Value "[INFO] Sobra encerrada antes da fila: $d" -Encoding UTF8
+                        Add-RunWarning -State $stateObj -Run $currentRunId -Fonte "sobra" -Texto "Encerrada antes da fila: $d"
+                    }
+                }
+            }
+            "remove" {
+                $removed = @($toRun | Where-Object { @(Remove-BlockedTests -Tests @($_) -Findings $findings).Count -eq 0 })
+                $toRun = @(Remove-BlockedTests -Tests $toRun -Findings $findings)
+                foreach ($r in $removed) {
+                    $rName  = "$($r.Name).$($r.Type)"
+                    $reason = Get-BlockReason -TestName $rName -Findings $findings
+                    $rText  = if ($reason) { "$rName ($reason)" } else { $rName }
+                    Add-Content -LiteralPath $logFile -Value "[AVISO] Teste tirado da fila pela checagem: $rText" -Encoding UTF8
+                    Add-RunWarning -State $stateObj -Run $currentRunId -Fonte "checagem" -Texto "Tirado da fila pela checagem: $rText"
+                }
+                if ($toRun.Count -eq 0) {
+                    Write-Host "`n  [!] Nenhum teste restou na fila." -ForegroundColor Yellow
+                    $decided = $true
+                }
+            }
+            default  {
+                # start (sem impedimentos) ou continue (operador seguiu mesmo assim)
+                foreach ($f in $findings) {
+                    $txt = "[$($f.Nivel)] $($f.Item)"
+                    if ($f.Nivel -eq "Impede") { $txt += " -- operador continuou mesmo assim ($(($f.Testes) -join ', '))" }
+                    Add-Content -LiteralPath $logFile -Value "[CHECAGEM] $txt" -Encoding UTF8
+                    Add-RunWarning -State $stateObj -Run $currentRunId -Fonte "checagem" -Texto $txt
+                }
+                $confirmed = $true
+                $decided   = $true
+            }
+        }
+    }
 }
 
 # Mover evidencias anteriores para testes que serao re-executados
@@ -1473,7 +2313,7 @@ foreach ($t in $toRun) {
     }
 }
 
-Add-Content -Path $logFile -Value "`n-- TESTES ($($toRun.Count) script(s)) --" -Encoding UTF8
+Add-Content -LiteralPath $logFile -Value "`n-- TESTES ($($toRun.Count) script(s)) --" -Encoding UTF8
 
 # Painel de progresso
 $progressY = Show-ExecutionProgress -TestsToRun $toRun -RunId $currentRunId
@@ -1486,9 +2326,17 @@ for ($idx = 0; $idx -lt $toRun.Count; $idx++) {
     $test = $toRun[$idx]
     Update-ProgressLine -Y $progressY -TestIndex $idx -Name $test.Name -Type $test.Type -Status "running" -Detail "" -Current ($idx + 1) -Total $toRun.Count
 
+    $pidsBefore = @(Get-Process -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.Id })
     $res = Invoke-TestScript -Test $test -LogFile $logFile -TraceRunDir $traceRunDir -Silent
     $allResults.Add($res)
     $testResults.Add($res)
+
+    # Sobras do teste que acabou (WPR, Edge, build servers, stack do podman...)
+    $remaining = @()
+    if ($idx + 1 -lt $toRun.Count) { $remaining = @($toRun[($idx + 1)..($toRun.Count - 1)]) }
+    foreach ($d in (Clear-TestLeftovers -After $test -Remaining $remaining -TestsRoot $TestsRoot -LogFile $logFile -PidsBefore $pidsBefore)) {
+        Add-RunWarning -State $stateObj -Run $currentRunId -Fonte "sobra" -Texto "Encerrada apos $($test.Name).$($test.Type): $d"
+    }
 
     $detail = "$([Math]::Round($res.Duration, 1))s"
     if ($res.ErrorSnippet) {
@@ -1503,7 +2351,7 @@ for ($idx = 0; $idx -lt $toRun.Count; $idx++) {
             Update-ProgressLine -Y $progressY -TestIndex $j -Name $toRun[$j].Name -Type $toRun[$j].Type -Status "CANCEL" -Detail "(Ctrl+Q)" -Current ($idx + 1) -Total $toRun.Count
         }
         $restantes = $toRun.Count - $idx - 1
-        Add-Content -Path $logFile -Value "`n[!] Fila interrompida pelo operador (Ctrl+Q) em $($test.Name). $restantes teste(s) nao executado(s)." -Encoding UTF8
+        Add-Content -LiteralPath $logFile -Value "`n[!] Fila interrompida pelo operador (Ctrl+Q) em $($test.Name). $restantes teste(s) nao executado(s)." -Encoding UTF8
         Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 1)
         Write-Host "  [!] Ctrl+Q: fila interrompida em $($test.Name). $restantes teste(s) cancelado(s)." -ForegroundColor Yellow
         Clear-KeyBuffer
@@ -1536,10 +2384,13 @@ Write-StateFile -TraceRunDir $traceRunDir -State $stateObj
 # Relatorio por run (Logs/)
 Show-Summary -Results $allResults.ToArray() -LogFile $logFile -ResultsFile $resultsFile -TotalSec ((Get-Date) - $runStart).TotalSeconds
 
-# ---- Inventario da maquina, relatorio consolidado e CSVs tematicos ----------
+# ---- Inventario da maquina, CSVs tematicos, avisos e relatorio consolidado --
 Collect-MachineInfo -OutputDir $traceRunDir -State $stateObj
+$thematic   = Test-ThematicCSVs -TraceRunDir $traceRunDir -LogFile $logFile
+$runFolders = @($testResults | ForEach-Object { Split-Path $_.TraceDir -Leaf } | Select-Object -Unique)
+Add-EndOfRunWarnings -State $stateObj -Run $currentRunId -TraceRunDir $traceRunDir -Folders $runFolders -MissingCsvFolders $thematic.MissingFolders -Sampler $CpuSamplerSettings
+Write-StateFile -TraceRunDir $traceRunDir -State $stateObj
 Build-ConsolidatedReport -TraceRunDir $traceRunDir -State $stateObj
-Test-ThematicCSVs -TraceRunDir $traceRunDir -LogFile $logFile | Out-Null
 
 # ---- Pasta de exportacao (Traces sem .etl, logs e pastas vazias) ------------
 $exportSummary = Export-ScenarioTraces -TraceRunDir $traceRunDir -ExportarDir $ExportarDir -State $stateObj -LogFile $logFile

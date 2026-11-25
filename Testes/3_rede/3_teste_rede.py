@@ -67,6 +67,10 @@ _fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
 _fh.setLevel(logging.DEBUG)
 _fh.setFormatter(_fmt)
 
+try:
+    sys.stdout.reconfigure(errors="replace")  # caractere fora do cp1252 nao derruba o log
+except (AttributeError, ValueError):
+    pass
 _ch = logging.StreamHandler(sys.stdout)
 _ch.setLevel(logging.INFO)
 _ch.setFormatter(_fmt)
