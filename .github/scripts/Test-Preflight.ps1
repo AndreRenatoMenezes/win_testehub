@@ -110,13 +110,20 @@ try {
     Set-Content -LiteralPath (Join-Path $testsRoot "5_bateria\Agentes_SI_Bateria_Profile.wpaProfile") -Value "<x/>"
     Assert-Condition ((Get-F @($tBat)).Count -eq 0) "profile de bateria presente -> sem achado"
 
-    $f = Get-F @($tRede)
-    Assert-Condition ((Find-Item $f 'speedtest').Count -eq 1) "teste 3 sem URL do speedtest -> Impede"
+    # Teste 3 unificado: uma fonte fora (URL interna ou internet) = Atencao; as duas = Impede
+    $f = Find-Item (Get-F @($tRede)) 'Rede:'
+    Assert-Condition ($f.Count -eq 1 -and $f[0].Nivel -eq "Atencao" -and $f[0].Item -match 'so a internet') "teste 3 sem URL do speedtest (com internet) -> Atencao, so a internet"
+    $script:internet = $false
+    $f = Find-Item (Get-F @($tRede)) 'Rede:'
+    Assert-Condition ($f.Count -eq 1 -and $f[0].Nivel -eq "Impede" -and $f[0].Item -match 'nenhuma das duas') "teste 3 sem URL e sem internet -> Impede"
     Set-Content -LiteralPath (Join-Path $hub "config.local.json") -Value '{"SpeedtestUrl":"https://speedtest.example.invalid/"}'
-    Assert-Condition ((Find-Item (Get-F @($tRede)) 'speedtest').Count -eq 0) "SpeedtestUrl no config.local.json -> sem achado"
+    $f = Find-Item (Get-F @($tRede)) 'Rede:'
+    Assert-Condition ($f.Count -eq 1 -and $f[0].Nivel -eq "Atencao" -and $f[0].Item -match 'so o speedtest interno') "teste 3 com URL e sem internet -> Atencao, so o interno"
+    $script:internet = $true
+    Assert-Condition ((Find-Item (Get-F @($tRede)) 'Rede:').Count -eq 0) "SpeedtestUrl no config.local.json e internet -> sem achado"
     Remove-Item -LiteralPath (Join-Path $hub "config.local.json")
     $env:HUB_SPEEDTEST_URL = "https://speedtest.example.invalid/"
-    Assert-Condition ((Find-Item (Get-F @($tRede)) 'speedtest').Count -eq 0) "HUB_SPEEDTEST_URL -> sem achado"
+    Assert-Condition ((Find-Item (Get-F @($tRede)) 'Rede:').Count -eq 0) "HUB_SPEEDTEST_URL -> sem achado"
     $env:HUB_SPEEDTEST_URL = ""
 
     Write-Host "`n  Ferramentas de dev (cargas.json)" -ForegroundColor Cyan

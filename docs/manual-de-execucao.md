@@ -57,9 +57,13 @@ Para as **cargas de desenvolvimento (Módulos 7 a 11)**, os setups `7_install_de
 
 ### 2.3 Rede `[Técnico]`
 
-- O teste de rede acessa o servidor de speedtest interno, cuja URL fica fora do repositório: chave `SpeedtestUrl` do `config.local.json` na raiz do hub (modelo em `config.local.example.json`) ou variável de ambiente `HUB_SPEEDTEST_URL`. Verifique se a máquina tem acesso a essa URL antes de executar o módulo de rede.
-- O teste complementar de rede na internet (`3-1_teste_rede_internet.py`) acessa `https://fast.com/` (Netflix). Os domínios `fast.com`, `api.fast.com` e `*.oca.nflxvideo.net` — ou a categoria "speedtest" — precisam estar liberados na política do agente zero trust/proxy; caso contrário, o teste falha com "site inacessível ou bloqueado".
-- Esse teste registra no CSV o **IP público de saída** e a localização vistos pelo fast.com, como evidência do caminho percorrido pelo tráfego (com o agente ativo, devem ser os do nó de saída do agente).
+O teste de rede (`3_teste_rede.py`, ~20 min) mede **duas fontes em rodadas intercaladas**, 10 de cada mais 1 de aquecimento:
+
+- **Speedtest interno:** a URL fica fora do repositório, na chave `SpeedtestUrl` do `config.local.json` na raiz do hub (modelo em `config.local.example.json`) ou na variável de ambiente `HUB_SPEEDTEST_URL`. Verifique se a máquina tem acesso a essa URL.
+- **Internet (`https://fast.com/`, Netflix):** os domínios `fast.com`, `api.fast.com` e `*.oca.nflxvideo.net`, ou a categoria "speedtest", precisam estar liberados na política do agente zero trust/proxy. O teste registra o **IP público de saída** e a localização vistos pelo fast.com, como evidência do caminho do tráfego (com o agente ativo, devem ser os do nó de saída do agente).
+- **Uma fonte fora do ar vira só aviso:** o teste passa quando pelo menos uma das duas mede ok, e o motivo da outra aparece nos avisos da rodada.
+- **Para comparar hardware, use cabo.** No Wi-Fi o teste registra banda, canal, sinal e AP de cada rodada e avisa no relatório. No Windows 11, o `netsh` só informa esses campos com a permissão de **Localização** ligada.
+- Para um teste rápido (ex.: conferir o acesso), defina `HUB_REDE_RODADAS=2` antes de abrir o hub.
 
 ### 2.4 Estrutura de Pastas Esperada `[Técnico]`
 
@@ -171,8 +175,6 @@ Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupad
 [X] 2-1_teste_disco_dlp            [PY]   pendente
 -- Rede ------------------------------------
 [X] 3_teste_rede                   [PY]   pendente
--- Rede Internet ---------------------------
-[X] 3-1_teste_rede_internet        [PY]   pendente
 -- Boot Shutdown ---------------------------
 [X] 4_boot_shutdown_auto           [PY]   pendente
 -- Bateria ---------------------------------
@@ -199,7 +201,7 @@ Num cenário com execuções anteriores, o menu mostra o último resultado e a d
 [ ] 1_automacao_performance        [PY]   PASS  (361.5s)
 [ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
 [X] 3_teste_rede                   [PY]   pendente
-[X] 3-1_teste_rede_internet        [PY]   pendente
+[X] 4_boot_shutdown_auto           [PY]   pendente
 ```
 
 > ![Menu de Testes](img/placeholder-menu-testes.png)  
@@ -392,13 +394,14 @@ Cada achado aparece no resumo com um nível e com o que fazer:
 - **`[X]` Impede:** o teste vai falhar com certeza.
     - Falta o `Agentes_SI_Profile.wpaProfile` (módulo 1) ou o `Agentes_SI_Bateria_Profile.wpaProfile` (módulo 5) na pasta do teste. Esses arquivos não são versionados.
     - Falta o `wpr.exe` ou o `wpaexporter.exe` (módulos 1 e 5).
-    - A URL do speedtest interno não está configurada (módulo 3).
+    - A URL do speedtest interno não está configurada **e** não há internet (módulo 3: nenhuma das duas fontes pode ser medida).
     - Falta uma ferramenta de dev, ou ela está abaixo da versão mínima do `cargas.json` (módulos 7 a 11). A ação manda rodar o Setup 7 ou o Setup 10.
     - A `podman machine` está desligada (módulo 10).
     - O notebook está na bateria (módulos 7 a 11, que dão FAIL fora da tomada).
 - **`[!]` Atenção:** o teste roda, mas a medição pode sair comprometida.
     - Notebook na bateria (demais testes; o teste 5 é o único que deve rodar na bateria).
-    - Sem internet (módulos 3.1 e 7 a 11).
+    - Sem internet (módulos 3 e 7 a 11). No módulo 3, só o speedtest interno será medido.
+    - A URL do speedtest interno não está configurada (módulo 3: só a internet será medida).
     - Pouco espaço livre no disco do hub (padrão: menos de 20 GB).
     - **Sobra de teste:** um processo que um teste abriu e não fechou direito, consumindo recursos.
     - Processo qualquer usando muita CPU (os 5 maiores acima de 10% de um núcleo). Só aviso: o hub **nunca** encerra processos que não são de teste.
@@ -473,8 +476,7 @@ Execucoes/
         ├── 1_cpu_memo/                      # Evidências do Módulo 1
         │   └── dlp_usb/                     # Evidências da variante 1-1
         ├── 2_disco/                         # Evidências do Módulo 2 e da variante 2-1
-        ├── 3_rede/
-        ├── 3_rede_internet/
+        ├── 3_rede/                          # Speedtest interno + fast.com (rede.csv)
         ├── 4_boot_shutdown/
         ├── 5_bateria/                       # Pré-voo, amostras, traces, bateria.csv
         ├── 6_wifi_fast_transition/
@@ -581,10 +583,11 @@ O amostrador não roda nos setups nem no teste 5 (bateria), para não acordar a 
 | Hub não inicia / fecha imediatamente | Falta de privilégio de admin | Execute `hub.bat` como Administrador (clique direito → Executar como administrador) |
 | "Python não encontrado" | Python não instalado ou `.venv` ausente | Re-execute o setup selecionando scripts 4 e 5 |
 | Teste de rede falha com "Edge não encontrado" | Microsoft Edge ausente/removido da máquina | O Edge é nativo do Windows 10/11 — reinstale/repare o Microsoft Edge pelo site oficial da Microsoft |
-| Teste de rede falha com "URL do speedtest interno não configurada" | `config.local.json` ausente ou sem a chave `SpeedtestUrl` | Crie o `config.local.json` a partir do `config.local.example.json` (veja a seção 7.3) |
+| Teste de rede com aviso "speedtest interno off -- URL do speedtest interno nao configurada" | `config.local.json` ausente ou sem a chave `SpeedtestUrl` | Crie o `config.local.json` a partir do `config.local.example.json` (veja a seção 7.3). Só a internet foi medida |
 | Teste de rede falha com "Falha ao iniciar o Microsoft Edge via Selenium" | O Selenium Manager não conseguiu baixar o `msedgedriver` | Verifique o acesso da máquina ao CDN de drivers do Edge, ou coloque um `msedgedriver.exe` compatível no `PATH` |
-| Teste de rede internet falha com "site inacessível ou bloqueado" | Política do agente zero trust/proxy bloqueando o fast.com (ou a categoria speedtest), ou máquina sem acesso à internet | Libere `fast.com`, `api.fast.com` e `*.oca.nflxvideo.net` na política; confira a tela capturada em `Evidencia_Internet_Bloqueio_*.png` e o log `teste_rede_internet_*.log` |
-| Teste de rede internet com menos de 5 aferições válidas | Rede instável ou medição sem concluir em 120 s | Verifique a conexão e o log; os valores ausentes aparecem como `N/A` em `resultado_afericoes_internet.csv` |
+| Teste de rede com aviso "internet (fast.com) off -- fast.com bloqueado" | Política do agente zero trust/proxy bloqueando o fast.com (ou a categoria speedtest), ou máquina sem acesso à internet | Libere `fast.com`, `api.fast.com` e `*.oca.nflxvideo.net` na política; confira a tela capturada em `Evidencia_Rede_Internet_Bloqueio_*.png` e o log `teste_rede_*.log`. O speedtest interno continua sendo medido |
+| Teste de rede com aviso de fonte "parcial" ou "instavel" | Rodadas que falharam, passaram de 120 s ou foram contaminadas por tráfego de fundo; ou CV acima de 10% | Veja as colunas `Status`, `Motivo` e `Contaminada` no `resultado_afericoes.csv`. Prefira cabo, feche o que estiver baixando (atualizações) e repita |
+| Teste de rede FAIL | Nenhuma das duas fontes terminou ok | Confira os motivos no `rede.csv` (`Interno_Motivo`, `Internet_Motivo`) e no log |
 | Teste de disco falha rapidamente | Espaço insuficiente em disco | Libere pelo menos 10 GB no disco principal |
 | Overlay visual não aparece | Problema com `tkinter` | Verifique se o Python foi instalado com suporte a tkinter (padrão na instalação oficial) |
 | Wi-Fi FT: "O Wi-Fi não está conectado" | Máquina no cabo, Wi-Fi desligado ou desconectado | Conecte o Wi-Fi na rede a testar e execute de novo |

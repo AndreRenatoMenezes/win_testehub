@@ -130,10 +130,11 @@ function Get-Scripts {
 
     # Ordenacao natural: numeros com zeros a esquerda na chave, para "10_x" vir
     # depois de "9_x" (Sort-Object Name puro colocaria "10_" antes de "1_").
-    # dev_cargas.py e a biblioteca comum dos modulos 7 a 11, nao um teste.
+    # dev_cargas.py e a biblioteca comum dos modulos 7 a 11 e rede_calc.py a do
+    # teste 3 (pasta _lib): bibliotecas, nao testes.
     # -LiteralPath (colchetes no caminho do hub) + filtro por extensao no lugar do -Include
     $files = Get-ChildItem -LiteralPath $Root -Recurse -File -ErrorAction SilentlyContinue |
-        Where-Object { ($_.Extension -eq ".ps1" -or $_.Extension -eq ".py") -and @("boot_shutdown_duration.ps1", "dev_cargas.py") -notcontains $_.Name } |
+        Where-Object { ($_.Extension -eq ".ps1" -or $_.Extension -eq ".py") -and $_.Directory.Name -ne "_lib" -and @("boot_shutdown_duration.ps1", "dev_cargas.py") -notcontains $_.Name } |
         Sort-Object { Get-NaturalSortKey $_.Name }
 
     foreach ($f in $files) {
@@ -1196,7 +1197,6 @@ function Test-ThematicCSVs {
         "1_cpu_memo"       = "cpu_memoria.csv"
         "2_disco"          = "disco.csv"
         "3_rede"           = "rede.csv"
-        "3_rede_internet"  = "rede_internet.csv"
         "4_boot_shutdown"  = "boot_shutdown.csv"
         "5_bateria"        = "bateria.csv"
         "6_wifi_fast_transition" = "wifi_ft.csv"
@@ -1537,6 +1537,38 @@ function Get-DevCsvWarnings {
     return @($out)
 }
 
+# Teste 3 (rede.csv, Metrica,Valor,Unidade): fonte que nao terminou ok,
+# medicao instavel (CV acima do limite), medicao no Wi-Fi e roaming.
+function Get-NetworkWarnings {
+    param([string]$TraceRunDir)
+    $out = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $csv = Join-Path (Join-Path $TraceRunDir "3_rede") "rede.csv"
+    if (-not (Test-Path -LiteralPath $csv)) { return @() }
+    try { $rows = @(Import-Csv -LiteralPath $csv -Encoding UTF8) } catch { return @() }
+    $v = @{}
+    foreach ($r in $rows) { if ($r.PSObject.Properties['Metrica']) { $v[[string]$r.Metrica] = [string]$r.Valor } }
+    if (-not $v.ContainsKey("Versao_Teste")) { return @() }   # rede.csv antigo (antes da unificacao)
+    $rotulos = [ordered]@{ "Interno" = "speedtest interno"; "Internet" = "internet (fast.com)" }
+    foreach ($p in $rotulos.Keys) {
+        $st = $v["${p}_Status"]
+        if ($st -and $st -ne "ok") {
+            $motivo = if ($v["${p}_Motivo"] -and $v["${p}_Motivo"] -ne "N/A") { " -- $($v["${p}_Motivo"])" } else { "" }
+            $out.Add([PSCustomObject]@{ Fonte = "rede"; Texto = "3_rede: $($rotulos[$p]) $st$motivo" })
+        }
+        if ($v["${p}_Estavel"] -eq "nao") {
+            $out.Add([PSCustomObject]@{ Fonte = "rede"; Texto = "3_rede: $($rotulos[$p]) instavel (CV download $($v["${p}_Download_CV"])%, upload $($v["${p}_Upload_CV"])%)" })
+        }
+    }
+    if ($v["Conexao_Tipo"] -eq "wifi" -or $v["Conexao_Tipo"] -eq "misto") {
+        $out.Add([PSCustomObject]@{ Fonte = "rede"; Texto = "3_rede: medido com Wi-Fi ($($v["Conexao_Tipo"])) -- para comparar hardware, use cabo" })
+    }
+    if ($v["Roaming"] -eq "sim") {
+        $onde = if ($v["Roaming_Rodadas"] -and $v["Roaming_Rodadas"] -ne "N/A") { " (antes de: $($v["Roaming_Rodadas"]))" } else { "" }
+        $out.Add([PSCustomObject]@{ Fonte = "rede"; Texto = "3_rede: o Wi-Fi trocou de AP (BSSID) durante o teste$onde -- veja resultado_afericoes.csv" })
+    }
+    return @($out)
+}
+
 # ---- Frequencia da CPU durante os testes -------------------------------------
 
 $script:CpuSamplerJob = $null
@@ -1681,6 +1713,11 @@ function Add-EndOfRunWarnings {
     }
     foreach ($w in (Get-DevCsvWarnings -TraceRunDir $TraceRunDir -Folders $Folders)) {
         Add-RunWarning -State $State -Run $Run -Fonte $w.Fonte -Texto $w.Texto
+    }
+    if ($Folders -contains "3_rede") {
+        foreach ($w in (Get-NetworkWarnings -TraceRunDir $TraceRunDir)) {
+            Add-RunWarning -State $State -Run $Run -Fonte $w.Fonte -Texto $w.Texto
+        }
     }
     if ($null -ne $Sampler -and $Sampler.Enabled) {
         foreach ($m in $Folders) {
@@ -1858,11 +1895,6 @@ function Get-PreflightFindings {
         }
     }
 
-    # Teste 3 (rede interna): URL do speedtest fora do repositorio
-    if ($byFolder.Contains("3_rede") -and -not (Test-SpeedtestConfigured -HubRoot $HubRoot)) {
-        $findings.Add((New-PreflightFinding "Impede" $byFolder["3_rede"] "URL do speedtest interno nao configurada" "Defina HUB_SPEEDTEST_URL ou SpeedtestUrl no config.local.json (veja config.local.example.json)"))
-    }
-
     # Cargas de dev (7-11): ferramentas na versao minima do cargas.json
     $devFolders = @($byFolder.Keys | Where-Object { Test-Path -LiteralPath (Join-Path (Join-Path $TestsRoot $_) "cargas.json") })
     foreach ($folder in $devFolders) {
@@ -1900,9 +1932,29 @@ function Get-PreflightFindings {
         }
     }
 
-    # Internet: 3.1 (fast.com) e cargas de dev (clones, pacotes, imagens)
-    $netNames = @($byFolder.Keys | Where-Object { $_ -eq "3_rede_internet" -or $devFolders -contains $_ } | ForEach-Object { $byFolder[$_] })
-    if ($netNames.Count -gt 0 -and -not (Test-InternetReachable -HostName $Settings.InternetHost)) {
+    # Internet: sondada uma vez, so quando um teste selecionado precisa dela
+    $netNames = @($byFolder.Keys | Where-Object { $devFolders -contains $_ } | ForEach-Object { $byFolder[$_] })
+    $internetOk = $true
+    if ($netNames.Count -gt 0 -or $byFolder.Contains("3_rede")) {
+        $internetOk = [bool](Test-InternetReachable -HostName $Settings.InternetHost)
+    }
+
+    # Teste 3 (rede): mede o speedtest interno (URL fora do repositorio) e o
+    # fast.com. Uma fonte fora vira so aviso no teste; as duas fora = FAIL.
+    if ($byFolder.Contains("3_rede")) {
+        $semUrl = -not (Test-SpeedtestConfigured -HubRoot $HubRoot)
+        $acaoUrl = "Defina HUB_SPEEDTEST_URL ou SpeedtestUrl no config.local.json (veja config.local.example.json)"
+        if ($semUrl -and -not $internetOk) {
+            $findings.Add((New-PreflightFinding "Impede" $byFolder["3_rede"] "Rede: URL do speedtest interno nao configurada e sem acesso a internet ($($Settings.InternetHost):443) -- nenhuma das duas fontes pode ser medida" $acaoUrl))
+        } elseif ($semUrl) {
+            $findings.Add((New-PreflightFinding "Atencao" $byFolder["3_rede"] "Rede: URL do speedtest interno nao configurada -- so a internet (fast.com) sera medida" $acaoUrl))
+        } elseif (-not $internetOk) {
+            $findings.Add((New-PreflightFinding "Atencao" $byFolder["3_rede"] "Rede: sem acesso a internet ($($Settings.InternetHost):443) -- so o speedtest interno sera medido" "Verifique a rede/proxy antes de iniciar"))
+        }
+    }
+
+    # Cargas de dev (clones, pacotes, imagens)
+    if ($netNames.Count -gt 0 -and -not $internetOk) {
         $findings.Add((New-PreflightFinding "Atencao" $netNames "Sem acesso a internet ($($Settings.InternetHost):443)" "Verifique a rede/proxy antes de iniciar"))
     }
 
@@ -2012,7 +2064,7 @@ function Get-TestLeftovers {
     $edge = @($procs | Where-Object { $_.Name -match '^msedge\.exe$' -and ([string]$_.CommandLine -match '--enable-automation' -or $drvPids -contains [int]$_.ParentProcessId) })
     $edgePids = @($drv | ForEach-Object { $_.ProcessId }) + @($edge | ForEach-Object { $_.ProcessId })
     if ($edgePids.Count -gt 0) {
-        & $add "edge" "Edge da automacao" "$($drv.Count) msedgedriver, $($edge.Count) msedge" $edgePids @("1_cpu_memo", "3_rede", "3_rede_internet", "5_bateria", "6_wifi_fast_transition")
+        & $add "edge" "Edge da automacao" "$($drv.Count) msedgedriver, $($edge.Count) msedge" $edgePids @("1_cpu_memo", "3_rede", "5_bateria", "6_wifi_fast_transition")
     }
 
     # Python rodando um script de Testes\ (o hub roda um teste por vez; fora

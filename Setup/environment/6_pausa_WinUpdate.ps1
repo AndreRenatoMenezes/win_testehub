@@ -32,10 +32,25 @@ try {
     Set-ItemProperty -Path $registryPath -Name "PauseQualityUpdatesStartTime" -Value $pausaInicio -ErrorAction Stop
     Set-ItemProperty -Path $registryPath -Name "PauseQualityUpdatesExpiryTime" -Value $pausaFim -ErrorAction Stop
 
+    # Delivery Optimization sem ponto a ponto (DODownloadMode 0 = HTTP apenas):
+    # o Windows deixa de enviar e receber atualizacoes de outras maquinas em
+    # segundo plano -- trafego que contaminaria o teste de rede (3_rede).
+    $doPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization"
+    if (-not (Test-Path $doPath)) {
+        New-Item -Path $doPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $doPath -Name "DODownloadMode" -Value 0 -Type DWord -ErrorAction Stop
+    $doModo = (Get-ItemProperty -Path $doPath -Name "DODownloadMode" -ErrorAction Stop).DODownloadMode
+    if ($doModo -ne 0) {
+        throw "DODownloadMode ficou em $doModo (esperado 0)"
+    }
+
     # Opcional: Reinicia o serviço de update para garantir que o sistema leia o registro imediatamente
     Restart-Service -Name "wuauserv" -Force -ErrorAction SilentlyContinue
+    Restart-Service -Name "DoSvc" -Force -ErrorAction SilentlyContinue
 
     Write-Output "[SUCESSO] Windows Update pausado por $DiasParaPausar dias (Expira em: $pausaFim UTC)."
+    Write-Output "[SUCESSO] Delivery Optimization sem ponto a ponto (DODownloadMode = $doModo, HTTP apenas)."
     exit 0 # Retorna código de sucesso para o Hub
 
 } catch {

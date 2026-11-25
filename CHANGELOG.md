@@ -8,12 +8,22 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- **Teste de rede unificado (`3_teste_rede.py`):** o speedtest interno e o fast.com são medidos no mesmo teste, em rodadas intercaladas (10 de cada + 1 de aquecimento, configurável no bloco `Rede` do `config.json` ou com `HUB_REDE_RODADAS`). O resultado por fonte é a **mediana**, com P25, P75, CV % e `Estavel` (CV do download e do upload até 10%). Uma fonte fora do ar (URL não configurada, fast.com bloqueado, 3 falhas seguidas) vira **aviso**: o teste passa quando pelo menos uma fonte tem 8 ou mais rodadas válidas.
+- **Menos variação na medição de rede:**
+  - o interno espera o fim real do speedtest ("All done"), e não mais 60 s fixos;
+  - o fast.com roda com duração e conexões fixas (20 s e 8, mínimo = máximo);
+  - cada fonte usa um Edge com perfil temporário;
+  - antes de cada rodada, o tráfego de fundo da interface é medido por 5 s, e acima de 1000 kbps a rodada fica fora da estatística (contaminada);
+  - cada rodada registra cabo/Wi-Fi, o link e, no Wi-Fi, banda, canal, sinal e BSSID; o ping ICMP ao servidor interno é medido à parte.
+  - Os avisos de fonte off/parcial, de medição instável, de Wi-Fi e de troca de AP vão para o `_relatorio`.
+- **Setup 6:** também desliga o compartilhamento ponto a ponto do Delivery Optimization (`DODownloadMode = 0`), que gerava tráfego de atualizações em segundo plano.
+
 - **Checagem antes da fila:** depois de escolher os testes, o hub confere só o que eles precisam e mostra no resumo pré-execução o que vai falhar (`[X]`: `.wpaProfile` dos módulos 1 e 5 ausente, `wpr`/`wpaexporter` fora do PATH, URL do speedtest não configurada, ferramenta de dev ausente ou abaixo da mínima do `cargas.json`, `podman machine` desligada, notebook na bateria nas cargas de dev) e o que pode comprometer a medição (`[!]`: bateria, sem internet, pouco disco, processo usando muita CPU). Com `[X]`, o `Enter` não inicia: `R` tira os testes afetados, `C` continua mesmo assim, `Esc` volta. A escolha fica no log, e cada teste tirado com `R` entra nos avisos da rodada com o motivo.
 - **Sobras de teste:** a checagem aponta processos que testes anteriores deixaram abertos (sessão do WPR, Edge da automação, `wpaexporter`, `diskspd`, Python de `Testes\`, build servers do .NET, stack do módulo 10, `podman machine`) e `F` os encerra do jeito certo de cada um (`wpr -cancel`, `podman compose down -v`...). Os build servers do .NET aparecem só como aviso antes da fila (podem ser do Visual Studio). Entre um teste e outro, o hub encerra sozinho as sobras do teste que acabou, incluindo os build servers do teste 7, só entre os processos que o próprio teste abriu.
 - **Avisos da rodada no `_relatorio.html`/`.json`:** checagem, sobras encerradas, módulo sem evidência na exportação, CSV temático faltando, carga de dev com status diferente de OK (com o motivo), carga sensível à rede e throttling. Os avisos ficam no `_state.json` e se acumulam entre runs.
 - **Frequência da CPU por módulo:** `<módulo>/frequencia_cpu.csv` com uso, desempenho, MHz efetivo e temperatura ACPI a cada 5 s, resumido no `_relatorio` (MHz médio, início/fim sob carga, queda). Queda acima de 20% vira aviso de throttling. Configurável na seção `CpuSampler` do `config.json`; não roda nos setups nem no teste 5.
 - **Setup 7 com plano B:** quando o winget não executa na conta (ex.: sessão elevada com outra conta) ou não resolve um item, o setup baixa o instalador oficial e só o executa com assinatura digital válida do fabricante (Git, .NET SDK, Go) ou com o SHA256 publicado no release (uv, docker-compose). A tabela final mostra status, via e versão de cada ferramenta, e o que faltar sai com o mesmo texto da checagem antes da fila. O PATH da máquina é alterado pelo registro, preservando `%SystemRoot%` e o tipo `REG_EXPAND_SZ`.
-- Testes de regressão no CI: `Test-Preflight.ps1`, `Test-RunWarnings.ps1`, `Test-LiteralPath.ps1`, `Test-Setup7Verificacao.ps1` e `test_reparar_texto.py`.
+- Testes de regressão no CI: `Test-Preflight.ps1`, `Test-RunWarnings.ps1`, `Test-LiteralPath.ps1`, `Test-Setup7Verificacao.ps1` e `test_rede_estatistica.py` (este cobre também o reparo dos nomes de servidor do fast.com).
 
 - **Pasta `Exportar/` pronta para o Drive:** ao fim de cada execução, o hub gera `Exportar/<cenário>/<modelo> - <patrimônio>/`, uma cópia de `Traces/` sem os arquivos `.etl` (200 a 400 MB cada), sem `.log`, sem pastas `logs/` e sem pastas vazias. `Traces/` não é alterada. O hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora, e avisa quando um módulo some da exportação por ter só `.etl` e logs (ex.: `1_cpu_memo` sem o `.wpaProfile`). Isso substitui a limpeza manual antes de subir as evidências.
 - **Modelo e patrimônio/serial na criação do cenário:** além do nome, o hub pergunta o modelo e o patrimônio da máquina, que ficam no `_state.json`, nomeiam a pasta de exportação e aparecem no `_relatorio.json`/`.html` e no `maquina.csv`. Cenários antigos perguntam os dois uma única vez.
@@ -27,6 +37,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Alterado
 
+- **Incompatível — teste 3.1 removido:** o `Testes/3_rede_internet/3-1_teste_rede_internet.py` foi incorporado ao `3_teste_rede.py`. A pasta `3_rede_internet/` e o `rede_internet.csv` deixam de ser gerados. O `rede.csv` muda de formato (`Versao_Teste = 2.0`, blocos `Interno_*` e `Internet_*`, mediana no lugar da média como número principal) e o `resultado_afericoes.csv` passa a ter uma linha por rodada das duas fontes, com a coluna `Fonte`. Quem lê esses CSVs (ex.: `relatorio_lab`) precisa se adaptar. Cenários antigos continuam abrindo, com o 3.1 como histórico.
+- **Checagem antes da fila no teste 3:** sem a URL interna ou sem internet passa a ser **Atenção** (a outra fonte é medida); só as duas juntas são **Impede**.
 - **Fim da pasta `Resultados/`:** o hub não gera mais `Resultados/<cenário>/`. A chave `Paths.ResultadosDir` do `config.json` vira `Paths.ExportarDir` (um `config.json` antigo continua funcionando, com `Exportar` como padrão).
   - `maquina.csv` passa a ser gravado em `Traces/`, com o modelo e o patrimônio informados. Ele é o único lugar com fabricante, modelo e serial do equipamento.
   - `cenario.csv` deixa de existir: os mesmos dados estão em `_relatorio.csv`/`.json` e `_state.json`. A coluna "Exit Code" dele gravava o número da run por engano.

@@ -78,8 +78,8 @@ jobs:
       - name: Compila todos os scripts
         run: python -m compileall -q Testes/ docs/
 
-      - name: Teste de regressão (reparo do nome do servidor no teste 3.1)
-        run: python -I -X utf8 .github/scripts/test_reparar_texto.py
+      - name: Teste de regressão (cálculos do teste de rede unificado)
+        run: python -I -X utf8 .github/scripts/test_rede_estatistica.py
 
       - name: HTML da documentação em sincronia com o Markdown
         run: python docs/gerar_html.py --check

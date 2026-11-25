@@ -446,10 +446,13 @@ li {
 </ul>
 <p>Para as <strong>cargas de desenvolvimento (Módulos 7 a 11)</strong>, os setups <code>7_install_devtools_dev</code> e <code>10_preparar_podman</code> instalam Git, .NET SDK 10, Go, uv, docker-compose, WSL2 e Podman (veja a seção 4.8).</p>
 <h3 id="23-rede-técnico">2.3 Rede <span class="tag tag-tecnico">Técnico</span></h3>
+<p>O teste de rede (<code>3_teste_rede.py</code>, ~20 min) mede <strong>duas fontes em rodadas intercaladas</strong>, 10 de cada mais 1 de aquecimento:</p>
 <ul>
-<li>O teste de rede acessa o servidor de speedtest interno, cuja URL fica fora do repositório: chave <code>SpeedtestUrl</code> do <code>config.local.json</code> na raiz do hub (modelo em <code>config.local.example.json</code>) ou variável de ambiente <code>HUB_SPEEDTEST_URL</code>. Verifique se a máquina tem acesso a essa URL antes de executar o módulo de rede.</li>
-<li>O teste complementar de rede na internet (<code>3-1_teste_rede_internet.py</code>) acessa <code>https://fast.com/</code> (Netflix). Os domínios <code>fast.com</code>, <code>api.fast.com</code> e <code>*.oca.nflxvideo.net</code> — ou a categoria "speedtest" — precisam estar liberados na política do agente zero trust/proxy; caso contrário, o teste falha com "site inacessível ou bloqueado".</li>
-<li>Esse teste registra no CSV o <strong>IP público de saída</strong> e a localização vistos pelo fast.com, como evidência do caminho percorrido pelo tráfego (com o agente ativo, devem ser os do nó de saída do agente).</li>
+<li><strong>Speedtest interno:</strong> a URL fica fora do repositório, na chave <code>SpeedtestUrl</code> do <code>config.local.json</code> na raiz do hub (modelo em <code>config.local.example.json</code>) ou na variável de ambiente <code>HUB_SPEEDTEST_URL</code>. Verifique se a máquina tem acesso a essa URL.</li>
+<li><strong>Internet (<code>https://fast.com/</code>, Netflix):</strong> os domínios <code>fast.com</code>, <code>api.fast.com</code> e <code>*.oca.nflxvideo.net</code>, ou a categoria "speedtest", precisam estar liberados na política do agente zero trust/proxy. O teste registra o <strong>IP público de saída</strong> e a localização vistos pelo fast.com, como evidência do caminho do tráfego (com o agente ativo, devem ser os do nó de saída do agente).</li>
+<li><strong>Uma fonte fora do ar vira só aviso:</strong> o teste passa quando pelo menos uma das duas mede ok, e o motivo da outra aparece nos avisos da rodada.</li>
+<li><strong>Para comparar hardware, use cabo.</strong> No Wi-Fi o teste registra banda, canal, sinal e AP de cada rodada e avisa no relatório. No Windows 11, o <code>netsh</code> só informa esses campos com a permissão de <strong>Localização</strong> ligada.</li>
+<li>Para um teste rápido (ex.: conferir o acesso), defina <code>HUB_REDE_RODADAS=2</code> antes de abrir o hub.</li>
 </ul>
 <h3 id="24-estrutura-de-pastas-esperada-técnico">2.4 Estrutura de Pastas Esperada <span class="tag tag-tecnico">Técnico</span></h3>
 <pre><code>C:\TesteHub\
@@ -587,8 +590,6 @@ li {
 [X] 2-1_teste_disco_dlp            [PY]   pendente
 -- Rede ------------------------------------
 [X] 3_teste_rede                   [PY]   pendente
--- Rede Internet ---------------------------
-[X] 3-1_teste_rede_internet        [PY]   pendente
 -- Boot Shutdown ---------------------------
 [X] 4_boot_shutdown_auto           [PY]   pendente
 -- Bateria ---------------------------------
@@ -611,7 +612,7 @@ li {
 <pre><code>[ ] 1_automacao_performance        [PY]   PASS  (361.5s)
 [ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
 [X] 3_teste_rede                   [PY]   pendente
-[X] 3-1_teste_rede_internet        [PY]   pendente
+[X] 4_boot_shutdown_auto           [PY]   pendente
 </code></pre>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot do menu checkbox com testes e status<br><em>Salvar como: img/placeholder-menu-testes.png</em></div>
 <h3 id="43-controles-do-menu">4.3 Controles do Menu</h3>
@@ -847,7 +848,7 @@ li {
 <li><strong><code>[X]</code> Impede:</strong> o teste vai falhar com certeza.<ul>
 <li>Falta o <code>Agentes_SI_Profile.wpaProfile</code> (módulo 1) ou o <code>Agentes_SI_Bateria_Profile.wpaProfile</code> (módulo 5) na pasta do teste. Esses arquivos não são versionados.</li>
 <li>Falta o <code>wpr.exe</code> ou o <code>wpaexporter.exe</code> (módulos 1 e 5).</li>
-<li>A URL do speedtest interno não está configurada (módulo 3).</li>
+<li>A URL do speedtest interno não está configurada <strong>e</strong> não há internet (módulo 3: nenhuma das duas fontes pode ser medida).</li>
 <li>Falta uma ferramenta de dev, ou ela está abaixo da versão mínima do <code>cargas.json</code> (módulos 7 a 11). A ação manda rodar o Setup 7 ou o Setup 10.</li>
 <li>A <code>podman machine</code> está desligada (módulo 10).</li>
 <li>O notebook está na bateria (módulos 7 a 11, que dão FAIL fora da tomada).</li>
@@ -855,7 +856,8 @@ li {
 </li>
 <li><strong><code>[!]</code> Atenção:</strong> o teste roda, mas a medição pode sair comprometida.<ul>
 <li>Notebook na bateria (demais testes; o teste 5 é o único que deve rodar na bateria).</li>
-<li>Sem internet (módulos 3.1 e 7 a 11).</li>
+<li>Sem internet (módulos 3 e 7 a 11). No módulo 3, só o speedtest interno será medido.</li>
+<li>A URL do speedtest interno não está configurada (módulo 3: só a internet será medida).</li>
 <li>Pouco espaço livre no disco do hub (padrão: menos de 20 GB).</li>
 <li><strong>Sobra de teste:</strong> um processo que um teste abriu e não fechou direito, consumindo recursos.</li>
 <li>Processo qualquer usando muita CPU (os 5 maiores acima de 10% de um núcleo). Só aviso: o hub <strong>nunca</strong> encerra processos que não são de teste.</li>
@@ -971,8 +973,7 @@ li {
         ├── 1_cpu_memo/                      # Evidências do Módulo 1
         │   └── dlp_usb/                     # Evidências da variante 1-1
         ├── 2_disco/                         # Evidências do Módulo 2 e da variante 2-1
-        ├── 3_rede/
-        ├── 3_rede_internet/
+        ├── 3_rede/                          # Speedtest interno + fast.com (rede.csv)
         ├── 4_boot_shutdown/
         ├── 5_bateria/                       # Pré-voo, amostras, traces, bateria.csv
         ├── 6_wifi_fast_transition/
@@ -1193,9 +1194,9 @@ Exportar/
 <td>O Edge é nativo do Windows 10/11 — reinstale/repare o Microsoft Edge pelo site oficial da Microsoft</td>
 </tr>
 <tr>
-<td>Teste de rede falha com "URL do speedtest interno não configurada"</td>
+<td>Teste de rede com aviso "speedtest interno off -- URL do speedtest interno nao configurada"</td>
 <td><code>config.local.json</code> ausente ou sem a chave <code>SpeedtestUrl</code></td>
-<td>Crie o <code>config.local.json</code> a partir do <code>config.local.example.json</code> (veja a seção 7.3)</td>
+<td>Crie o <code>config.local.json</code> a partir do <code>config.local.example.json</code> (veja a seção 7.3). Só a internet foi medida</td>
 </tr>
 <tr>
 <td>Teste de rede falha com "Falha ao iniciar o Microsoft Edge via Selenium"</td>
@@ -1203,14 +1204,19 @@ Exportar/
 <td>Verifique o acesso da máquina ao CDN de drivers do Edge, ou coloque um <code>msedgedriver.exe</code> compatível no <code>PATH</code></td>
 </tr>
 <tr>
-<td>Teste de rede internet falha com "site inacessível ou bloqueado"</td>
+<td>Teste de rede com aviso "internet (fast.com) off -- fast.com bloqueado"</td>
 <td>Política do agente zero trust/proxy bloqueando o fast.com (ou a categoria speedtest), ou máquina sem acesso à internet</td>
-<td>Libere <code>fast.com</code>, <code>api.fast.com</code> e <code>*.oca.nflxvideo.net</code> na política; confira a tela capturada em <code>Evidencia_Internet_Bloqueio_*.png</code> e o log <code>teste_rede_internet_*.log</code></td>
+<td>Libere <code>fast.com</code>, <code>api.fast.com</code> e <code>*.oca.nflxvideo.net</code> na política; confira a tela capturada em <code>Evidencia_Rede_Internet_Bloqueio_*.png</code> e o log <code>teste_rede_*.log</code>. O speedtest interno continua sendo medido</td>
 </tr>
 <tr>
-<td>Teste de rede internet com menos de 5 aferições válidas</td>
-<td>Rede instável ou medição sem concluir em 120 s</td>
-<td>Verifique a conexão e o log; os valores ausentes aparecem como <code>N/A</code> em <code>resultado_afericoes_internet.csv</code></td>
+<td>Teste de rede com aviso de fonte "parcial" ou "instavel"</td>
+<td>Rodadas que falharam, passaram de 120 s ou foram contaminadas por tráfego de fundo; ou CV acima de 10%</td>
+<td>Veja as colunas <code>Status</code>, <code>Motivo</code> e <code>Contaminada</code> no <code>resultado_afericoes.csv</code>. Prefira cabo, feche o que estiver baixando (atualizações) e repita</td>
+</tr>
+<tr>
+<td>Teste de rede FAIL</td>
+<td>Nenhuma das duas fontes terminou ok</td>
+<td>Confira os motivos no <code>rede.csv</code> (<code>Interno_Motivo</code>, <code>Internet_Motivo</code>) e no log</td>
 </tr>
 <tr>
 <td>Teste de disco falha rapidamente</td>

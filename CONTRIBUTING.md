@@ -22,7 +22,7 @@ O `hub.ps1` procura **recursivamente** por arquivos `*.ps1` e `*.py` em duas pas
 
 - Os scripts aparecem no menu ordenados pelo nome do arquivo, em **ordem numérica natural** (`9_` antes de `10_`), e agrupados pela pasta-mãe.
 - O rótulo do grupo vem do nome da pasta, sem o prefixo numérico: `5_bateria` → **Bateria**.
-- **Todo** `.ps1`/`.py` dessas pastas vira item do menu. Um script auxiliar (chamado por outro, e não pelo operador) precisa entrar na lista `-Exclude` da função `Get-Scripts` no `hub.ps1`, como já acontece com `boot_shutdown_duration.ps1` e com a biblioteca `Testes/_lib/dev_cargas.py`.
+- **Todo** `.ps1`/`.py` dessas pastas vira item do menu. Bibliotecas comuns ficam em `Testes/_lib/` (`dev_cargas.py`, `rede_calc.py`), que a função `Get-Scripts` do `hub.ps1` ignora inteira. Outro script auxiliar (chamado por outro, e não pelo operador) precisa entrar na lista de exclusão da `Get-Scripts`, como já acontece com `boot_shutdown_duration.ps1`.
 
 ## Contrato de um script
 

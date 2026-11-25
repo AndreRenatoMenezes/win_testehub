@@ -4,6 +4,8 @@
 #  Add-RunWarning acumula avisos por run no _state.json (sem duplicar);
 #  Get-EmptyExportModules ignora o frequencia_cpu.csv do proprio hub;
 #  Get-DevCsvWarnings acusa carga com status != OK e carga sensivel a rede;
+#  Get-NetworkWarnings le o rede.csv do teste 3 (fonte off/parcial, instavel,
+#  Wi-Fi, roaming);
 #  Get-CpuFrequencySummary mede a queda so sob carga; Build-ConsolidatedReport
 #  grava "Avisos da rodada" e a frequencia no _relatorio.html/.json; o
 #  amostrador (Start-Job) grava o CSV e para.
@@ -16,7 +18,7 @@ $ErrorActionPreference = "Stop"
 $hubPath = (Resolve-Path $HubPath).Path
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($hubPath, [ref]$null, [ref]$null)
 foreach ($nome in "Get-NaturalSortKey", "Get-StateField", "Get-LatestTestResults", "Get-RunWarnings", "Add-RunWarning",
-                "Get-EmptyExportModules", "Get-DevCsvWarnings", "Get-Median", "Get-CpuFrequencySummary",
+                "Get-EmptyExportModules", "Get-DevCsvWarnings", "Get-NetworkWarnings", "Get-Median", "Get-CpuFrequencySummary",
                 "Add-EndOfRunWarnings", "Build-ConsolidatedReport", "Start-CpuSampler", "Stop-CpuSampler", "Test-CpuSamplingEnabled") {
     $fn = $ast.FindAll({
         param($node)
@@ -100,6 +102,47 @@ try {
     Assert-Condition ($fail.Count -eq 1 -and $fail[0].Texto -match 'A7b-podman-compose-healthy: FAIL -- timeout') "carga FAIL com motivo; subparte ignorada"
     Assert-Condition ($net.Count -eq 1 -and $net[0].Texto -match 'A7a') "carga sensivel a rede acusada"
     Assert-Condition (@(Get-DevCsvWarnings -TraceRunDir $traces -Folders @("2_disco")).Count -eq 0) "modulo fora da lista nao gera aviso"
+
+    Section "Get-NetworkWarnings (teste 3)"
+    New-Item -ItemType Directory -Path (Join-Path $traces "3_rede") -Force | Out-Null
+    $redeCsv = Join-Path $traces "3_rede\rede.csv"
+    Assert-Condition (@(Get-NetworkWarnings -TraceRunDir $traces).Count -eq 0) "sem rede.csv -> sem aviso"
+    [System.IO.File]::WriteAllLines($redeCsv, @("Metrica,Valor,Unidade", "Download_Media,80.00,Mbps"), (New-Object System.Text.UTF8Encoding($false)))
+    Assert-Condition (@(Get-NetworkWarnings -TraceRunDir $traces).Count -eq 0) "rede.csv antigo (sem Versao_Teste) -> ignorado"
+    $linhas = @(
+        "Metrica,Valor,Unidade", "Versao_Teste,2.0,texto", "Conexao_Tipo,wifi,texto", "Roaming,nao,texto",
+        "Interno_Status,ok,texto", "Interno_Motivo,N/A,texto", "Interno_Estavel,nao,texto",
+        "Interno_Download_CV,14.20,%", "Interno_Upload_CV,4.10,%",
+        "Internet_Status,off,texto", '"Internet_Motivo","fast.com bloqueado: interface de medicao nao carregou em 30s",texto',
+        "Internet_Estavel,N/A,texto"
+    )
+    [System.IO.File]::WriteAllLines($redeCsv, $linhas, (New-Object System.Text.UTF8Encoding($false)))
+    $nw = @(Get-NetworkWarnings -TraceRunDir $traces)
+    Assert-Condition ($nw.Count -eq 3 -and @($nw | Where-Object { $_.Fonte -ne "rede" }).Count -eq 0) "internet off, interno instavel e Wi-Fi -> 3 avisos 'rede' (obtido $($nw.Count))"
+    Assert-Condition (@($nw | Where-Object { $_.Texto -match 'internet \(fast\.com\) off -- fast\.com bloqueado' }).Count -eq 1) "fonte off com o motivo"
+    Assert-Condition (@($nw | Where-Object { $_.Texto -match 'speedtest interno instavel \(CV download 14\.20%' }).Count -eq 1) "fonte instavel com o CV"
+    Assert-Condition (@($nw | Where-Object { $_.Texto -match 'Wi-Fi' }).Count -eq 1) "medicao no Wi-Fi"
+    $linhas[3] = "Roaming,sim,texto"; $linhas += "Roaming_Rodadas,Internet 4,texto"; $linhas[2] = "Conexao_Tipo,cabo,texto"; $linhas[6] = "Interno_Estavel,sim,texto"; $linhas[9] = "Internet_Status,ok,texto"
+    [System.IO.File]::WriteAllLines($redeCsv, $linhas, (New-Object System.Text.UTF8Encoding($false)))
+    $nw = @(Get-NetworkWarnings -TraceRunDir $traces)
+    Assert-Condition ($nw.Count -eq 1 -and $nw[0].Texto -match 'trocou de AP.*antes de: Internet 4') "cabo, estavel, ok e roaming -> so o aviso de roaming, com a rodada"
+    $stR = [PSCustomObject]@{ runs = @() }
+    Add-EndOfRunWarnings -State $stR -Run 2 -TraceRunDir $traces -Folders @("2_disco") -Sampler $null
+    Assert-Condition (@(Get-RunWarnings -State $stR | Where-Object { $_.texto -match '3_rede' }).Count -eq 0) "teste 3 fora da run -> rede.csv nao gera aviso"
+    Add-EndOfRunWarnings -State $stR -Run 2 -TraceRunDir $traces -Folders @("3_rede") -Sampler $null
+    Assert-Condition (@(Get-RunWarnings -State $stR | Where-Object { $_.texto -match 'trocou de AP' }).Count -eq 1) "teste 3 na run -> aviso no _state"
+    Remove-Item -LiteralPath (Join-Path $traces "3_rede") -Recurse -Force
+
+    Section "Cenario antigo com o teste 3.1 (removido na unificacao)"
+    $stOld = [PSCustomObject]@{ scenario = "c"; machine = "m"; createdAt = "c"; lastRunAt = "l"; runs = @(
+        [PSCustomObject]@{ runId = 1; timestamp = "t"; tests = @(
+            [PSCustomObject]@{ name = "3_teste_rede.py"; folder = "3_rede"; status = "PASS"; duration = 300 },
+            [PSCustomObject]@{ name = "3-1_teste_rede_internet.py"; folder = "3_rede_internet"; status = "PASS"; duration = 200 }) }) }
+    $latestOld = Get-LatestTestResults -State $stOld
+    Assert-Condition ($latestOld.Count -eq 2 -and $latestOld["3-1_teste_rede_internet.py"].status -eq "PASS") "historico do 3.1 continua legivel"
+    $tOld = Join-Path $root "TOld"; New-Item -ItemType Directory -Path $tOld -Force | Out-Null
+    Build-ConsolidatedReport -TraceRunDir $tOld -State $stOld
+    Assert-Condition ((Get-Content -LiteralPath (Join-Path $tOld "_relatorio.html") -Raw) -match '3-1_teste_rede_internet') "relatorio de cenario antigo gerado com o 3.1 como historico"
 
     Section "Get-CpuFrequencySummary"
     $fc = Join-Path $root "freq.csv"
