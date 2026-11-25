@@ -112,10 +112,10 @@ try {
 
     $f = Get-F @($tRede)
     Assert-Condition ((Find-Item $f 'speedtest').Count -eq 1) "teste 3 sem URL do speedtest -> Impede"
-    Set-Content -LiteralPath (Join-Path $hub "config.local.json") -Value '{"SpeedtestUrl":"https://10.0.0.1/"}'
+    Set-Content -LiteralPath (Join-Path $hub "config.local.json") -Value '{"SpeedtestUrl":"https://speedtest.example.invalid/"}'
     Assert-Condition ((Find-Item (Get-F @($tRede)) 'speedtest').Count -eq 0) "SpeedtestUrl no config.local.json -> sem achado"
     Remove-Item -LiteralPath (Join-Path $hub "config.local.json")
-    $env:HUB_SPEEDTEST_URL = "https://10.0.0.1/"
+    $env:HUB_SPEEDTEST_URL = "https://speedtest.example.invalid/"
     Assert-Condition ((Find-Item (Get-F @($tRede)) 'speedtest').Count -eq 0) "HUB_SPEEDTEST_URL -> sem achado"
     $env:HUB_SPEEDTEST_URL = ""
 
