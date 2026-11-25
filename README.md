@@ -50,8 +50,7 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 | 1.1 | CPU e Memória — DLP/USB | `1-1_automacao_performance_dlp.py` | Variante do Módulo 1: cópias para pendrive durante a captura, para medir o custo do agente de DLP | 5 ciclos de 60 s | os ciclos terminam sem erro |
 | 2 | Disco | `2_teste_disco.py` | Leitura e escrita sequenciais com DiskSpd (bloco de 1 MB, arquivo de 8 GB), 10 baterias | ~25 min | as 10 baterias terminam e o CSV é gerado |
 | 2.1 | Disco — DLP/USB | `2-1_teste_disco_dlp.py` | Cópia PC ↔ pendrive de um arquivo de 2 GB, 5 baterias | 5 baterias | as baterias terminam sem erro |
-| 3 | Rede (interna) | `3_teste_rede.py` | Download, upload, ping e jitter num speedtest interno, 5 aferições | ~6 min | as 5 aferições são capturadas |
-| 3.1 | Rede (internet) | `3-1_teste_rede_internet.py` | As mesmas métricas no fast.com, pelo caminho real do tráfego (proxy/zero trust), mais o IP público de saída | ~3 min | as 5 aferições são válidas |
+| 3 | Rede | `3_teste_rede.py` | Download, upload, ping e jitter no speedtest interno **e** no fast.com (caminho real do tráfego, com proxy/zero trust), 10 rodadas intercaladas de cada + aquecimento. Mediana, quartis e CV por fonte, tráfego de fundo e cabo/Wi-Fi por rodada | ~20 min | pelo menos uma fonte com ≥ 8 rodadas válidas (a outra fora do ar vira aviso) |
 | 4 | Boot e Shutdown | `4_boot_shutdown_auto.py` | 5 reinícios automáticos e análise dos eventos 100/200 do `Diagnostics-Performance` | ~30–40 min | nenhum boot ou shutdown crítico (> 60 s) no dia |
 | 5 | Bateria | `5_teste_bateria.py` | 60 min ociosa + 60 min de escritório na bateria, com pré-voo de padronização, WPR, SRUM e relatório de energia | ~2h20–2h40 | a coleta é válida nas duas fases |
 | 6 | Wi-Fi Fast Transition | `6_teste_fast_transition.py` | Roaming 802.11r durante uma caminhada de 5 min, com painel ao vivo e inventário de APs | ~7 min | ≥ 1 troca de AP com FT |
@@ -255,13 +254,12 @@ Ao criar um cenário, o hub pergunta o **nome do cenário**, o **modelo** e o **
 ├── Testes/                    # um módulo por pasta (N_categoria/)
 │   ├── 1_cpu_memo/
 │   ├── 2_disco/               # inclui diskspd.exe (MIT)
-│   ├── 3_rede/
-│   ├── 3_rede_internet/
+│   ├── 3_rede/                # speedtest interno + fast.com
 │   ├── 4_boot_shutdown/
 │   ├── 5_bateria/
 │   ├── 6_wifi_fast_transition/
 │   ├── 7_dev_dotnet/ … 11_dev_git_arquivos/   # cargas de dev (cargas.json + referencia.json)
-│   └── _lib/                  # biblioteca comum dos módulos 7 a 11 (fora do menu)
+│   └── _lib/                  # bibliotecas (fora do menu): dev_cargas.py (7 a 11) e rede_calc.py (3)
 ├── docs/                      # manual e metodologia (.md = fonte; .html gerado por gerar_html.py)
 │   └── assets/brand/          # logo, ícone, favicon e imagem de prévia do repositório
 └── .github/                   # CI, Dependabot e modelos de issue e de PR

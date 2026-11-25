@@ -35,7 +35,7 @@ O **WinTestHub** (Hardware Test Hub) é um framework de validação de hardware 
 **O que é testado:**
 - Desempenho de CPU e memória sob estresse sustentado
 - Velocidade de leitura e escrita do disco principal
-- Velocidade de conexão de rede (download, upload, latência, jitter)
+- Velocidade de conexão de rede (download, upload, latência, jitter) no speedtest interno e na internet (fast.com)
 - Tempo de inicialização (boot) e desligamento (shutdown) do Windows
 - Consumo de energia na bateria (máquina ociosa e sob carga de escritório) e autonomia projetada
 - Roaming Wi-Fi entre APs com Fast Transition (802.11r) e compatibilidade de adaptador, driver e BIOS
@@ -160,7 +160,7 @@ Padronizar a configuração da máquina de teste antes da execução dos módulo
 | `3_softwares_msStore` | Instala via winget o Windows ADK, o CrystalDiskMark e o CrystalDiskInfo | Garante as ferramentas auxiliares necessárias |
 | `4_install_python` | Instala o Python 3.12 oficial e remove o alias da Microsoft Store | Pré-requisito para os scripts de teste em Python |
 | `5_install_py_dependencies` | Cria `.venv` e instala pacotes Python | Isola dependências e garante versões corretas |
-| `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias | Evita downloads e reinicializações durante testes |
+| `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias e desliga o compartilhamento ponto a ponto do Delivery Optimization (`DODownloadMode = 0`) | Evita downloads, reinicializações e tráfego de atualizações em segundo plano durante os testes (inclusive o de rede) |
 | `7_install_devtools_dev` | Instala Git, .NET SDK 10, Go, uv e docker-compose (idempotente). Via winget; quando o winget não executa na conta (ex.: sessão elevada com outra conta) ou não resolve um item, baixa o instalador oficial e só o executa com assinatura digital válida do fabricante (Git, .NET, Go) ou com o SHA256 publicado no release (uv, docker-compose) | Ferramentas exigidas pelos módulos 7 a 11 |
 | `8_enable_diagnostics` | Desativa a Inicialização Rápida e habilita os serviços DPS e SysMain e a política WDI de diagnóstico de boot | Necessário para o teste de boot/shutdown (eventos 100 e 200 no Event Log) |
 | `9_AdicionarTecladoUSInt` | Adiciona o layout de teclado EUA-Internacional ao idioma pt-BR | Padronização de ambiente |
@@ -364,56 +364,104 @@ Se o DLP bloquear a escrita, apagar o arquivo do pendrive ou negar a leitura, a 
 
 ### 6.1 Objetivo
 
-Aferir a velocidade de conexão de rede da máquina, medindo download, upload, latência (ping) e variação de latência (jitter) através de múltiplas aferições.
+Aferir a velocidade da conexão de rede da máquina por **dois caminhos**, nas mesmas condições:
+
+- **Interno:** o speedtest interno (OpenSpeedTest) do laboratório. Mede a rede corporativa até um servidor controlado e é a referência mais estável para comparar máquinas.
+- **Internet:** o fast.com (Netflix), pelo mesmo caminho do tráfego real do usuário. Em máquinas com agente **zero trust**, o tráfego para destinos internos pode não passar pelo agente (bypass ou túnel distinto), enquanto o tráfego para a internet passa pelo proxy/túnel e pela inspeção SSL. Esta fonte captura o impacto do agente na navegação.
+
+As duas fontes são medidas no mesmo teste, em **rodadas intercaladas**, para que uma mudança de condição da rede ao longo da execução afete as duas por igual. O script é `Testes/3_rede/3_teste_rede.py`. Os cálculos ficam em `Testes/_lib/rede_calc.py`.
 
 ### 6.2 Ferramenta Utilizada
 
-- **Microsoft Edge** via Selenium WebDriver — para acessar o servidor de speedtest
-- **Servidor de speedtest interno** (URL em `config.local.json` → `SpeedtestUrl`, não versionada) — ponto de medição padronizado
+- **Microsoft Edge** via Selenium WebDriver, com o driver obtido automaticamente pelo Selenium Manager. Cada fonte usa o **próprio Edge com perfil temporário** (sem cache, extensões nem sincronização), apagado no fim.
+- **Servidor de speedtest interno** (URL em `config.local.json` → `SpeedtestUrl`, ou `HUB_SPEEDTEST_URL`, não versionada). Só nesta fonte os erros de certificado são ignorados, porque o servidor é acessado por IP via HTTPS.
+- **fast.com** (Netflix): speedtest público, sem anúncios, que usa servidores de borda próximos ao cliente. Os erros de certificado **não** são ignorados: a inspeção SSL do agente atua como atuaria para o usuário. O teste grava no painel de configurações do site uma **duração fixa** (mínima = máxima, padrão 20 s) e um **número fixo de conexões paralelas** (padrão 8), no lugar do modo automático, que encurta ou alonga a medição conforme a rede.
+- **`ping.exe`** para a latência ICMP até o servidor interno, independente do navegador.
+- **`psutil`**, `Get-NetAdapter` e `netsh wlan` para o tráfego de fundo e a conexão de cada rodada.
+
+> **Nota:** o `speed.cloudflare.com` foi avaliado e descartado porque exige verificação antirrobô antes de iniciar a medição, o que impede a execução desassistida.
 
 ### 6.3 Procedimento
 
 | Etapa | Descrição | Duração |
 |-------|-----------|---------|
-| 1 | Abertura do Microsoft Edge via Selenium | ~5s |
-| 2 | Navegação para o servidor de speedtest | ~3s |
-| 3 | **Aferição** — clica em "Start" e aguarda conclusão | ~60 segundos |
-| 4 | Captura de screenshot como evidência | ~2s |
-| 5 | Extração de métricas via regex do texto da página | ~1s |
-| 6 | Repetição dos passos 3-5 por **5 aferições** | ~6 min total |
-| 7 | Geração de CSV consolidado | ~2s |
+| 1 | Abre um Edge por fonte. No da internet, grava a configuração fixa do fast.com | ~15 s |
+| 2 | Aguarda a rede acalmar: até 30 s com o tráfego de fundo abaixo do limite (o Edge recém-aberto baixa componentes) | 5–30 s |
+| 3 | **Rodadas intercaladas:** aquecimento interno, aquecimento internet, interno 1, internet 1, interno 2… até 10 de cada | ~18 min |
+| 4 | Gera o `resultado_afericoes.csv` e o `rede.csv` (regravados a cada rodada) | ~1 s |
+
+Cada rodada segue os passos abaixo:
+
+1. Lê a conexão ativa: interface, cabo ou Wi-Fi, velocidade do link e, no Wi-Fi, banda, canal, sinal e BSSID.
+2. Mede o **tráfego de fundo** da interface por 5 s, com nada rodando. Acima de 1000 kbps, a rodada fica marcada como **contaminada**.
+3. **Interno:** faz 10 pings ICMP ao servidor (se ele não responder a ping, o ICMP é desligado no restante da execução), abre o speedtest, inicia e espera o sinal de fim da própria página ("All done"), sem tempo fixo. O limite é de 120 s.
+4. **Internet:** abre o fast.com, que inicia sozinho, e espera download, latência e upload concluírem. O limite é de 120 s.
+5. Lê as métricas na página, salva o screenshot e deixa o Edge daquela fonte em página em branco, para ele não gerar tráfego durante a rodada da outra.
+
+A 1ª rodada de cada fonte é **aquecimento**: fica registrada, mas não entra nas estatísticas. Nas execuções de 24/11/2026, a 1ª rodada do fast.com tinha upload 1,7 vez maior que as demais.
 
 ### 6.4 Métricas Coletadas
 
-| Métrica | Unidade | Descrição |
-|---------|---------|-----------|
-| Download | Mbps | Velocidade de download |
-| Upload | Mbps | Velocidade de upload |
-| Ping | ms | Latência de ida e volta |
-| Jitter | ms | Variação da latência entre pacotes |
+| Métrica | Fonte | Unidade | Descrição |
+|---------|-------|---------|-----------|
+| Download | as duas | Mbps | Velocidade de download |
+| Upload | as duas | Mbps | Velocidade de upload |
+| Ping | as duas | ms | Latência sem carga (no fast.com, "Não carregados") |
+| Jitter | interno | ms | Variação da latência medida pelo speedtest |
+| Ping ICMP / Jitter ICMP | interno | ms | Mediana e variação (média das diferenças sucessivas) de 10 pings. N/A se o servidor não responde a ICMP |
+| Latência sob carga | internet | ms | Latência durante a transferência ("Carregada"); indica fila (bufferbloat). **Só informativa:** varia demais para comparar |
+| Tráfego de fundo | as duas | kbps | Tráfego da interface nos 5 s antes da rodada |
+| Conexão | as duas | texto | Interface, cabo/Wi-Fi, link (Mbps); no Wi-Fi, banda, canal, sinal e BSSID |
+| Local do cliente, IP de saída, servidores | internet | texto | Por onde o tráfego saiu e quais servidores mediram |
 
-As métricas são coletadas **5 vezes**, e todas as medições individuais são registradas no CSV.
+**Estatística por fonte**, só com as rodadas medidas (sem aquecimento), válidas e não contaminadas:
+
+- **mediana** (o número principal, robusto a uma rodada fora da curva);
+- média, **P25 e P75** (quartis), **CV %** (desvio-padrão amostral ÷ média), mínimo e máximo;
+- **`Estavel`** = `sim` quando o CV do download e o do upload ficam no máximo em 10%.
+
+> **Nota:** no Windows 11, o `netsh wlan` exige a permissão de **Localização** (e às vezes elevação) para informar banda, canal, sinal e BSSID. Sem ela, esses campos ficam N/A, e o tipo (Wi-Fi ou cabo) continua vindo do `Get-NetAdapter`.
 
 ### 6.5 Evidências Geradas
 
-Para cada aferição, é salvo:
+Na pasta `3_rede/` do cenário:
 
-- **Screenshot** da página de resultado (`Evidencia_Afericao_N_<data-hora>.png`)
-- **Linha no CSV** com timestamp e valores medidos
-
-> ![Exemplo Evidência Rede](img/placeholder-evidencia-rede.png)  
-> *Insira aqui: screenshot de uma das evidências de aferição de rede*
+- `teste_rede_<data_hora>.log`: log completo da execução.
+- `resultado_afericoes.csv`: uma linha por rodada (separador `;`, decimal com vírgula). A coluna `Rodada` mostra `A1` para o aquecimento e `1`…`10` para as medidas. Colunas: `Fonte;Rodada;Aquecimento;Status;Motivo;Data_Hora;Duracao_s;Download;Upload;Ping;Jitter;Latencia_Carga;Ping_ICMP;Jitter_ICMP;Trafego_Fundo_Kbps;Contaminada;Interface;Conexao_Tipo;Link_Mbps;Wifi_Banda;Wifi_Canal;Wifi_Sinal;Wifi_BSSID;Local_Cliente;IP_Saida;Servidores;Config_Fast;Print`.
+- `rede.csv`: CSV temático (`Metrica,Valor,Unidade`, decimal com ponto):
+  - linhas gerais: `Versao_Teste` (2.0), `Rodadas_Configuradas`, `Aquecimento_Por_Fonte`, `Conexao_Tipo` (`cabo`, `wifi` ou `misto`) e `Roaming`;
+  - um bloco por fonte (`Interno_*` e `Internet_*`) com `Status`, `Motivo`, `Rodadas_Executadas`, `Rodadas_Validas`, `Rodadas_Contaminadas` e `Estavel`, e para cada métrica `<Metrica>_Mediana`, `_Media`, `_P25`, `_P75`, `_CV`, `_Min` e `_Max` (ex.: `Interno_Download_Mediana`);
+  - na internet, também `Internet_Config_Fast`, `Internet_Local_Cliente`, `Internet_IP_Saida` e `Internet_Servidores` (o valor mais frequente).
+- `Evidencia_Rede_Interno_<A1|01..10>_<data_hora>.png` e `Evidencia_Rede_Internet_<A1|01..10>_<data_hora>.png`: screenshot de cada rodada.
+- `Evidencia_Rede_Internet_Bloqueio_<data_hora>.png` e `Evidencia_Rede_Interno_Falha_<data_hora>.png`: só quando a página não carregou.
 
 ### 6.6 Critério de Aprovação
 
+Cada fonte termina com um status:
+
+| Status | Condição |
+|--------|----------|
+| **ok** | Pelo menos 8 rodadas válidas de 10 (`MinValidas`) |
+| **parcial** | Alguma rodada válida, mas menos que o mínimo |
+| **off** | Nenhuma rodada válida. O motivo fica registrado: URL não configurada, site bloqueado, 3 falhas seguidas ou rodadas contaminadas |
+
 | Condição | Resultado |
 |----------|-----------|
-| 5 aferições capturadas com sucesso e CSV gerado | **PASS** (exit code 0) |
-| Edge não encontrado ou aferições incompletas | **FAIL** (exit code 1) |
+| Pelo menos uma fonte terminou **ok** | **PASS** (exit code 0) |
+| Nenhuma fonte terminou ok | **FAIL** (exit code 1) |
+
+Uma fonte **parcial** ou **off**, uma fonte **instável** (`Estavel=nao`), medição no **Wi-Fi** e **troca de AP** durante o teste viram avisos na seção "Avisos da rodada" do `_relatorio`, sem reprovar o teste.
+
+- O fast.com bloqueado (página não carrega ou o site acusa erro) para de ser medido na hora, com screenshot da tela exibida. O interno segue sozinho.
+- Um erro isolado numa rodada conta só aquela rodada como falha. Depois de 3 falhas seguidas, a fonte vira off.
+
+A checagem antes da fila acusa:
+- **Atenção** quando falta a URL interna (só a internet será medida) ou não há internet (só o interno será medido);
+- **Impede** quando faltam as duas.
 
 ### 6.7 Referência de Valores Aceitáveis `[Gestão]`
 
-> **Nota:** A tabela abaixo deve ser preenchida pela equipe conforme os padrões da organização.
+> **Nota:** a tabela abaixo deve ser preenchida pela equipe conforme os padrões da organização. Use as **medianas** do speedtest interno.
 
 | Métrica | Mínimo aceitável | Ideal |
 |---------|-------------------|-------|
@@ -422,71 +470,34 @@ Para cada aferição, é salvo:
 | Ping | ___ ms (máximo) | ___ ms |
 | Jitter | ___ ms (máximo) | ___ ms |
 
-### 6.8 Teste Complementar — Speedtest na Internet (fast.com)
+### 6.8 Como Analisar `[Gestão]`
 
-#### Objetivo e motivação
+A rede é a métrica que mais varia entre execuções. Em 24/11/2026, o fast.com mediu 532 Mbps às 19:31 e 80 Mbps às 23:17 na mesma máquina: o horário e os servidores escolhidos pelo site mudaram. Para que a diferença medida seja da máquina ou do agente, e não da internet:
 
-O teste das seções 6.1–6.7 mede contra um servidor de speedtest **interno**. Em máquinas com agente **zero trust**, o tráfego para destinos internos pode não ser inspecionado nem roteado pelo agente (bypass da rede corporativa ou túnel distinto), enquanto o tráfego para a internet passa pelo proxy/túnel e pela inspeção SSL do agente. O teste complementar mede a velocidade num speedtest **público da internet**, pelo mesmo caminho do tráfego real do usuário, para capturar o impacto do agente na navegação.
+- **Use a mediana.** A média de poucas rodadas é arrastada por uma rodada fora da curva.
+- **Só compare execuções com `Estavel=sim`** nas duas pontas. Com `nao`, repita o teste antes de concluir.
+- **Use cabo para comparar hardware.** O Wi-Fi é a maior fonte de variação. Se precisar ser Wi-Fi, use o mesmo AP, a mesma banda e a mesma posição. Confira `Wifi_Banda`, `Wifi_Canal` e `Wifi_Sinal` no `resultado_afericoes.csv`, e descarte execuções com `Roaming=sim`.
+- **O interno é a referência.** O fast.com escolhe o servidor sozinho. Só compare execuções do fast.com com os **mesmos servidores** (`Internet_Servidores`) e na **mesma janela de horário**; de preferência, alterne baseline e candidata no mesmo período.
+- **Rodadas contaminadas** (`Rodadas_Contaminadas` > 0) indicam tráfego em segundo plano: confira o Setup 6 e processos de atualização antes de repetir.
+- **A latência sob carga é só informativa.** Nas medições de referência, ela variou com CV de 51%.
+- **Agente zero trust:** compare o `Internet_*` do cenário baseline com o do cenário com agente. O **local do cliente** e o **IP de saída** mostram por onde o tráfego saiu: com o agente ativo, espera-se o nó de saída do provedor do agente. Se continuarem iguais aos do baseline, o tráfego provavelmente não passou pelo agente.
+- O fast.com mede até a borda de conteúdo da Netflix mais próxima, muitas vezes dentro do próprio provedor de internet. O resultado representa a navegação cotidiana, não o trânsito internacional.
 
-O script é `Testes/3_rede_internet/3-1_teste_rede_internet.py`. Ele aparece no menu do hub na seção **Rede Internet**, logo após **Rede**, e tem PASS/FAIL próprio (um bloqueio na internet não reprova o teste interno, e vice-versa).
+### 6.9 Configuração `[Técnico]`
 
-#### Ferramenta Utilizada
+Bloco `Rede` do `config.json`. `HUB_REDE_RODADAS` sobrescreve `Rodadas`, para testes rápidos.
 
-- **Microsoft Edge** via Selenium WebDriver — driver obtido automaticamente pelo Selenium Manager
-- **fast.com** (Netflix) — speedtest público e gratuito, sem anúncios, que inicia a medição sozinho e usa servidores de borda da Netflix próximos ao cliente (ex.: Rio de Janeiro e Barueri)
-- Erros de certificado **não** são ignorados: a inspeção SSL do agente atua como atuaria para o usuário
-
-> **Nota:** o `speed.cloudflare.com` foi avaliado e descartado porque exige verificação antirrobô ("Confirme que é humano") antes de iniciar a medição, o que impede a execução desassistida.
-
-#### Procedimento
-
-| Etapa | Descrição | Duração |
-|-------|-----------|---------|
-| 1 | Abertura do Microsoft Edge via Selenium | ~5s |
-| 2 | Acesso a `https://fast.com/` — a medição inicia automaticamente | ~2s |
-| 3 | **Aferição** — aguarda a conclusão de download, latência e upload (sem espera fixa; limite de 120 s) | ~20–45 segundos |
-| 4 | Leitura das métricas na página e captura de screenshot | ~2s |
-| 5 | Repetição dos passos 2-4 por **5 aferições** | ~3 min total |
-| 6 | Geração dos CSVs | ~1s |
-
-#### Métricas Coletadas
-
-| Métrica | Unidade | Descrição |
-|---------|---------|-----------|
-| Download | Mbps | Velocidade de download |
-| Upload | Mbps | Velocidade de upload |
-| Ping | ms | Latência sem carga ("Não carregados" no fast.com) |
-| Latência sob carga | ms | Latência medida durante a transferência ("Carregada") — indica formação de fila (bufferbloat) |
-| Local do cliente | texto | Localização de saída vista pelo serviço |
-| IP de saída | texto | IP público pelo qual o tráfego saiu para a internet |
-| Servidores | texto | Localização dos servidores de medição usados |
-
-O fast.com não reporta jitter nem perda de pacotes.
-
-#### Evidências Geradas
-
-Na pasta `3_rede_internet/` do cenário:
-
-- `teste_rede_internet_<data_hora>.log` — log completo da execução
-- `resultado_afericoes_internet.csv` — uma linha por aferição (separador `;`, decimal com vírgula): `Afericao;Data_Hora;Download;Upload;Ping;Latencia_Carga;Local_Cliente;IP_Saida;Servidores;Status;Print`
-- `rede_internet.csv` — CSV temático (`Metrica,Valor,Unidade`) com aferições executadas/válidas, médias, mínimos e máximos, local, IP de saída e servidores
-- `Evidencia_Internet_Afericao_N_<data_hora>.png` — screenshot de cada aferição
-- `Evidencia_Internet_Bloqueio_<data_hora>.png` — somente quando o site está inacessível ou bloqueado
-
-#### Critério de Aprovação
-
-| Condição | Resultado |
-|----------|-----------|
-| 5 aferições com Download, Upload e Ping capturados e CSVs gerados | **PASS** (exit code 0) |
-| Site inacessível ou bloqueado (política do agente zero trust/proxy, sem internet) — falha rápida, com screenshot da tela exibida | **FAIL** (exit code 1) |
-| Menos de 5 aferições válidas (timeout ou valores ausentes) | **FAIL** (exit code 1) |
-| Edge não encontrado ou driver do Edge não obtido | **FAIL** (exit code 1) |
-
-#### Como Interpretar `[Gestão]`
-
-- Compare o `rede_internet.csv` do cenário **baseline** (sem agente) com o do cenário **com agente**, executados na mesma rede e na mesma janela de horário.
-- **Local do cliente** e **IP de saída** mostram por onde o tráfego saiu. Com o agente zero trust ativo, espera-se ver o IP/local do nó de saída do provedor do agente; se continuarem iguais aos do baseline, o tráfego provavelmente não passou pelo agente.
-- O fast.com mede até a borda de conteúdo da Netflix mais próxima (muitas vezes dentro do próprio provedor de internet). O resultado representa a navegação cotidiana, não o trânsito internacional.
+| Chave | Padrão | Uso |
+|-------|--------|-----|
+| `Rodadas` | 10 | Rodadas medidas por fonte |
+| `Aquecimento` | 1 | Rodadas de aquecimento por fonte (fora da estatística) |
+| `MinValidas` | 8 | Rodadas válidas para a fonte ficar ok (no máximo `Rodadas`) |
+| `LimiteCV` | 10 | CV máximo (%) do download e do upload para `Estavel=sim` |
+| `MaxFalhasSeguidas` | 3 | Falhas seguidas até a fonte virar off |
+| `TimeoutInternoSeg`, `TimeoutInternetSeg` | 120 | Limite de cada rodada |
+| `FastDuracaoSeg`, `FastConexoes` | 20, 8 | Configuração fixa do fast.com |
+| `PingsICMP` | 10 | Pings ao servidor interno por rodada (0 desliga) |
+| `JanelaFundoSeg`, `LimiteTrafegoFundoKbps` | 5, 1000 | Janela e limite do tráfego de fundo |
 
 ---
 
@@ -923,20 +934,14 @@ Execucoes/
         │   ├── resultado_validacao_disco_*.csv
         │   ├── disco.csv
         │   └── resultado_validacao_usb_*.csv, teste_usb_nativo_*.log, disco_usb.csv  ← variante 2-1
-        ├── 3_rede/                              ← evidências do teste de rede
+        ├── 3_rede/                              ← evidências do teste de rede (interno + internet)
         │   ├── teste_rede_*.log
-        │   ├── resultado_afericoes.csv
-        │   ├── rede.csv
-        │   ├── Evidencia_Afericao_1_*.png
+        │   ├── resultado_afericoes.csv              (uma linha por rodada, das duas fontes)
+        │   ├── rede.csv                             (blocos Interno_* e Internet_*)
+        │   ├── Evidencia_Rede_Interno_A1_*.png
+        │   ├── Evidencia_Rede_Internet_A1_*.png
         │   ├── ...
-        │   └── Evidencia_Afericao_5_*.png
-        ├── 3_rede_internet/                     ← evidências do teste de rede na internet
-        │   ├── teste_rede_internet_*.log
-        │   ├── resultado_afericoes_internet.csv
-        │   ├── rede_internet.csv
-        │   ├── Evidencia_Internet_Afericao_1_*.png
-        │   ├── ...
-        │   └── Evidencia_Internet_Afericao_5_*.png
+        │   └── Evidencia_Rede_Internet_10_*.png
         ├── 4_boot_shutdown/                     ← evidências do teste de boot
         │   ├── BootShutdown_<data>.csv
         │   └── boot_shutdown.csv
@@ -1106,7 +1111,7 @@ Dados estruturados com metadados completos. Ideal para integração com APIs e s
 
 | Termo | Definição |
 |-------|-----------|
-| **Aferição** | Uma medição individual dentro de um teste. Ex: cada uma das 5 medições de velocidade de rede |
+| **Aferição** | Uma medição individual dentro de um teste. Ex: cada uma das rodadas de velocidade de rede |
 | **Autonomia projetada** | Tempo que a bateria cheia duraria no ritmo de consumo medido numa fase: capacidade de carga cheia ÷ taxa média de descarga. É uma extrapolação linear, não uma descarga completa |
 | **Bateria (teste de disco)** | Um ciclo completo de operações dentro de um teste. Ex: cada uma das 10 baterias de leitura/escrita do teste de disco |
 | **Bateria (Módulo 5)** | O teste de consumo de energia na bateria do notebook (seção 8) |

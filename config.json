@@ -21,5 +21,19 @@
         "ThrottleAlertPct": 20,
         "LoadMinPct": 50,
         "SkipFolders": ["5_bateria"]
+    },
+    "Rede": {
+        "Rodadas": 10,
+        "Aquecimento": 1,
+        "MinValidas": 8,
+        "LimiteCV": 10,
+        "MaxFalhasSeguidas": 3,
+        "TimeoutInternoSeg": 120,
+        "TimeoutInternetSeg": 120,
+        "FastDuracaoSeg": 20,
+        "FastConexoes": 8,
+        "PingsICMP": 10,
+        "JanelaFundoSeg": 5,
+        "LimiteTrafegoFundoKbps": 1000
     }
 }
