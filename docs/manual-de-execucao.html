@@ -435,13 +435,14 @@ li {
 <p>Os itens abaixo são instalados automaticamente pela <strong>Fase de Setup</strong> do hub. Não é necessário instalá-los manualmente antes da primeira execução:</p>
 <ul>
 <li>Python 3.x (com ambiente virtual <code>.venv</code>)</li>
-<li>Microsoft Edge (nativo do Windows 10/11 — usado no teste de rede)</li>
+<li>LibreOffice (<code>TheDocumentFoundation.LibreOffice</code>, instalado pelo <code>3_softwares_msStore.ps1</code> — usado no Módulo 1 em modo 100% local e offline, sem login)</li>
+<li>Microsoft Edge (nativo do Windows 10/11 — usado no teste de rede e na fase de escritório do teste de bateria)</li>
 <li>Dependências Python: <code>psutil</code>, <code>speedtest-cli</code>, <code>requests</code>, <code>selenium</code>, <code>pandas</code>, <code>pyautogui</code>, <code>pyperclip</code>, <code>pynput</code></li>
 </ul>
 <p>Para o <strong>teste de bateria (Módulo 5)</strong>, além disso:</p>
 <ul>
 <li><strong>Windows Performance Toolkit</strong> (<code>wpr.exe</code> e <code>wpaexporter.exe</code>) no PATH — o mesmo pré-requisito do Módulo 1</li>
-<li><strong>Microsoft Edge com a conta Google já logada</strong> (Google Docs e Sheets), como no Módulo 1</li>
+<li><strong>Microsoft Edge com a conta Google já logada</strong> (Google Docs e Sheets; exigido apenas no Módulo 5, pois o Módulo 1 utiliza o LibreOffice localmente)</li>
 <li><strong>Feche o Edge antes de iniciar</strong>: o teste encerra o Edge e reabre só com as páginas dele</li>
 </ul>
 <p>Para as <strong>cargas de desenvolvimento (Módulos 7 a 11)</strong>, os setups <code>7_install_devtools_dev</code> e <code>10_preparar_podman</code> instalam Git, .NET SDK 10, Go, uv, docker-compose, WSL2 e Podman (veja a seção 4.8).</p>
@@ -502,7 +503,7 @@ li {
 </tr>
 <tr>
 <td><code>3_softwares_msStore</code></td>
-<td>Instala via winget o Windows ADK, o CrystalDiskMark e o CrystalDiskInfo</td>
+<td>Instala via winget o Windows ADK, o CrystalDiskMark, o CrystalDiskInfo e o LibreOffice</td>
 </tr>
 <tr>
 <td><code>4_install_python</code></td>
@@ -609,7 +610,7 @@ li {
 </code></pre>
 <p>Desmarque com <code>Espaço</code> o que não for executar agora. Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (<code>1-1</code> e <code>2-1</code>) só fazem sentido com um pendrive em <code>E:\</code>.</p>
 <p>Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:</p>
-<pre><code>[ ] 1_automacao_performance        [PY]   PASS  (361.5s)
+<pre><code>[ ] 1_automacao_performance        [PY]   PASS  (1842.5s)
 [ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
 [X] 3_teste_rede                   [PY]   pendente
 [X] 4_boot_shutdown_auto           [PY]   pendente
@@ -848,6 +849,7 @@ li {
 <li><strong><code>[X]</code> Impede:</strong> o teste vai falhar com certeza.<ul>
 <li>Falta o <code>Agentes_SI_Profile.wpaProfile</code> (módulo 1) ou o <code>Agentes_SI_Bateria_Profile.wpaProfile</code> (módulo 5) na pasta do teste. Esses arquivos não são versionados.</li>
 <li>Falta o <code>wpr.exe</code> ou o <code>wpaexporter.exe</code> (módulos 1 e 5).</li>
+<li>Falta o LibreOffice (<code>soffice.exe</code>) quando <code>1_automacao_performance.py</code> está selecionado (módulo 1; não bloqueia a variante <code>1-1_automacao_performance_dlp.py</code>). A ação manda rodar o Setup <code>3_softwares_msStore</code>.</li>
 <li>A URL do speedtest interno não está configurada <strong>e</strong> não há internet (módulo 3: nenhuma das duas fontes pode ser medida).</li>
 <li>Falta uma ferramenta de dev, ou ela está abaixo da versão mínima do <code>cargas.json</code> (módulos 7 a 11). A ação manda rodar o Setup 7 ou o Setup 10.</li>
 <li>A <code>podman machine</code> está desligada (módulo 10).</li>
@@ -896,7 +898,7 @@ li {
 </tbody>
 </table>
 <p>Com algum <code>[X]</code> na tela, o <code>Enter</code> não inicia a fila: escolha <code>R</code>, <code>C</code> ou <code>Esc</code>. Os achados e a escolha feita vão para o log da run. Quando a fila inicia (<code>Enter</code> ou <code>C</code>), os achados também entram nos avisos da rodada (seção 6.6); com <code>Esc</code>, ou recusando o <code>F</code>, ficam só no log.</p>
-<p><strong>Sobras que o hub reconhece.</strong> O Edge e o Python são reconhecidos pela linha de comando ou pela flag de automação. <code>wpaexporter.exe</code> e <code>diskspd.exe</code> são reconhecidos pelo nome, porque só existem por causa dos testes do hub.</p>
+<p><strong>Sobras que o hub reconhece.</strong> O LibreOffice, o Edge e o Python são reconhecidos pela linha de comando ou pela flag de automação. <code>wpaexporter.exe</code> e <code>diskspd.exe</code> são reconhecidos pelo nome, porque só existem por causa dos testes do hub.</p>
 <table>
 <thead>
 <tr>
@@ -912,6 +914,10 @@ li {
 <tr>
 <td><code>wpaexporter.exe</code>, <code>diskspd.exe</code></td>
 <td>encerra a árvore do processo</td>
+</tr>
+<tr>
+<td>LibreOffice da automação (<code>soffice.exe</code> e <code>soffice.bin</code> com subperfil <code>wintesthub_lo_profile</code>)</td>
+<td>encerra os processos do teste</td>
 </tr>
 <tr>
 <td>Edge da automação (<code>msedgedriver</code> e o Edge aberto por ele ou com <code>--enable-automation</code>)</td>
@@ -935,7 +941,7 @@ li {
 </tr>
 </tbody>
 </table>
-<p>O Edge e o Python do usuário ficam: um Edge comum (mesmo aberto para depuração pelo VS Code) e um Python fora de <code>Testes\</code> não são sobra.</p>
+<p>O LibreOffice, o Edge e o Python do usuário ficam: um LibreOffice aberto sem <code>wintesthub_lo_profile</code>, um Edge comum (mesmo aberto para depuração pelo VS Code) e um Python fora de <code>Testes\</code> não são sobra.</p>
 <p><strong>Entre um teste e outro</strong>, o hub repete a busca só com as sobras do teste que acabou e as encerra sem perguntar, porque a fila é desassistida. Entre os processos, ele só encerra os que <strong>o próprio teste abriu</strong>: o que já existia antes do teste começar (ex.: o Visual Studio do usuário) fica. A sessão do WPR, a stack do módulo 10 e a <code>podman machine</code> não são processos; elas seguem a pasta do teste que acabou de rodar. A <code>podman machine</code> só é desligada quando nenhum teste do módulo 10 vem depois. Cada encerramento vai para o log e para os avisos da rodada.</p>
 </div>
 
