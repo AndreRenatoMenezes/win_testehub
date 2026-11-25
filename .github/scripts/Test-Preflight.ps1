@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 $hubPath = (Resolve-Path $HubPath).Path
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($hubPath, [ref]$null, [ref]$null)
 foreach ($nome in "New-PreflightFinding", "Get-DevModuleTools", "Test-SpeedtestConfigured", "Get-PreflightFindings",
-                "Test-WprRecording", "Get-TestLeftovers", "Remove-BlockedTests", "Clear-TestLeftovers", "Stop-TestLeftovers") {
+                "Test-WprRecording", "Get-TestLeftovers", "Remove-BlockedTests", "Get-BlockReason", "Clear-TestLeftovers", "Stop-TestLeftovers") {
     $fn = $ast.FindAll({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $nome
@@ -168,6 +168,15 @@ try {
     $queue = @($tGo, $tDisk)
     $left = @(Remove-BlockedTests -Tests $queue -Findings (Get-F $queue))
     Assert-Condition ($left.Count -eq 1 -and $left[0].Name -eq "2_teste_disco") "[R] tira so o teste com Impede"
+    $fq = Get-F $queue      # Get-F devolve ,@(): sem @() em volta, senao aninha
+    $goName = "$($tGo.Name).$($tGo.Type)"
+    $why = Get-BlockReason -TestName $goName -Findings $fq
+    $esperado = @($fq | Where-Object { $_.Nivel -eq "Impede" -and @($_.Testes) -contains $goName } | ForEach-Object { $_.Item })
+    Assert-Condition ($why -and $esperado.Count -ge 1 -and $why -like "*$($esperado[0])*" -and $why -notmatch 'psobject|\{get;set;\}') "motivo do [R] = item do achado Impede ($why)"
+    Assert-Condition ((Get-BlockReason -TestName "$($tDisk.Name).$($tDisk.Type)" -Findings $fq) -eq "") "teste sem Impede -> motivo vazio"
+    $dup = @((New-PreflightFinding -Nivel "Impede" -Testes @("a.py") -Item "x"), (New-PreflightFinding -Nivel "Impede" -Testes @("a.py") -Item "x"),
+             (New-PreflightFinding -Nivel "Impede" -Testes @("a.py") -Item "y"), (New-PreflightFinding -Nivel "Atencao" -Testes @("a.py") -Item "z"))
+    Assert-Condition ((Get-BlockReason -TestName "a.py" -Findings $dup) -eq "x; y") "varios Impede: itens unicos separados por '; ', sem Atencao"
     $script:tools = $okTools.Clone()
 
     Write-Host "`n  Sobras de teste" -ForegroundColor Cyan

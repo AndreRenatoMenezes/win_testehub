@@ -556,7 +556,7 @@ O `_relatorio.html` e o `_relatorio.json` (em `Traces/`, e portanto também na e
 
 | Fonte | Quando aparece |
 |-------|----------------|
-| `checagem` | Achados da checagem antes da fila, o teste tirado com `R` ou a escolha `C` |
+| `checagem` | Achados da checagem antes da fila, o teste tirado com `R` (com o motivo) ou a escolha `C` |
 | `sobra` | Sobra de teste encerrada antes da fila (`F`) ou entre testes |
 | `modulo_vazio` | Módulo executado que ficaria só com `.etl`/logs na exportação |
 | `csv_faltando` | Teste executado que não gerou o CSV temático |

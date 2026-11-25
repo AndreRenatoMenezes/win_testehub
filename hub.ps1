@@ -657,6 +657,14 @@ function Remove-BlockedTests {
     return @($Tests | Where-Object { $blocked -notcontains "$($_.Name).$($_.Type)" })
 }
 
+# Motivo(s) que tiraram um teste da fila: os itens dos achados 'Impede' que o citam.
+function Get-BlockReason {
+    param([string]$TestName, [array]$Findings)
+    $items = @($Findings | Where-Object { $_.Nivel -eq "Impede" -and @($_.Testes) -contains $TestName } |
+        ForEach-Object { $_.Item } | Select-Object -Unique)
+    return ($items -join "; ")
+}
+
 # ---- Progresso em tempo real -------------------------------------------------
 
 function Show-ExecutionProgress {
@@ -1003,7 +1011,10 @@ function Build-ConsolidatedReport {
     Set-Content -LiteralPath $csvPath -Value $csvLines -Encoding UTF8
 
     # Avisos da rodada (acumulados no _state.json) e frequencia da CPU por modulo
-    $warnings = @(Get-RunWarnings -State $State | Sort-Object { [int]$_.run })
+    # Sort-Object do PS 5.1 nao e estavel: desempata pela ordem em que foram gravados
+    $rawWarnings = @(Get-RunWarnings -State $State)
+    $warnings = @(0..($rawWarnings.Count - 1) | Where-Object { $rawWarnings.Count -gt 0 } |
+        Sort-Object @{ e = { [int]$rawWarnings[$_].run } }, @{ e = { $_ } } | ForEach-Object { $rawWarnings[$_] })
     $freq = @()
     foreach ($folder in @($results | ForEach-Object { $_.Folder } | Select-Object -Unique)) {
         if (-not $folder) { continue }
@@ -2263,8 +2274,11 @@ while (-not $confirmed) {
                 $removed = @($toRun | Where-Object { @(Remove-BlockedTests -Tests @($_) -Findings $findings).Count -eq 0 })
                 $toRun = @(Remove-BlockedTests -Tests $toRun -Findings $findings)
                 foreach ($r in $removed) {
-                    Add-Content -LiteralPath $logFile -Value "[AVISO] Teste tirado da fila pela checagem: $($r.Name).$($r.Type)" -Encoding UTF8
-                    Add-RunWarning -State $stateObj -Run $currentRunId -Fonte "checagem" -Texto "Tirado da fila pela checagem: $($r.Name).$($r.Type)"
+                    $rName  = "$($r.Name).$($r.Type)"
+                    $reason = Get-BlockReason -TestName $rName -Findings $findings
+                    $rText  = if ($reason) { "$rName ($reason)" } else { $rName }
+                    Add-Content -LiteralPath $logFile -Value "[AVISO] Teste tirado da fila pela checagem: $rText" -Encoding UTF8
+                    Add-RunWarning -State $stateObj -Run $currentRunId -Fonte "checagem" -Texto "Tirado da fila pela checagem: $rText"
                 }
                 if ($toRun.Count -eq 0) {
                     Write-Host "`n  [!] Nenhum teste restou na fila." -ForegroundColor Yellow

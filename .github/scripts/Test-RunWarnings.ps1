@@ -136,12 +136,18 @@ try {
         [PSCustomObject]@{ runId = 3; timestamp = "t3"; tests = @([PSCustomObject]@{ name = "1_automacao_performance.py"; folder = "1_cpu_memo"; status = "PASS"; duration = 20 }) }
     )
     Add-RunWarning -State $st -Run 1 -Fonte "sobra" -Texto "Encerrada apos x: <Edge> & cia"
+    # varios avisos na mesma run: o Sort-Object instavel do PS 5.1 os embaralhava
+    foreach ($i in 1..8) { Add-RunWarning -State $st -Run 1 -Fonte "rede" -Texto "aviso de ordem $i" }
     Build-ConsolidatedReport -TraceRunDir $traces -State $st
     $html = Get-Content -LiteralPath (Join-Path $traces "_relatorio.html") -Raw
     $json = Get-Content -LiteralPath (Join-Path $traces "_relatorio.json") -Raw | ConvertFrom-Json
     Assert-Condition ($html -match 'Avisos da rodada' -and $html -match 'run #1' -and $html -match 'run #3') "HTML com a secao de avisos, incluindo a run anterior"
     Assert-Condition ($html -match '&lt;Edge&gt; &amp; cia' -and $html -notmatch '<Edge>') "texto do aviso escapado no HTML"
     Assert-Condition (@($json.Avisos).Count -eq @(Get-RunWarnings -State $st).Count) "JSON com os mesmos avisos"
+    $porRun = @{}; foreach ($w in @(Get-RunWarnings -State $st)) { $k = [int]$w.run; if (-not $porRun.ContainsKey($k)) { $porRun[$k] = @() }; $porRun[$k] += "$($w.run)|$($w.texto)" }
+    $esperado = @($porRun.Keys | Sort-Object | ForEach-Object { $porRun[$_] })
+    $obtido = @($json.Avisos | ForEach-Object { "$($_.run)|$($_.texto)" })
+    Assert-Condition (($obtido -join "`n") -eq ($esperado -join "`n")) "avisos por run, na ordem em que foram gravados (sort estavel)"
     $f2 = @($json.FrequenciaCpu | Where-Object { $_.Modulo -eq "2_disco" })
     Assert-Condition ($f2.Count -eq 1 -and $f2[0].QuedaPct -ge 25 -and $html -match 'Frequencia da CPU') "frequencia por modulo no JSON e no HTML"
     $st3 = [PSCustomObject]@{ scenario = "c"; machine = "m"; createdAt = "c"; lastRunAt = "l"; runs = @([PSCustomObject]@{ runId = 1; timestamp = "t"; tests = @([PSCustomObject]@{ name = "a.py"; folder = "zz"; status = "PASS"; duration = 1 }) }) }
