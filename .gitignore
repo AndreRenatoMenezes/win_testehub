@@ -2,6 +2,8 @@
 # Saidas do hub (geradas a cada execucao)
 # ---------------------------------------------------------------------------
 Execucoes/
+Exportar/
+# Saida antiga (antes da pasta Exportar)
 Resultados/
 
 # ---------------------------------------------------------------------------

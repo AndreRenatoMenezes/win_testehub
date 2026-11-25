@@ -11,7 +11,7 @@ if (-not (Test-Path $configFile)) {
         Paths = @{
             SetupRoot     = "Setup"
             TestsRoot     = "Testes"
-            ResultadosDir = "Resultados"
+            ExportarDir   = "Exportar"
             ExecucoesDir  = "Execucoes"
         }
         Settings = @{
@@ -26,7 +26,9 @@ $config = Get-Content $configFile | ConvertFrom-Json
 
 $SetupRoot     = Join-Path $PSScriptRoot $config.Paths.SetupRoot
 $TestsRoot     = Join-Path $PSScriptRoot $config.Paths.TestsRoot
-$ResultadosDir = Join-Path $PSScriptRoot $config.Paths.ResultadosDir
+# ExportarDir: config.json antigo (com ResultadosDir) nao tem a chave -> padrao "Exportar"
+$exportarRel   = if ($config.Paths.PSObject.Properties['ExportarDir']) { $config.Paths.ExportarDir } else { "Exportar" }
+$ExportarDir   = Join-Path $PSScriptRoot $exportarRel
 $ExecucoesDir  = Join-Path $PSScriptRoot $config.Paths.ExecucoesDir
 $SkipSetup     = $config.SkipSetup
 $VenvPath      = Join-Path $PSScriptRoot $config.Settings.PythonVenvName
@@ -140,14 +142,66 @@ function Write-StateFile {
 }
 
 function New-StateObject {
-    param([string]$Scenario, [string]$Machine)
+    param([string]$Scenario, [string]$Machine, [string]$Modelo, [string]$Patrimonio)
     return [PSCustomObject]@{
-        scenario  = $Scenario
-        machine   = $Machine
-        createdAt = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
-        lastRunAt = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
-        runs      = @()
+        scenario   = $Scenario
+        machine    = $Machine
+        modelo     = $Modelo
+        patrimonio = $Patrimonio
+        createdAt  = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+        lastRunAt  = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+        runs       = @()
     }
+}
+
+# ---- Identificacao da maquina (modelo / patrimonio) --------------------------
+
+# Remove caracteres invalidos em nome de pasta e espacos nas pontas.
+# '[' e ']' tambem saem: sao curinga para os cmdlets com -Path do PowerShell.
+function ConvertTo-SafeFolderName {
+    param([string]$Text)
+    if ($null -eq $Text) { return "" }
+    $invalid = [System.IO.Path]::GetInvalidFileNameChars() + [char[]]'[]'
+    $clean = -join ($Text.ToCharArray() | Where-Object { $invalid -notcontains $_ })
+    # Windows nao aceita nome de pasta terminado em ponto ou espaco
+    return $clean.Trim().TrimEnd('.', ' ').Trim()
+}
+
+# Pergunta um valor obrigatorio (repete enquanto vier vazio apos a limpeza).
+function Read-RequiredValue {
+    param([string]$Prompt)
+    while ($true) {
+        $value = ConvertTo-SafeFolderName (Read-Host $Prompt)
+        if (-not [string]::IsNullOrWhiteSpace($value)) { return $value }
+        Write-Host "  [!] Valor obrigatorio." -ForegroundColor Red
+    }
+}
+
+function Read-MachineIdentity {
+    $modelo     = Read-RequiredValue "  >> Modelo da maquina (Ex: 3440, Pro 14 i5)"
+    $patrimonio = Read-RequiredValue "  >> Patrimonio/serial (Ex: 050221)"
+    return [PSCustomObject]@{ Modelo = $modelo; Patrimonio = $patrimonio }
+}
+
+# Le um campo do state sem quebrar no StrictMode quando ele nao existe.
+function Get-StateField {
+    param([PSCustomObject]$State, [string]$Name)
+    $prop = $State.PSObject.Properties[$Name]
+    if ($null -eq $prop -or $null -eq $prop.Value) { return "" }
+    return [string]$prop.Value
+}
+
+# Cenarios antigos nao tem modelo/patrimonio: pergunta uma vez e grava no state.
+function Ensure-MachineIdentity {
+    param([PSCustomObject]$State, [string]$TraceRunDir)
+    if ((Get-StateField $State "modelo") -and (Get-StateField $State "patrimonio")) { return $State }
+
+    Write-Host "`n  Este cenario nao tem modelo/patrimonio registrados." -ForegroundColor Yellow
+    $id = Read-MachineIdentity
+    $State | Add-Member -NotePropertyName modelo     -NotePropertyValue $id.Modelo     -Force
+    $State | Add-Member -NotePropertyName patrimonio -NotePropertyValue $id.Patrimonio -Force
+    Write-StateFile -TraceRunDir $TraceRunDir -State $State
+    return $State
 }
 
 function Add-RunToState {
@@ -224,14 +278,20 @@ function Get-ExistingScenarios {
     return ,@($sorted | Select-Object -First 5)
 }
 
+# Perguntas da criacao de cenario: nome, modelo e patrimonio/serial.
+function Read-NewScenario {
+    $nome = ConvertTo-SafeFolderName (Read-Host "  >> Nome do cenario (Ex: SDWAN 108.11.4.734 - Stack) [Enter para: Execucao]")
+    if ([string]::IsNullOrWhiteSpace($nome)) { $nome = "Execucao" }
+    $id = Read-MachineIdentity
+    return [PSCustomObject]@{ Mode = "new"; Name = $nome; Modelo = $id.Modelo; Patrimonio = $id.Patrimonio; Path = $null; State = $null }
+}
+
 function Show-ScenarioMenu {
     param([string]$ExecucoesDir)
     $scenarios = Get-ExistingScenarios -ExecucoesDir $ExecucoesDir
 
     if ($scenarios.Count -eq 0) {
-        $nome = Read-Host "  >> Digite o Nome do Teste (Ex: ImagemLimpa, PosUpdate) [Enter para: Execucao]"
-        if ([string]::IsNullOrWhiteSpace($nome)) { $nome = "Execucao" }
-        return [PSCustomObject]@{ Mode = "new"; Name = $nome; Path = $null; State = $null }
+        return (Read-NewScenario)
     }
 
     Write-Host "  Cenarios recentes:" -ForegroundColor Cyan
@@ -250,15 +310,13 @@ function Show-ScenarioMenu {
     Write-Host ""
     Write-Host "  [N] Criar novo cenario" -ForegroundColor DarkCyan
     Write-Host "  [1-$($scenarios.Count)] Continuar cenario existente" -ForegroundColor DarkCyan
-    Write-Host "  [E] Exportar cenario para ZIP" -ForegroundColor DarkCyan
+    Write-Host "  [E] Exportar cenario (gerar pasta Exportar / ZIP)" -ForegroundColor DarkCyan
     Write-Host ""
 
     while ($true) {
         $choice = Read-Host "  >> Escolha"
         if ($choice -eq 'N' -or $choice -eq 'n') {
-            $nome = Read-Host "  >> Digite o Nome do Teste (Ex: ImagemLimpa, PosUpdate) [Enter para: Execucao]"
-            if ([string]::IsNullOrWhiteSpace($nome)) { $nome = "Execucao" }
-            return [PSCustomObject]@{ Mode = "new"; Name = $nome; Path = $null; State = $null }
+            return (Read-NewScenario)
         }
         if ($choice -eq 'E' -or $choice -eq 'e') {
             return [PSCustomObject]@{ Mode = "export"; Name = $null; Path = $null; State = $null }
@@ -864,6 +922,8 @@ function Build-ConsolidatedReport {
     $jsonObj = [PSCustomObject]@{
         Scenario      = $State.scenario
         Machine       = $State.machine
+        Modelo        = (Get-StateField $State "modelo")
+        Patrimonio    = (Get-StateField $State "patrimonio")
         CreatedAt     = $State.createdAt
         LastRunAt     = $State.lastRunAt
         TotalRuns     = ($State.runs | Measure-Object).Count
@@ -911,6 +971,7 @@ $BrandCss
         <div class="summary">
             <p><strong>Cenario:</strong> $($State.scenario)</p>
             <p><strong>Maquina:</strong> $($State.machine)</p>
+            <p><strong>Modelo / Patrimonio:</strong> $(Get-StateField $State "modelo") / $(Get-StateField $State "patrimonio")</p>
             <p><strong>Criado em:</strong> $($State.createdAt)</p>
             <p><strong>Ultima execucao:</strong> $($State.lastRunAt)</p>
             <p><strong>Total de runs:</strong> $totalRuns</p>
@@ -931,7 +992,7 @@ $BrandCss
 # ---- Coleta de Informacoes da Maquina ----------------------------------------
 
 function Collect-MachineInfo {
-    param([string]$OutputDir)
+    param([string]$OutputDir, [PSCustomObject]$State)
 
     Write-Host "  Coletando informacoes da maquina..." -ForegroundColor DarkCyan
 
@@ -960,22 +1021,25 @@ function Collect-MachineInfo {
         "Disco Tamanho (GB),$diskGB",
         "Sistema Operacional,`"$($os.Caption)`"",
         "Build do SO,`"$($os.BuildNumber)`"",
-        "Data da Coleta,`"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`""
+        "Data da Coleta,`"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`"",
+        "Modelo Informado,`"$(Get-StateField $State 'modelo')`"",
+        "Patrimonio/Serial Informado,`"$(Get-StateField $State 'patrimonio')`""
     )
     Set-Content -Path $csvPath -Value $csvLines -Encoding UTF8
     Write-Host "  [OK] maquina.csv gerado em $OutputDir" -ForegroundColor Green
 }
 
-# ---- Copia de CSVs Tematicos para Resultados ---------------------------------
+# ---- Verificacao de CSVs Tematicos ------------------------------------------
 
-function Copy-ThematicCSVs {
+# Avisa quando um teste rodou mas nao gerou o CSV tematico esperado.
+# Nao copia nada: os CSVs ficam em Traces/ e seguem na exportacao.
+function Test-ThematicCSVs {
     param(
         [string]$TraceRunDir,
-        [string]$ResultadosDir,
         [string]$LogFile
     )
 
-    Write-Host "`n  Copiando CSVs tematicos para Resultados..." -ForegroundColor DarkCyan
+    Write-Host "`n  Verificando CSVs tematicos..." -ForegroundColor DarkCyan
 
     $expectedCSVs = @{
         "1_cpu_memo"       = "cpu_memoria.csv"
@@ -992,14 +1056,14 @@ function Copy-ThematicCSVs {
         "11_dev_git_arquivos"    = "dev_git_arquivos.csv"
     }
 
-    # CSVs das variantes DLP/USB (1-1 e 2-1): opcionais -- copiados quando
+    # CSVs das variantes DLP/USB (1-1 e 2-1): opcionais -- listados quando
     # existirem, sem aviso quando ausentes. Caminho relativo a TraceRunDir.
     $variantCSVs = [ordered]@{
         "1_cpu_memo/dlp_usb/cpu_memoria_dlp.csv" = "cpu_memoria_dlp.csv"
         "2_disco/disco_usb.csv"                  = "disco_usb.csv"
     }
 
-    $copied  = 0
+    $found   = 0
     $missing = 0
 
     foreach ($folder in ($expectedCSVs.Keys | Sort-Object { Get-NaturalSortKey $_ })) {
@@ -1007,41 +1071,167 @@ function Copy-ThematicCSVs {
         $sourcePath = Join-Path $TraceRunDir (Join-Path $folder $csvName)
 
         if (Test-Path $sourcePath) {
-            $destPath = Join-Path $ResultadosDir $csvName
-            Copy-Item -Path $sourcePath -Destination $destPath -Force
-            Write-Host "  [OK] $csvName copiado" -ForegroundColor Green
-            $copied++
+            Write-Host "  [OK] $csvName" -ForegroundColor Green
+            $found++
         } else {
             $testFolder = Join-Path $TraceRunDir $folder
             if (Test-Path $testFolder) {
                 Write-Host "  [!] $csvName nao encontrado -- teste executado mas CSV nao foi gerado" -ForegroundColor Yellow
                 Add-Content -Path $LogFile -Value "[AVISO] CSV tematico '$csvName' nao gerado pelo teste em '$folder'" -Encoding UTF8
+                $missing++
             } else {
                 Write-Host "  [--] $csvName -- teste pendente `($folder nao executado`)" -ForegroundColor DarkGray
                 Add-Content -Path $LogFile -Value "[INFO] CSV tematico '$csvName' pendente -- teste '$folder' nao executado" -Encoding UTF8
             }
-            $missing++
         }
     }
 
     foreach ($relPath in $variantCSVs.Keys) {
-        $sourcePath = Join-Path $TraceRunDir $relPath
-        if (Test-Path $sourcePath) {
-            $csvName = $variantCSVs[$relPath]
-            Copy-Item -Path $sourcePath -Destination (Join-Path $ResultadosDir $csvName) -Force
-            Write-Host "  [OK] $csvName copiado" -ForegroundColor Green
-            $copied++
+        if (Test-Path (Join-Path $TraceRunDir $relPath)) {
+            Write-Host "  [OK] $($variantCSVs[$relPath])" -ForegroundColor Green
+            $found++
         }
     }
 
     if ($missing -gt 0) { $resultColor = "Yellow" } else { $resultColor = "Green" }
-    Write-Host "  Resultado: ${copied} copiado`(s`), ${missing} pendente`(s`)/ausente`(s`)" -ForegroundColor $resultColor
+    Write-Host "  Resultado: ${found} encontrado`(s`), ${missing} ausente`(s`)" -ForegroundColor $resultColor
+    return [PSCustomObject]@{ Found = $found; Missing = $missing }
+}
+
+# ---- Exportacao dos traces (pasta Exportar) ----------------------------------
+
+# Destino da exportacao: Exportar/<cenario>/<modelo> - <patrimonio>.
+# Cada parte passa pela limpeza de nome de pasta (sem '\', '/', ':'...), entao
+# o destino nunca sai de ExportarDir, mesmo com _state.json editado a mao.
+function Get-ExportPath {
+    param([string]$ExportarDir, [PSCustomObject]$State)
+    $cenario    = ConvertTo-SafeFolderName (Get-StateField $State "scenario")
+    $modelo     = ConvertTo-SafeFolderName (Get-StateField $State "modelo")
+    $patrimonio = ConvertTo-SafeFolderName (Get-StateField $State "patrimonio")
+    if ([string]::IsNullOrWhiteSpace($cenario))    { $cenario    = "Execucao" }
+    if ([string]::IsNullOrWhiteSpace($modelo))     { $modelo     = "SemModelo" }
+    if ([string]::IsNullOrWhiteSpace($patrimonio)) { $patrimonio = "SemPatrimonio" }
+    return (Join-Path (Join-Path $ExportarDir $cenario) "$modelo - $patrimonio")
+}
+
+# Copia Traces/ para a pasta de exportacao sem .etl, sem logs (.log e pastas
+# logs/) e sem pastas vazias. Traces/ nao e alterada. Idempotente: o destino
+# e recriado a cada chamada. Devolve um resumo ou $null em caso de erro.
+# Usa sempre -LiteralPath: '[' e ']' sao validos em nome de pasta e, com
+# -Path, virariam curinga (e poderiam apagar a exportacao de outro cenario).
+function Export-ScenarioTraces {
+    param(
+        [string]$TraceRunDir,
+        [string]$ExportarDir,
+        [PSCustomObject]$State,
+        [string]$LogFile
+    )
+
+    $dest = Get-ExportPath -ExportarDir $ExportarDir -State $State
+    Write-Host "`n  Gerando pasta de exportacao..." -ForegroundColor DarkCyan
+
+    if (-not (Test-Path -LiteralPath $TraceRunDir)) {
+        Write-Host "  [!] Pasta Traces nao encontrada: $TraceRunDir" -ForegroundColor Red
+        return $null
+    }
+
+    if (Test-Path -LiteralPath $dest) {
+        Write-Host "  [i] Substituindo exportacao existente: $dest" -ForegroundColor DarkGray
+        Remove-Item -LiteralPath $dest -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $dest) {
+            Write-Host "  [!] Nao foi possivel limpar a exportacao anterior (arquivo aberto?). Feche os arquivos e use [E] para exportar de novo." -ForegroundColor Red
+            if ($LogFile) { Add-Content -Path $LogFile -Value "[ERRO] Exportacao anterior nao pode ser removida: $dest" -Encoding UTF8 }
+            return $null
+        }
+    }
+    New-Item -ItemType Directory -Path $dest -Force | Out-Null
+
+    # Um ZIP de uma exportacao anterior ficaria desatualizado: remove
+    $staleZip = "$dest.zip"
+    if (Test-Path -LiteralPath $staleZip) {
+        Remove-Item -LiteralPath $staleZip -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $staleZip) {
+            Write-Host "  [!] ZIP anterior (desatualizado) nao pode ser removido, esta aberto? $staleZip" -ForegroundColor Yellow
+        } else {
+            Write-Host "  [i] ZIP anterior removido (desatualizado): $staleZip" -ForegroundColor DarkGray
+        }
+    }
+
+    # Contabiliza o que fica de fora (para o resumo). Soma sem Measure-Object:
+    # no PS 5.1, Measure-Object de lista vazia nao tem .Sum (quebra no StrictMode).
+    $srcFiles  = @(Get-ChildItem -LiteralPath $TraceRunDir -Recurse -File -Force -ErrorAction SilentlyContinue)
+    $traceRoot = (Resolve-Path -LiteralPath $TraceRunDir).ProviderPath.TrimEnd('\')
+    $excluded  = @($srcFiles | Where-Object {
+        $rel = $_.FullName.Substring($traceRoot.Length)
+        $_.Extension -eq '.etl' -or $_.Extension -eq '.log' -or $rel -match '(?i)\\logs\\'
+    })
+    $etlCount = @($excluded | Where-Object { $_.Extension -eq '.etl' }).Count
+    [long]$excludedBytes = 0
+    foreach ($f in $excluded) { $excludedBytes += $f.Length }
+
+    # robocopy: /E subpastas; /XF e /XD exclusoes; exit code < 8 = sucesso.
+    # Sem barra final: robocopy le '\"' como aspas escapadas em caminhos com espaco
+    $null = & robocopy.exe $TraceRunDir.TrimEnd('\') $dest.TrimEnd('\') /E /XF *.etl *.log /XD logs /R:1 /W:1 /NFL /NDL /NJH /NJS /NP
+    $rc = $LASTEXITCODE
+    if ($rc -ge 8) {
+        Write-Host "  [!] Falha ao copiar para a exportacao (robocopy exit $rc)." -ForegroundColor Red
+        if ($LogFile) { Add-Content -Path $LogFile -Value "[ERRO] Exportacao falhou (robocopy exit $rc): $dest" -Encoding UTF8 }
+        Remove-Item -LiteralPath $dest -Recurse -Force -ErrorAction SilentlyContinue
+        return $null
+    }
+
+    # Remove pastas vazias, das mais profundas para as mais rasas
+    Get-ChildItem -LiteralPath $dest -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+        Sort-Object { $_.FullName.Length } -Descending |
+        Where-Object { @(Get-ChildItem -LiteralPath $_.FullName -Force).Count -eq 0 } |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+
+    $outFiles = @(Get-ChildItem -LiteralPath $dest -Recurse -File -Force -ErrorAction SilentlyContinue)
+    [long]$outBytes = 0
+    foreach ($f in $outFiles) { $outBytes += $f.Length }
+
+    # Modulos que tinham arquivos em Traces/ mas sumiram da exportacao (so .etl/logs):
+    # ex.: 1_cpu_memo sem o .wpaProfile grava os .etl e pula os CSVs do WPA.
+    # Pastas de 1o nivel com arquivos na origem (reaproveita $srcFiles); 'logs' e
+    # excluida de proposito pelo robocopy, entao nao conta como modulo vazio.
+    $srcModules = @($srcFiles | ForEach-Object {
+        $rel = $_.FullName.Substring($traceRoot.Length).TrimStart('\')
+        if ($rel.Contains('\')) { $rel.Split('\')[0] }
+    } | Select-Object -Unique)
+    $emptyModules = @()
+    foreach ($m in $srcModules) {
+        if ($m -ieq 'logs') { continue }
+        if (-not (Test-Path -LiteralPath (Join-Path $dest $m))) { $emptyModules += $m }
+    }
+
+    $summary = [PSCustomObject]@{
+        Path          = $dest
+        Files         = $outFiles.Count
+        SizeMB        = [Math]::Round($outBytes / 1MB, 1)
+        ExcludedFiles = $excluded.Count
+        ExcludedEtl   = $etlCount
+        ExcludedMB    = [Math]::Round($excludedBytes / 1MB, 1)
+        EmptyModules  = $emptyModules
+    }
+
+    Write-Host "  [OK] Exportacao pronta: $dest" -ForegroundColor Green
+    Write-Host "       $($summary.Files) arquivo(s), $($summary.SizeMB) MB" -ForegroundColor DarkCyan
+    Write-Host "       Fora da exportacao: $($summary.ExcludedFiles) arquivo(s) ($($summary.ExcludedEtl) .etl), $($summary.ExcludedMB) MB" -ForegroundColor DarkGray
+    if ($LogFile) {
+        Add-Content -Path $LogFile -Value "[INFO] Exportacao: $dest | $($summary.Files) arquivo(s), $($summary.SizeMB) MB | excluidos: $($summary.ExcludedFiles) ($($summary.ExcludedEtl) .etl), $($summary.ExcludedMB) MB" -Encoding UTF8
+    }
+    foreach ($m in $emptyModules) {
+        Write-Host "  [!] $m ficou fora da exportacao: so tinha .etl, .log ou pastas logs/. As evidencias estao apenas em Execucoes/ (verifique o teste, ex.: .wpaProfile ausente)." -ForegroundColor Yellow
+        if ($LogFile) { Add-Content -Path $LogFile -Value "[AVISO] Modulo '$m' sem nenhum arquivo na exportacao (so .etl/logs em Traces)" -Encoding UTF8 }
+    }
+    return $summary
 }
 
 # ---- Exportacao de Cenario para ZIP ------------------------------------------
 
+# Menu [E]: regera a pasta de exportacao de um cenario existente e oferece o ZIP.
 function Export-ScenarioZip {
-    param([string]$ExecucoesDir)
+    param([string]$ExecucoesDir, [string]$ExportarDir)
 
     $scenarios = Get-ExistingScenarios -ExecucoesDir $ExecucoesDir
 
@@ -1062,99 +1252,73 @@ function Export-ScenarioZip {
         $num = 0
         if ([int]::TryParse($choice, [ref]$num) -and $num -ge 1 -and $num -le $scenarios.Count) {
             $selected = $scenarios[$num - 1]
-            Compress-And-Validate -ScenarioPath $selected.Path -ExecucoesDir $ExecucoesDir
+            $traceDir = Join-Path $selected.Path "Traces"
+            $state    = Ensure-MachineIdentity -State $selected.State -TraceRunDir $traceDir
+            $summary  = Export-ScenarioTraces -TraceRunDir $traceDir -ExportarDir $ExportarDir -State $state
+            if ($null -ne $summary) { Request-ExportZip -ExportPath $summary.Path }
             return
         }
         Write-Host "  [!] Opcao invalida." -ForegroundColor Red
     }
 }
 
-function Compress-And-Validate {
-    param(
-        [string]$ScenarioPath,
-        [string]$ExecucoesDir
-    )
-
-    $scenarioName = Split-Path $ScenarioPath -Leaf
-    $zipPath = Join-Path $ExecucoesDir "$scenarioName.zip"
-
-    Write-Host "`n  Compactando cenario '$scenarioName'..." -ForegroundColor Cyan
-
-    $originalFiles = @(Get-ChildItem -Path $ScenarioPath -Recurse -File -ErrorAction SilentlyContinue)
-    $originalCount = $originalFiles.Count
-
-    if ($originalCount -eq 0) {
-        Write-Host "  [!] Pasta do cenario esta vazia. Nada para compactar." -ForegroundColor Yellow
-        return
-    }
-
-    if (Test-Path $zipPath) { Remove-Item -Path $zipPath -Force }
-    Compress-Archive -Path "$ScenarioPath\*" -DestinationPath $zipPath -Force
-
-    try {
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
-        $zipFileCount = @($zip.Entries | Where-Object { -not $_.FullName.EndsWith('/') }).Count
-        $zip.Dispose()
-
-        if ($zipFileCount -eq 0) {
-            Write-Host "  [!] ZIP gerado esta vazio!" -ForegroundColor Red
-            $retry = Read-Host "  Deseja gerar o ZIP novamente? (S/N)"
-            if ($retry -eq 'S' -or $retry -eq 's') {
-                Remove-Item -Path $zipPath -Force
-                Compress-And-Validate -ScenarioPath $ScenarioPath -ExecucoesDir $ExecucoesDir
-            }
-            return
-        }
-
-        if ($zipFileCount -ne $originalCount) {
-            Write-Host "  [!] ZIP incompleto: $originalCount arquivos na pasta, $zipFileCount no ZIP" -ForegroundColor Red
-            $retry = Read-Host "  Deseja gerar o ZIP novamente? (S/N)"
-            if ($retry -eq 'S' -or $retry -eq 's') {
-                Remove-Item -Path $zipPath -Force
-                Compress-And-Validate -ScenarioPath $ScenarioPath -ExecucoesDir $ExecucoesDir
-            }
-            return
-        }
-
-        Remove-Item -Path $ScenarioPath -Recurse -Force
-        Write-Host "  [OK] ZIP gerado e validado. Pasta original removida." -ForegroundColor Green
-        Write-Host "  Arquivo: $zipPath `($zipFileCount arquivos`)" -ForegroundColor DarkCyan
-
-    } catch {
-        Write-Host "  [!] Erro ao validar ZIP: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "  Pasta original mantida: $ScenarioPath" -ForegroundColor Yellow
+# Pergunta se compacta a pasta exportada da maquina; o ZIP fica ao lado dela.
+function Request-ExportZip {
+    param([string]$ExportPath)
+    Write-Host ""
+    $zipChoice = Read-Host "  Deseja compactar a pasta exportada em ZIP? (S/N)"
+    if ($zipChoice -eq 'S' -or $zipChoice -eq 's') {
+        Compress-And-Validate -SourcePath $ExportPath -ZipPath "$ExportPath.zip"
     }
 }
 
-# ---- Geracao de cenario.csv (Resultados) -------------------------------------
-
-function Build-ScenarioCSV {
+# Compacta SourcePath em ZipPath (com a pasta como raiz do ZIP) e valida pela
+# contagem de arquivos. Nao apaga nada: Traces/ e a pasta exportada ficam.
+function Compress-And-Validate {
     param(
-        [string]$ResultadosDir,
-        [PSCustomObject]$State
+        [string]$SourcePath,
+        [string]$ZipPath
     )
 
-    Write-Host "  Gerando cenario.csv..." -ForegroundColor DarkCyan
+    $name = Split-Path $SourcePath -Leaf
+    Write-Host "`n  Compactando '$name'..." -ForegroundColor Cyan
 
-    $csvPath = Join-Path $ResultadosDir "cenario.csv"
-    $csvHeader = "Nome do Cenario,Hostname,Nome do Teste,Categoria,Status,Duracao (s),Exit Code,Run,Data da Execucao"
-    $csvLines = @($csvHeader)
-
-    # Usar resultado consolidado (ultimo status de cada teste)
-    $latest = Get-LatestTestResults -State $State
-    foreach ($key in ($latest.Keys | Sort-Object)) {
-        $r = $latest[$key]
-        # Encontrar o timestamp da run correspondente
-        $runTimestamp = ""
-        foreach ($run in $State.runs) {
-            if ($run.runId -eq $r.runId) { $runTimestamp = $run.timestamp; break }
-        }
-        $csvLines += "`"$($State.scenario)`",`"$($State.machine)`",`"$key`",`"$($r.folder)`",$($r.status),$($r.duration),$($r.runId),$($r.runId),`"$runTimestamp`""
+    $originalCount = @(Get-ChildItem -LiteralPath $SourcePath -Recurse -File -Force -ErrorAction SilentlyContinue).Count
+    if ($originalCount -eq 0) {
+        Write-Host "  [!] Pasta vazia. Nada para compactar." -ForegroundColor Yellow
+        return
     }
 
-    Set-Content -Path $csvPath -Value $csvLines -Encoding UTF8
-    Write-Host "  [OK] cenario.csv gerado" -ForegroundColor Green
+    try {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        if (Test-Path -LiteralPath $ZipPath) { Remove-Item -LiteralPath $ZipPath -Force }
+        # CreateFromDirectory: sem o limite de 2 GB do Compress-Archive no PS 5.1
+        [System.IO.Compression.ZipFile]::CreateFromDirectory($SourcePath, $ZipPath, [System.IO.Compression.CompressionLevel]::Optimal, $true)
+
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+        try {
+            $zipFileCount = @($zip.Entries | Where-Object { -not $_.FullName.EndsWith('/') }).Count
+        } finally {
+            $zip.Dispose()
+        }
+
+        if ($zipFileCount -ne $originalCount) {
+            Write-Host "  [!] ZIP incompleto: $originalCount arquivos na pasta, $zipFileCount no ZIP. ZIP descartado." -ForegroundColor Red
+            Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue
+            $retry = Read-Host "  Deseja gerar o ZIP novamente? (S/N)"
+            if ($retry -eq 'S' -or $retry -eq 's') {
+                Compress-And-Validate -SourcePath $SourcePath -ZipPath $ZipPath
+            }
+            return
+        }
+
+        $zipMB = [Math]::Round((Get-Item -LiteralPath $ZipPath).Length / 1MB, 1)
+        Write-Host "  [OK] ZIP gerado e validado: $ZipPath `($zipFileCount arquivos, $zipMB MB`)" -ForegroundColor Green
+    } catch {
+        Write-Host "  [!] Erro ao gerar/validar ZIP: $($_.Exception.Message). ZIP descartado." -ForegroundColor Red
+        # Nao deixa um ZIP parcial com o nome do ZIP valido
+        Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # ---- MAIN -------------------------------------------------------------------
@@ -1164,7 +1328,7 @@ Write-Header
 Write-Host "  [!] Removendo bloqueios de seguranca (Unblock-File)..." -ForegroundColor DarkGray
 Get-ChildItem -Path $PSScriptRoot -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 
-foreach ($dir in @($ResultadosDir, $ExecucoesDir)) {
+foreach ($dir in @($ExportarDir, $ExecucoesDir)) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 }
 
@@ -1178,7 +1342,7 @@ $currentRunId    = 1
 
 # Tratar modo "export" (opcao [E])
 if ($scenarioChoice.Mode -eq "export") {
-    Export-ScenarioZip -ExecucoesDir $ExecucoesDir
+    Export-ScenarioZip -ExecucoesDir $ExecucoesDir -ExportarDir $ExportarDir
     exit 0
 }
 
@@ -1187,7 +1351,7 @@ if ($scenarioChoice.Mode -eq "continue") {
     $traceRunDir     = Join-Path $scenarioDir "Traces"
     $logRunDir       = Join-Path $scenarioDir "Logs"
     if (-not (Test-Path $logRunDir)) { New-Item -ItemType Directory -Path $logRunDir -Force | Out-Null }
-    $stateObj        = $scenarioChoice.State
+    $stateObj        = Ensure-MachineIdentity -State $scenarioChoice.State -TraceRunDir $traceRunDir
     $previousResults = Get-LatestTestResults -State $stateObj
     $currentRunId    = ($stateObj.runs | Measure-Object).Count + 1
     Write-Host "`n  Continuando cenario: $(Split-Path $scenarioDir -Leaf) `(run #$currentRunId`)" -ForegroundColor Cyan
@@ -1206,15 +1370,9 @@ if ($scenarioChoice.Mode -eq "continue") {
     New-Item -ItemType Directory -Path $traceRunDir -Force | Out-Null
     New-Item -ItemType Directory -Path $logRunDir -Force | Out-Null
 
-    $stateObj = New-StateObject -Scenario $scenarioChoice.Name -Machine $env:COMPUTERNAME
+    $stateObj = New-StateObject -Scenario $scenarioChoice.Name -Machine $env:COMPUTERNAME -Modelo $scenarioChoice.Modelo -Patrimonio $scenarioChoice.Patrimonio
     Write-StateFile -TraceRunDir $traceRunDir -State $stateObj
     Write-Host "`n  Novo cenario criado: $(Split-Path $scenarioDir -Leaf)" -ForegroundColor Cyan
-}
-
-# Diretorio de resultados estruturados
-$resultadosCenarioDir = Join-Path $ResultadosDir (Split-Path $scenarioDir -Leaf)
-if (-not (Test-Path $resultadosCenarioDir)) {
-    New-Item -ItemType Directory -Path $resultadosCenarioDir -Force | Out-Null
 }
 
 $logFile     = Join-Path $logRunDir "run_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
@@ -1224,7 +1382,7 @@ $allResults    = [System.Collections.Generic.List[PSCustomObject]]::new()
 $setupResults  = [System.Collections.Generic.List[PSCustomObject]]::new()
 $runStart      = Get-Date
 
-$logHeader = "WINTESTHUB -- $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`nHost: $env:COMPUTERNAME | User: $env:USERNAME`nCenario: $(Split-Path $scenarioDir -Leaf) | Run: #$currentRunId`nSetupRoot: $SetupRoot`nTestsRoot: $TestsRoot`nTracesDir: $traceRunDir`nLogsDir: $logRunDir`nResultados: $resultadosCenarioDir`n$('-'*62)"
+$logHeader = "WINTESTHUB -- $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`nHost: $env:COMPUTERNAME | User: $env:USERNAME`nCenario: $(Split-Path $scenarioDir -Leaf) | Run: #$currentRunId`nSetupRoot: $SetupRoot`nTestsRoot: $TestsRoot`nTracesDir: $traceRunDir`nLogsDir: $logRunDir`nExportar: $(Get-ExportPath -ExportarDir $ExportarDir -State $stateObj)`n$('-'*62)"
 Add-Content -Path $logFile -Value $logHeader -Encoding UTF8
 
 # ==== FASE 1: PREPARACAO =====================================================
@@ -1378,19 +1536,13 @@ Write-StateFile -TraceRunDir $traceRunDir -State $stateObj
 # Relatorio por run (Logs/)
 Show-Summary -Results $allResults.ToArray() -LogFile $logFile -ResultsFile $resultsFile -TotalSec ((Get-Date) - $runStart).TotalSeconds
 
-# Relatorio consolidado (Traces/cenario/)
+# ---- Inventario da maquina, relatorio consolidado e CSVs tematicos ----------
+Collect-MachineInfo -OutputDir $traceRunDir -State $stateObj
 Build-ConsolidatedReport -TraceRunDir $traceRunDir -State $stateObj
+Test-ThematicCSVs -TraceRunDir $traceRunDir -LogFile $logFile | Out-Null
 
-# ---- Resultados Estruturados ------------------------------------------------
-Collect-MachineInfo -OutputDir $resultadosCenarioDir
-Build-ScenarioCSV -ResultadosDir $resultadosCenarioDir -State $stateObj
-Copy-ThematicCSVs -TraceRunDir $traceRunDir -ResultadosDir $resultadosCenarioDir -LogFile $logFile
+# ---- Pasta de exportacao (Traces sem .etl, logs e pastas vazias) ------------
+$exportSummary = Export-ScenarioTraces -TraceRunDir $traceRunDir -ExportarDir $ExportarDir -State $stateObj -LogFile $logFile
 
-Write-Host "`n  Resultados estruturados salvos em: $resultadosCenarioDir" -ForegroundColor Magenta
-
-# ---- Pergunta de Exportacao ZIP ---------------------------------------------
-Write-Host ""
-$exportChoice = Read-Host "  Deseja exportar este cenario para ZIP? (S/N)"
-if ($exportChoice -eq 'S' -or $exportChoice -eq 's') {
-    Compress-And-Validate -ScenarioPath $scenarioDir -ExecucoesDir $ExecucoesDir
-}
+# ---- Pergunta de ZIP (da pasta exportada) -----------------------------------
+if ($null -ne $exportSummary) { Request-ExportZip -ExportPath $exportSummary.Path }
