@@ -1799,6 +1799,18 @@ function Test-CommandAvailable {
     return [bool](Get-Command $Cmd -CommandType Application -ErrorAction SilentlyContinue)
 }
 
+function Test-LibreOfficeAvailable {
+    if (-not [string]::IsNullOrWhiteSpace($env:HUB_LIBREOFFICE_PATH) -and (Test-Path -LiteralPath $env:HUB_LIBREOFFICE_PATH)) { return $true }
+    if (Test-CommandAvailable -Cmd "soffice") { return $true }
+    foreach ($p in @(
+        "C:\Program Files\LibreOffice\program\soffice.exe",
+        "C:\Program Files (x86)\LibreOffice\program\soffice.exe"
+    )) {
+        if (Test-Path -LiteralPath $p) { return $true }
+    }
+    return $false
+}
+
 function Test-SpeedtestConfigured {
     param([string]$HubRoot)
     if (-not [string]::IsNullOrWhiteSpace($env:HUB_SPEEDTEST_URL)) { return $true }
@@ -1892,6 +1904,13 @@ function Get-PreflightFindings {
             if (-not (Test-CommandAvailable -Cmd $exe)) {
                 $findings.Add((New-PreflightFinding "Impede" $names "$exe.exe nao encontrado no PATH ($folder)" "Instale o Windows Performance Toolkit (Windows ADK) e reabra o hub"))
             }
+        }
+    }
+
+    if ($byFolder.Contains("1_cpu_memo")) {
+        $loNames = @($byFolder["1_cpu_memo"] | Where-Object { $_ -match '^1_automacao_performance\.' })
+        if ($loNames.Count -gt 0 -and -not (Test-LibreOfficeAvailable)) {
+            $findings.Add((New-PreflightFinding "Impede" $loNames "LibreOffice (soffice.exe) nao encontrado (1_cpu_memo)" "Instale: rode o Setup 3_softwares_msStore"))
         }
     }
 
@@ -2064,7 +2083,14 @@ function Get-TestLeftovers {
     $edge = @($procs | Where-Object { $_.Name -match '^msedge\.exe$' -and ([string]$_.CommandLine -match '--enable-automation' -or $drvPids -contains [int]$_.ParentProcessId) })
     $edgePids = @($drv | ForEach-Object { $_.ProcessId }) + @($edge | ForEach-Object { $_.ProcessId })
     if ($edgePids.Count -gt 0) {
-        & $add "edge" "Edge da automacao" "$($drv.Count) msedgedriver, $($edge.Count) msedge" $edgePids @("1_cpu_memo", "3_rede", "5_bateria", "6_wifi_fast_transition")
+        & $add "edge" "Edge da automacao" "$($drv.Count) msedgedriver, $($edge.Count) msedge" $edgePids @("3_rede", "5_bateria", "6_wifi_fast_transition")
+    }
+
+    # LibreOffice da automacao: soffice.exe ou soffice.bin com subperfil wintesthub_lo_profile
+    $lo = @($procs | Where-Object { $_.Name -match '^soffice\.(exe|bin)$' -and [string]$_.CommandLine -match '(?i)wintesthub_lo_profile' })
+    $loPids = @($lo | ForEach-Object { $_.ProcessId })
+    if ($loPids.Count -gt 0) {
+        & $add "libreoffice" "LibreOffice da automacao" "$($lo.Count) processo(s)" $loPids @("1_cpu_memo")
     }
 
     # Python rodando um script de Testes\ (o hub roda um teste por vez; fora
@@ -2114,9 +2140,38 @@ function Stop-TestLeftovers {
                     & podman compose -f $compose down -v 2>&1 | Out-Null
                 }
                 "podman-machine" { & podman machine stop 2>&1 | Out-Null }
+                "libreoffice"    {
+                    # Encerra apenas os PIDs do LibreOffice do teste (sem /T), preservando
+                    # descendentes nao relacionados ou processos protegidos por IgnorePids.
+                    $errosTk = [System.Collections.Generic.List[string]]::new()
+                    foreach ($p in $l.Pids) {
+                        $global:LASTEXITCODE = 0
+                        try {
+                            $tkOut = (& taskkill.exe /F /PID $p 2>&1 | Out-String).Trim()
+                            if ($LASTEXITCODE -ne 0) {
+                                $errosTk.Add("PID ${p}: codigo $LASTEXITCODE$(if ($tkOut) { " ($tkOut)" })")
+                            }
+                        } catch {
+                            $errosTk.Add("PID ${p}: $($_.Exception.Message)")
+                        }
+                    }
+                    if ($errosTk.Count -gt 0) { throw ($errosTk -join "; ") }
+                }
                 default          {
                     # taskkill /T leva junto os filhos (ex.: msedge aberto pelo driver)
-                    foreach ($p in $l.Pids) { & taskkill.exe /T /F /PID $p 2>&1 | Out-Null }
+                    $errosTk = [System.Collections.Generic.List[string]]::new()
+                    foreach ($p in $l.Pids) {
+                        $global:LASTEXITCODE = 0
+                        try {
+                            $tkOut = (& taskkill.exe /T /F /PID $p 2>&1 | Out-String).Trim()
+                            if ($LASTEXITCODE -ne 0) {
+                                $errosTk.Add("PID ${p}: codigo $LASTEXITCODE$(if ($tkOut) { " ($tkOut)" })")
+                            }
+                        } catch {
+                            $errosTk.Add("PID ${p}: $($_.Exception.Message)")
+                        }
+                    }
+                    if ($errosTk.Count -gt 0) { throw ($errosTk -join "; ") }
                 }
             }
             $done.Add("$($l.Nome) ($($l.Detalhe))")

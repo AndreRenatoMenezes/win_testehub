@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 
 $hubPath = (Resolve-Path $HubPath).Path
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($hubPath, [ref]$null, [ref]$null)
-foreach ($nome in "New-PreflightFinding", "Get-DevModuleTools", "Test-SpeedtestConfigured", "Get-PreflightFindings",
+foreach ($nome in "New-PreflightFinding", "Get-DevModuleTools", "Test-SpeedtestConfigured", "Test-LibreOfficeAvailable", "Get-PreflightFindings",
                 "Test-WprRecording", "Get-TestLeftovers", "Remove-BlockedTests", "Get-BlockReason", "Clear-TestLeftovers", "Stop-TestLeftovers") {
     $fn = $ast.FindAll({
         param($node)
@@ -47,6 +47,8 @@ function Get-PowerSource { $script:power }
 function Test-InternetReachable { param($HostName) $script:internet }
 function Get-FreeSpaceGB { param($Path) $script:freeGB }
 function Test-CommandAvailable { param($Cmd) $script:tools.ContainsKey($Cmd) -and $null -ne $script:tools[$Cmd] }
+$realTestLibreOffice = ${function:Test-LibreOfficeAvailable}
+function Test-LibreOfficeAvailable { Test-CommandAvailable -Cmd "soffice" }
 function Get-ToolVersion {
     param($Cmd, $VersionArgs)
     if (-not $script:tools.ContainsKey($Cmd) -or $null -eq $script:tools[$Cmd]) { return $null }
@@ -72,13 +74,14 @@ Set-Content -LiteralPath (Join-Path $testsRoot "10_dev_containers\cargas.json") 
 
 function New-T { param($Folder, $Name, $Type = "py") [PSCustomObject]@{ Name = $Name; Type = $Type; ParentFolder = $Folder } }
 $tCpu  = New-T "1_cpu_memo" "1_automacao_performance"
+$tCpuDlp = New-T "1_cpu_memo" "1-1_automacao_performance_dlp"
 $tRede = New-T "3_rede" "3_teste_rede"
 $tBat  = New-T "5_bateria" "5_teste_bateria"
 $tGo   = New-T "8_dev_go" "8_dev_go"
 $tPod  = New-T "10_dev_containers" "10_dev_containers"
 $tDisk = New-T "2_disco" "2_teste_disco"
 $settings = [PSCustomObject]@{ MinFreeGB = 20; CpuAlertPct = 10; InternetHost = "example.invalid" }
-$okTools = @{ wpr = "wpr"; wpaexporter = "wpa"; go = "go version go1.22.3 windows/amd64"; git = "git version 2.45.1"; podman = "podman version 5.2.0" }
+$okTools = @{ wpr = "wpr"; wpaexporter = "wpa"; soffice = "LibreOffice 24.8"; go = "go version go1.22.3 windows/amd64"; git = "git version 2.45.1"; podman = "podman version 5.2.0" }
 
 function Get-F { param($Tests) Get-PreflightFindings -Tests $Tests -TestsRoot $testsRoot -HubRoot $hub -Settings $settings -SkipLeftovers }
 function Find-Item { param($F, $Pattern) return ,@($F | Where-Object { $_.Item -match $Pattern }) }
@@ -101,6 +104,22 @@ try {
     $script:tools.Remove("wpaexporter")
     $f = Get-F @($tCpu)
     Assert-Condition ((Find-Item $f 'wpaexporter').Count -eq 1) "wpaexporter ausente -> Impede"
+    $script:tools = $okTools.Clone()
+
+    $script:tools.Remove("soffice")
+    $fLo = Find-Item (Get-F @($tCpu, $tCpuDlp)) 'LibreOffice'
+    Assert-Condition ($fLo.Count -eq 1 -and $fLo[0].Nivel -eq "Impede" -and $fLo[0].Acao -match 'Setup 3_softwares_msStore') "1_automacao_performance sem LibreOffice -> Impede mandando rodar o Setup 3"
+    Assert-Condition ($fLo.Count -eq 1 -and ($fLo[0].Testes -contains "1_automacao_performance.py") -and ($fLo[0].Testes -notcontains "1-1_automacao_performance_dlp.py")) "LibreOffice ausente bloqueia apenas 1_automacao_performance.py, nao 1-1_automacao_performance_dlp.py"
+    Assert-Condition ((Find-Item (Get-F @($tCpuDlp)) 'LibreOffice').Count -eq 0) "1-1_automacao_performance_dlp isolado sem LibreOffice -> sem achado de LibreOffice"
+    $fakeSoffice = Join-Path $hub "fake_soffice.exe"
+    Set-Content -LiteralPath $fakeSoffice -Value "bin"
+    $oldLoPath = $env:HUB_LIBREOFFICE_PATH
+    try {
+        $env:HUB_LIBREOFFICE_PATH = $fakeSoffice
+        Assert-Condition ([bool](& $realTestLibreOffice)) "sonda real Test-LibreOfficeAvailable reconhece HUB_LIBREOFFICE_PATH existente"
+    } finally {
+        $env:HUB_LIBREOFFICE_PATH = $oldLoPath
+    }
     $script:tools = $okTools.Clone()
 
     $f = Get-F @($tDisk)
@@ -207,7 +226,13 @@ try {
         [PSCustomObject]@{ Name = "diskspd.exe"; ProcessId = 30; ParentProcessId = 21; CommandLine = "diskspd.exe -c1G" },
         [PSCustomObject]@{ Name = "dotnet.exe"; ProcessId = 40; ParentProcessId = 1; CommandLine = 'dotnet.exe "C:\sdk\MSBuild.dll" /nodemode:1 /nodeReuse:true' },
         [PSCustomObject]@{ Name = "dotnet.exe"; ProcessId = 41; ParentProcessId = 1; CommandLine = 'dotnet.exe run --project app' },
-        [PSCustomObject]@{ Name = "VBCSCompiler.exe"; ProcessId = 42; ParentProcessId = 1; CommandLine = 'VBCSCompiler.exe' }
+        [PSCustomObject]@{ Name = "VBCSCompiler.exe"; ProcessId = 42; ParentProcessId = 1; CommandLine = 'VBCSCompiler.exe' },
+        [PSCustomObject]@{ Name = "soffice.bin"; ProcessId = 50; ParentProcessId = 1; CommandLine = '"soffice.bin" --writer C:\Users\user\doc.odt' },
+        [PSCustomObject]@{ Name = "soffice.exe"; ProcessId = 51; ParentProcessId = 1; CommandLine = '"soffice.exe" -env:UserInstallation=file:///C:/Temp/wintesthub_lo_profile_writer --writer' },
+        [PSCustomObject]@{ Name = "soffice.bin"; ProcessId = 52; ParentProcessId = 51; CommandLine = '"soffice.bin" -env:UserInstallation=file:///C:/Temp/wintesthub_lo_profile_writer --writer' },
+        [PSCustomObject]@{ Name = "notepad.exe"; ProcessId = 53; ParentProcessId = 51; CommandLine = '"notepad.exe" C:\Users\user\notas.txt' },
+        [PSCustomObject]@{ Name = "soffice.bin"; ProcessId = 54; ParentProcessId = 51; CommandLine = '"soffice.bin" -env:UserInstallation=file:///C:/Temp/wintesthub_lo_profile_calc --calc' },
+        [PSCustomObject]@{ Name = "soffice.bin"; ProcessId = 55; ParentProcessId = 51; CommandLine = '"soffice.bin" --writer user.odt' }
     )
     $script:podman = [PSCustomObject]@{ Available = $true; Containers = @("wintestehub-database"); MachineRunning = $true }
 
@@ -228,20 +253,42 @@ try {
     Assert-Condition ($ign.Count -eq 0) "processos que ja existiam antes do teste (IgnorePids) nao sao sobra"
     $edge5 = @(Get-TestLeftovers -TestsRoot $testsRoot -Folders @("5_bateria") | ForEach-Object { $_.Id })
     Assert-Condition ($edge5 -contains "edge") "Edge da automacao tambem e limpo depois do teste 5"
+    $loLeft = @($all | Where-Object { $_.Id -eq "libreoffice" })
+    Assert-Condition ($loLeft.Count -eq 1 -and ($loLeft[0].Pids -contains 51) -and ($loLeft[0].Pids -contains 52) -and ($loLeft[0].Pids -contains 54) -and ($loLeft[0].Pids -notcontains 50) -and ($loLeft[0].Pids -notcontains 53) -and ($loLeft[0].Pids -notcontains 55)) "LibreOffice da automacao exige wintesthub_lo_profile no CommandLine, ignorando LibreOffice do usuario (50), descendente nao relacionado (53) e filho soffice sem marcador (--writer user.odt, 55)"
+    $allIgn = Get-TestLeftovers -TestsRoot $testsRoot -Folders @("1_cpu_memo") -IgnorePids @(54)
+    $loIgn = @($allIgn | Where-Object { $_.Id -eq "libreoffice" })
+    Assert-Condition ($loIgn.Count -eq 1 -and ($loIgn[0].Pids -contains 51) -and ($loIgn[0].Pids -contains 52) -and ($loIgn[0].Pids -notcontains 54) -and ($loIgn[0].Pids -notcontains 53) -and ($loIgn[0].Pids -notcontains 55)) "LibreOffice respeita IgnorePids (54 protegido) e preserva descendente nao relacionado (53) e filho soffice sem marcador (55)"
 
     # Stop-TestLeftovers real, com stubs dos comandos externos
     $script:calls = @()
     function wpr { $script:calls += "wpr $($args -join ' ')" }
     function podman { $script:calls += "podman $($args -join ' ')" }
     function dotnet { $script:calls += "dotnet $($args -join ' ')" }
-    function taskkill.exe { $script:calls += "taskkill $($args -join ' ')" }
+    function taskkill.exe { $global:LASTEXITCODE = 0; $script:calls += "taskkill $($args -join ' ')" }
     function Test-CommandAvailable { param($Cmd) $true }
-    $toStop = @($all | Where-Object { @("wpr", "compose", "podman-machine", "diskspd") -contains $_.Id })
+    $toStop = @($all | Where-Object { @("wpr", "compose", "podman-machine", "diskspd") -contains $_.Id }) + $loIgn
     $null = Stop-TestLeftovers -Leftovers $toStop -TestsRoot $testsRoot
     Assert-Condition ($script:calls -contains "wpr -cancel") "sessao WPR encerrada com wpr -cancel"
     Assert-Condition (@($script:calls | Where-Object { $_ -match '^podman compose -f .*compose\.yml down -v$' }).Count -eq 1) "stack derrubada com podman compose down -v"
     Assert-Condition ($script:calls -contains "podman machine stop") "podman machine parada com podman machine stop"
     Assert-Condition ($script:calls -contains "taskkill /T /F /PID 30") "diskspd encerrado com taskkill /T"
+    Assert-Condition (($script:calls -contains "taskkill /F /PID 51") -and ($script:calls -contains "taskkill /F /PID 52") -and ($script:calls -notcontains "taskkill /T /F /PID 51") -and ($script:calls -notcontains "taskkill /F /PID 53") -and ($script:calls -notcontains "taskkill /F /PID 54") -and ($script:calls -notcontains "taskkill /F /PID 55")) "LibreOffice encerrado sem /T apenas nos PIDs com wintesthub_lo_profile (51, 52), preservando descendente nao relacionado (53), IgnorePids (54) e filho soffice sem marcador (55)"
+
+    # Tratamento de falha do taskkill em Stop-TestLeftovers (continua nos demais PIDs e reporta falha)
+    $script:callsFail = @()
+    function taskkill.exe {
+        $cmdStr = "taskkill $($args -join ' ')"
+        $script:callsFail += $cmdStr
+        if ($cmdStr -match 'PID 51$') {
+            $global:LASTEXITCODE = 128
+            Write-Output "ERRO: processo 51 nao encontrado"
+            return
+        }
+        $global:LASTEXITCODE = 0
+    }
+    $resFail = @(Stop-TestLeftovers -Leftovers $loIgn -TestsRoot $testsRoot)
+    Assert-Condition (($script:callsFail -contains "taskkill /F /PID 51") -and ($script:callsFail -contains "taskkill /F /PID 52")) "falha do taskkill no primeiro PID (51) ainda tenta encerrar os demais PIDs do teste (52)"
+    Assert-Condition ($resFail.Count -eq 1 -and $resFail[0] -match 'LibreOffice da automacao: falha ao encerrar.*PID 51.*codigo 128') "Stop-TestLeftovers captura e relata falha do taskkill ($($resFail[0]))"
     Assert-Condition ($ids -contains "diskspd") "diskspd detectado"
     $bs = @($all | Where-Object { $_.Id -eq "dotnet" })
     Assert-Condition ($bs.Count -eq 1 -and $bs[0].Pids -contains 40 -and $bs[0].Pids -contains 42 -and $bs[0].Pids -notcontains 41) "build servers do .NET detectados; dotnet comum fica"
@@ -250,7 +297,7 @@ try {
     Assert-Condition ($keep -notcontains "podman-machine") "podman machine mantida quando a fila ainda usa o modulo 10"
 
     $only1 = @(Get-TestLeftovers -TestsRoot $testsRoot -Folders @("1_cpu_memo") | ForEach-Object { $_.Id })
-    Assert-Condition (($only1 -contains "wpr") -and ($only1 -contains "edge") -and ($only1 -contains "python") -and ($only1 -notcontains "diskspd") -and ($only1 -notcontains "compose")) "filtro por teste: depois do modulo 1 so as sobras dele (+ Python de teste)"
+    Assert-Condition (($only1 -contains "wpr") -and ($only1 -contains "libreoffice") -and ($only1 -contains "python") -and ($only1 -notcontains "edge") -and ($only1 -notcontains "diskspd") -and ($only1 -notcontains "compose")) "filtro por teste: depois do modulo 1 so as sobras dele (wpr, libreoffice, python; sem edge)"
 
     # Clear-TestLeftovers encerra (Stop-TestLeftovers substituido) e registra
     $script:stopped = @()

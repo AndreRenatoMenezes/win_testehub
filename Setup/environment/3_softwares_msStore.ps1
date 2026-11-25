@@ -1,6 +1,6 @@
-# ---------------------------------------------------------------- objective
+﻿# ---------------------------------------------------------------- objective
 # Script: Instalação Automatizada (Admin)
-# Apps: CrystalDiskMark, CrystalDiskInfo e Windows ADK
+# Apps: CrystalDiskMark, CrystalDiskInfo, Windows ADK e LibreOffice
 # Integração: Validação HTTP, Retry Loop e Clean Output
 # --------------------------------------------------------------------------
 
@@ -42,7 +42,8 @@ if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
 $apps = @(
     "Microsoft.WindowsADK",
     "CrystalDewWorld.CrystalDiskMark",
-    "CrystalDewWorld.CrystalDiskInfo"
+    "CrystalDewWorld.CrystalDiskInfo",
+    "TheDocumentFoundation.LibreOffice"
 )
 
 # 5. Loop de Instalação com Verificação, Retry e Log Limpo
