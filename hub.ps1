@@ -1,3 +1,7 @@
+# -Retomar <pasta do cenario>: usado pela tarefa WinTestHub-Retomar depois de um
+# reinicio pedido por um setup (ver "Reinicio com retomada"). Sem ele, nada muda.
+param([string]$Retomar = "")
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
@@ -110,6 +114,7 @@ $BrandCss = @'
             .bg-PASS { background-color: #2e7c35; }
             .bg-FAIL { background-color: #c53030; }
             .bg-ERROR { background-color: #b45309; }
+            .bg-REINICIAR { background-color: #a16207; }
 '@
 
 # ---- Descoberta de scripts ---------------------------------------------------
@@ -286,6 +291,123 @@ function Get-LatestTestResults {
         }
     }
     return $latest
+}
+
+# ---- Reinicio com retomada (Setup 10) ----------------------------------------
+# Um setup que sai com 3010 (REINICIAR) pode reiniciar o Windows: o hub grava a
+# fila restante em Traces\_retomar.json e agenda a tarefa $ResumeTaskName, que
+# reabre o hub com -Retomar <cenario> no proximo logon (admin, sem UAC).
+
+$ResumeTaskName   = "WinTestHub-Retomar"
+$ResumeFileName   = "_retomar.json"
+$ResumeMaxReboots = 3
+
+# Fila a partir do setup que pediu o reinicio. reinicios conta pedidos seguidos
+# do mesmo setup (Previous = fila da retomada atual, ou $null).
+function New-ResumeQueue {
+    param([string]$ScenarioDir, [int]$RunId, [array]$Remaining, [string]$RequestedBy, $Previous)
+    $reinicios = 1
+    if ($null -ne $Previous -and [string]$Previous.pedidoPor -eq $RequestedBy) {
+        $reinicios = [int]$Previous.reinicios + 1
+    }
+    return [PSCustomObject]@{
+        scenarioDir = $ScenarioDir.TrimEnd('\')
+        runId       = $RunId
+        fila        = @($Remaining | ForEach-Object { "$($_.Name).$($_.Type)" })
+        pedidoPor   = $RequestedBy
+        reinicios   = $reinicios
+        criadoEm    = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+    }
+}
+
+function Write-ResumeQueue {
+    param([string]$TraceRunDir, [PSCustomObject]$Queue)
+    $Queue | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $TraceRunDir $ResumeFileName) -Encoding UTF8
+}
+
+# $null quando ausente, corrompida, incompleta ou de um cenario que nao existe mais.
+function Read-ResumeQueue {
+    param([string]$TraceRunDir)
+    $file = Join-Path $TraceRunDir $ResumeFileName
+    if (-not (Test-Path -LiteralPath $file)) { return $null }
+    try {
+        $q = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
+        foreach ($campo in "scenarioDir", "runId", "fila", "pedidoPor", "reinicios") {
+            if ($null -eq $q.PSObject.Properties[$campo]) { return $null }
+        }
+        if ([int]$q.runId -lt 1 -or @($q.fila).Count -eq 0) { return $null }
+        if (-not (Test-Path -LiteralPath ([string]$q.scenarioDir))) { return $null }
+        return $q
+    } catch {
+        return $null
+    }
+}
+
+function Remove-ResumeQueue {
+    param([string]$TraceRunDir)
+    if ([string]::IsNullOrEmpty($TraceRunDir)) { return }
+    Remove-Item -LiteralPath (Join-Path $TraceRunDir $ResumeFileName) -Force -ErrorAction SilentlyContinue
+}
+
+# Nomes da fila -> scripts atuais de Setup, na ordem da fila. Nome que nao
+# existe mais vai para Missing.
+function Resolve-ResumeQueue {
+    param([PSCustomObject]$Queue, $Scripts)
+    $found   = @()
+    $missing = @()
+    foreach ($n in @($Queue.fila)) {
+        $s = @($Scripts | Where-Object { "$($_.Name).$($_.Type)" -eq [string]$n }) | Select-Object -First 1
+        if ($null -ne $s) { $found += $s } else { $missing += [string]$n }
+    }
+    return [PSCustomObject]@{ Found = $found; Missing = $missing }
+}
+
+function Unregister-ResumeTask {
+    $t = Get-ScheduledTask -TaskName $ResumeTaskName -ErrorAction SilentlyContinue
+    if ($null -ne $t) { Unregister-ScheduledTask -TaskName $ResumeTaskName -Confirm:$false -ErrorAction SilentlyContinue }
+}
+
+function Register-ResumeTask {
+    param([string]$HubPath, [string]$ScenarioDir)
+    Unregister-ResumeTask
+    $user = "$env:USERDOMAIN\$env:USERNAME"
+    $arg  = "-NoProfile -ExecutionPolicy Bypass -File `"$HubPath`" -Retomar `"$($ScenarioDir.TrimEnd('\'))`""
+    $action    = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $arg -WorkingDirectory (Split-Path -Parent $HubPath)
+    $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $user
+    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
+    $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
+    Register-ScheduledTask -TaskName $ResumeTaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force -ErrorAction Stop | Out-Null
+}
+
+# Pergunta S/N. S: grava a fila, agenda a tarefa e reinicia em 15 s ("reboot").
+# N, ou qualquer erro no caminho (desfaz o que fez): "continue". O state do
+# cenario ja foi gravado pelo loop antes desta chamada.
+function Request-RebootAndResume {
+    param([PSCustomObject]$Queue, [string]$TraceRunDir, [string]$HubPath, [string]$LogFile)
+    Write-Host "  [!] Este setup precisa reiniciar o Windows. Reiniciar agora? (S/N)" -ForegroundColor Yellow
+    Clear-KeyBuffer
+    $k = [Console]::ReadKey($true)
+    if ($k.KeyChar -ne 's' -and $k.KeyChar -ne 'S') {
+        Add-Content -LiteralPath $LogFile -Value "[INFO] $($Queue.pedidoPor) pediu reinicio; operador escolheu nao reiniciar agora" -Encoding UTF8
+        Write-Host "  Seguindo sem reiniciar.`n" -ForegroundColor DarkGray
+        return "continue"
+    }
+    try {
+        Write-ResumeQueue -TraceRunDir $TraceRunDir -Queue $Queue
+        Register-ResumeTask -HubPath $HubPath -ScenarioDir $Queue.scenarioDir
+        & shutdown.exe /r /t 15 /c "WinTestHub: reiniciando para concluir $($Queue.pedidoPor)" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "shutdown.exe retornou $LASTEXITCODE" }
+    } catch {
+        Unregister-ResumeTask
+        Remove-ResumeQueue -TraceRunDir $TraceRunDir
+        Write-Host "  [!] Nao foi possivel agendar o reinicio: $($_.Exception.Message). Seguindo sem reiniciar.`n" -ForegroundColor Red
+        Add-Content -LiteralPath $LogFile -Value "[AVISO] Reinicio pedido por $($Queue.pedidoPor) nao agendado: $($_.Exception.Message)" -Encoding UTF8
+        return "continue"
+    }
+    Add-Content -LiteralPath $LogFile -Value "[INFO] Reiniciando o Windows (pedido por $($Queue.pedidoPor), reinicio #$($Queue.reinicios)). Fila de retomada: $(@($Queue.fila) -join ', ')" -Encoding UTF8
+    Write-Host "`n  O Windows vai reiniciar em 15 segundos (cancelar: shutdown /a)." -ForegroundColor Cyan
+    Write-Host "  Depois do logon o hub abre sozinho e continua: $(@($Queue.fila) -join ', ')`n" -ForegroundColor Cyan
+    return "reboot"
 }
 
 # ---- Selecao de Cenario ------------------------------------------------------
@@ -781,6 +903,17 @@ function Update-SessionPath {
     $env:PATH = "$([System.Environment]::GetEnvironmentVariable('Path', 'Machine'));$([System.Environment]::GetEnvironmentVariable('Path', 'User'))"
 }
 
+# Codigo de saida padrao do Windows para "reinicio necessario" (ERROR_SUCCESS_REBOOT_REQUIRED).
+# Hoje so o Setup 10 o usa (recursos do WSL2 aguardando reinicio).
+$RebootExitCode = 3010
+
+function Get-ScriptStatus {
+    param([int]$ExitCode)
+    if ($ExitCode -eq 0) { return "PASS" }
+    if ($ExitCode -eq $RebootExitCode) { return "REINICIAR" }
+    return "FAIL"
+}
+
 function Invoke-TestScript {
     param([PSCustomObject]$Test, [string]$LogFile, [string]$TraceRunDir, [switch]$Silent)
 
@@ -833,7 +966,7 @@ function Invoke-TestScript {
         }
 
         $output = ($capturedOut -join "`n").Trim()
-        if ($exitCode -ne 0) { $status = "FAIL" }
+        $status = Get-ScriptStatus -ExitCode $exitCode
     }
     catch {
         $status   = "ERROR"
@@ -897,6 +1030,7 @@ function Show-Summary {
     $pass  = @($Results | Where-Object { $_.Status -eq "PASS"  }).Count
     $fail  = @($Results | Where-Object { $_.Status -eq "FAIL"  }).Count
     $err   = @($Results | Where-Object { $_.Status -eq "ERROR" }).Count
+    $rein  = @($Results | Where-Object { $_.Status -eq "REINICIAR" }).Count
     $totalTraces = ($Results | Measure-Object -Property TraceCount -Sum).Sum
 
     Write-Host "`n  +==========================================+" -ForegroundColor Cyan
@@ -909,7 +1043,7 @@ function Show-Summary {
             Write-Host "`n  -- $($group[0]) $( '-' * (26 - $group[0].Length) )" -ForegroundColor $group[1]
             foreach ($r in $group[2]) {
                 $clr  = if ($r.Status -eq "PASS") { "Green" } elseif ($r.Status -eq "FAIL") { "Red" } else { "Yellow" }
-                $icon = if ($r.Status -eq "PASS") { "[OK]" } elseif ($r.Status -eq "FAIL") { "[FAIL]" } else { "[ERR]" }
+                $icon = if ($r.Status -eq "PASS") { "[OK]" } elseif ($r.Status -eq "FAIL") { "[FAIL]" } elseif ($r.Status -eq "REINICIAR") { "[REIN]" } else { "[ERR]" }
                 Write-Host "  $icon " -NoNewline -ForegroundColor $clr
                 Write-Host $r.Display -NoNewline -ForegroundColor White
                 Write-Host "  $([Math]::Round($r.Duration,2))s  @ $($r.Timestamp)" -NoNewline -ForegroundColor DarkGray
@@ -926,7 +1060,7 @@ function Show-Summary {
     }
 
     Write-Host "`n  --------------------------------------------" -ForegroundColor DarkGray
-    Write-Host "  Total : $($Results.Count)   PASS: $pass   FAIL: $fail   ERROR: $err" -ForegroundColor White
+    Write-Host "  Total : $($Results.Count)   PASS: $pass   FAIL: $fail   ERROR: $err   REINICIAR: $rein" -ForegroundColor White
     Write-Host "  Tempo total  : $([Math]::Round($TotalSec,2))s" -ForegroundColor DarkGray
     Write-Host "  Traces salvos: $totalTraces arquivo(s)`n" -ForegroundColor DarkGray
 
@@ -939,7 +1073,7 @@ function Show-Summary {
 
     # ---- Exporta JSON
     $jsonPath = "$ResultsFile.json"
-    $jsonObj  = [PSCustomObject]@{ RunTimestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss"); Host = $env:COMPUTERNAME; TotalScripts = $Results.Count; Pass = $pass; Fail = $fail; Error = $err; TotalDuration = [Math]::Round($TotalSec,3); TotalTraces = $totalTraces; Scripts = $Results }
+    $jsonObj  = [PSCustomObject]@{ RunTimestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss"); Host = $env:COMPUTERNAME; TotalScripts = $Results.Count; Pass = $pass; Fail = $fail; Error = $err; Reiniciar = $rein; TotalDuration = [Math]::Round($TotalSec,3); TotalTraces = $totalTraces; Scripts = $Results }
     $jsonObj | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
 
     # ---- Exporta Relatorio HTML (NOVO)
@@ -963,7 +1097,7 @@ $BrandCss
             <p><strong>Utilizador:</strong> $env:USERNAME</p>
             <p><strong>Inicio da Execucao:</strong> $($jsonObj.RunTimestamp)</p>
             <p><strong>Tempo Total:</strong> $([Math]::Round($TotalSec,2))s</p>
-            <p><strong>Estatisticas:</strong> Total: $($Results.Count) | <span style="color:#2e7c35;font-weight:bold;">Aprovados: $pass</span> | <span style="color:#c53030;font-weight:bold;">Falhados: $fail</span> | <span style="color:#b45309;font-weight:bold;">Erros: $err</span></p>
+            <p><strong>Estatisticas:</strong> Total: $($Results.Count) | <span style="color:#2e7c35;font-weight:bold;">Aprovados: $pass</span> | <span style="color:#c53030;font-weight:bold;">Falhados: $fail</span> | <span style="color:#b45309;font-weight:bold;">Erros: $err</span> | <span style="color:#a16207;font-weight:bold;">Aguardando reinicio: $rein</span></p>
         </div>
         <table>
             <tr><th>Fase</th><th>Nome do Teste</th><th>Tipo</th><th>Status</th><th>Duracao</th><th>Traces Gerados</th></tr>
@@ -989,7 +1123,7 @@ $BrandCss
     Set-Content -LiteralPath $htmlPath -Value $html -Encoding UTF8
 
     # Appenda resumo no log
-    $summaryLog = "`n$('-'*62)`nRESUMO FINAL`nTotal: $($Results.Count) | PASS: $pass | FAIL: $fail | ERROR: $err`nTempo total: $([Math]::Round($TotalSec,2))s`nTraces: $totalTraces arquivo(s)`nHTML Gerado em: $htmlPath`n$('-'*62)"
+    $summaryLog = "`n$('-'*62)`nRESUMO FINAL`nTotal: $($Results.Count) | PASS: $pass | FAIL: $fail | ERROR: $err | REINICIAR: $rein`nTempo total: $([Math]::Round($TotalSec,2))s`nTraces: $totalTraces arquivo(s)`nHTML Gerado em: $htmlPath`n$('-'*62)"
     Add-Content -LiteralPath $LogFile -Value $summaryLog -Encoding UTF8
     
     Write-Host "  Relatorio HTML : $htmlPath" -ForegroundColor Magenta
@@ -1019,6 +1153,7 @@ function Build-ConsolidatedReport {
     $pass  = @($results | Where-Object { $_.Status -eq "PASS" }).Count
     $fail  = @($results | Where-Object { $_.Status -eq "FAIL" }).Count
     $err   = @($results | Where-Object { $_.Status -eq "ERROR" }).Count
+    $rein  = @($results | Where-Object { $_.Status -eq "REINICIAR" }).Count
     $total = $results.Count
     $totalDuration = ($results | Measure-Object -Property Duration -Sum).Sum
 
@@ -1068,6 +1203,7 @@ function Build-ConsolidatedReport {
         Pass          = $pass
         Fail          = $fail
         Error         = $err
+        Reiniciar     = $rein
         TotalDuration = [Math]::Round($totalDuration, 3)
         Tests         = $results
         Avisos        = @($warnings)
@@ -1145,7 +1281,7 @@ $BrandCss
             <p><strong>Criado em:</strong> $($State.createdAt)</p>
             <p><strong>Ultima execucao:</strong> $($State.lastRunAt)</p>
             <p><strong>Total de runs:</strong> $totalRuns</p>
-            <p><strong>Estatisticas:</strong> Total: $total | <span style="color:#2e7c35;font-weight:bold;">Aprovados: $pass</span> | <span style="color:#c53030;font-weight:bold;">Falhados: $fail</span> | <span style="color:#b45309;font-weight:bold;">Erros: $err</span></p>
+            <p><strong>Estatisticas:</strong> Total: $total | <span style="color:#2e7c35;font-weight:bold;">Aprovados: $pass</span> | <span style="color:#c53030;font-weight:bold;">Falhados: $fail</span> | <span style="color:#b45309;font-weight:bold;">Erros: $err</span> | <span style="color:#a16207;font-weight:bold;">Aguardando reinicio: $rein</span></p>
         </div>
         <table>
             <tr><th>Teste</th><th>Status</th><th>Duracao</th><th>Run</th><th>Pasta</th></tr>
@@ -2193,8 +2329,29 @@ foreach ($dir in @($ExportarDir, $ExecucoesDir)) {
 
 Write-Host ""
 
+# ---- Retomada apos reinicio -------------------------------------------------
+# A tarefa sai antes de tudo: o hub nao reabre no logon seguinte, e uma tarefa
+# esquecida de outra rodada tambem some.
+$resumeQueue = $null
+$resumeState = $null
+if (-not [string]::IsNullOrWhiteSpace($Retomar)) {
+    $resumeQueue = Read-ResumeQueue -TraceRunDir (Join-Path $Retomar.TrimEnd('\') "Traces")
+    if ($null -ne $resumeQueue) {
+        $resumeState = Read-StateFile -TraceRunDir (Join-Path $resumeQueue.scenarioDir "Traces")
+        if ($null -eq $resumeState) { $resumeQueue = $null }
+    }
+    if ($null -eq $resumeQueue) {
+        Write-Host "`n  [!] Fila de retomada ausente ou invalida em '$Retomar'. Abrindo o menu de cenario." -ForegroundColor Yellow
+    }
+}
+try { Unregister-ResumeTask } catch { Write-Host "  [!] Nao foi possivel remover a tarefa $ResumeTaskName`: $($_.Exception.Message)" -ForegroundColor Yellow }
+
 # ---- Selecao de cenario -----------------------------------------------------
-$scenarioChoice = Show-ScenarioMenu -ExecucoesDir $ExecucoesDir
+if ($null -ne $resumeQueue) {
+    $scenarioChoice = [PSCustomObject]@{ Mode = "continue"; Name = $resumeState.scenario; Path = $resumeQueue.scenarioDir; State = $resumeState }
+} else {
+    $scenarioChoice = Show-ScenarioMenu -ExecucoesDir $ExecucoesDir
+}
 
 $previousResults = @{}
 $currentRunId    = 1
@@ -2213,7 +2370,13 @@ if ($scenarioChoice.Mode -eq "continue") {
     $stateObj        = Ensure-MachineIdentity -State $scenarioChoice.State -TraceRunDir $traceRunDir
     $previousResults = Get-LatestTestResults -State $stateObj
     $currentRunId    = ($stateObj.runs | Measure-Object).Count + 1
-    Write-Host "`n  Continuando cenario: $(Split-Path $scenarioDir -Leaf) `(run #$currentRunId`)" -ForegroundColor Cyan
+    if ($null -ne $resumeQueue) {
+        # Mesmo run de antes do reinicio
+        $currentRunId = [int]$resumeQueue.runId
+        Write-Host "`n  Retomando cenario $(Split-Path $scenarioDir -Leaf) `(run #$currentRunId`) apos reinicio: $(@($resumeQueue.fila) -join ', ')" -ForegroundColor Cyan
+    } else {
+        Write-Host "`n  Continuando cenario: $(Split-Path $scenarioDir -Leaf) `(run #$currentRunId`)" -ForegroundColor Cyan
+    }
 } else {
     $runStamp           = Get-Date -Format "yyyy-MM-dd"
     $scenarioFolderName = "$($scenarioChoice.Name)_$($env:COMPUTERNAME)_$runStamp"
@@ -2246,7 +2409,12 @@ Add-Content -LiteralPath $logFile -Value $logHeader -Encoding UTF8
 
 # ==== FASE 1: PREPARACAO =====================================================
 
-if (-not $SkipSetup) {
+if ($null -ne $resumeQueue) {
+    Add-Content -LiteralPath $logFile -Value "Retomada apos reinicio (pedido por $($resumeQueue.pedidoPor), reinicio #$($resumeQueue.reinicios))" -Encoding UTF8
+}
+
+# Na retomada a fase 1 roda mesmo com SkipSetup: a fila veio de setups desta rodada.
+if (-not $SkipSetup -or $null -ne $resumeQueue) {
     $allSetup = Get-Scripts -Root $SetupRoot -Kind "setup"
     if ($allSetup.Count -gt 0) {
         Write-Host ""
@@ -2254,19 +2422,44 @@ if (-not $SkipSetup) {
         Write-Host "  |   FASE 1 -- PREPARACAO DA MAQUINA        |" -ForegroundColor DarkYellow
         Write-Host "  +------------------------------------------+" -ForegroundColor DarkYellow
 
-        $setupMenuItems = Build-MenuItems -Scripts $allSetup -PreviousResults $previousResults
-        Write-Host "`n  $($allSetup.Count) script(s) encontrados. Selecione os que deseja executar:`n" -ForegroundColor White
+        if ($null -ne $resumeQueue) {
+            # Sem menu: a fila gravada antes do reinicio, na mesma ordem
+            $resolved = Resolve-ResumeQueue -Queue $resumeQueue -Scripts $allSetup
+            foreach ($m in $resolved.Missing) {
+                Write-Host "  [!] $m estava na fila de retomada mas nao existe mais em Setup (ignorado)." -ForegroundColor Yellow
+                Add-Content -LiteralPath $logFile -Value "[AVISO] $m estava na fila de retomada mas nao existe mais em Setup" -Encoding UTF8
+            }
+            $setupToRun = @($resolved.Found)
+        } else {
+            $setupMenuItems = Build-MenuItems -Scripts $allSetup -PreviousResults $previousResults
+            Write-Host "`n  $($allSetup.Count) script(s) encontrados. Selecione os que deseja executar:`n" -ForegroundColor White
 
-        $afterSetup = Show-CheckboxMenu -Items $setupMenuItems
-        $setupToRun = @($afterSetup | Where-Object { $_.Selectable -and $_.Selected })
+            $afterSetup = Show-CheckboxMenu -Items $setupMenuItems
+            $setupToRun = @($afterSetup | Where-Object { $_.Selectable -and $_.Selected })
+        }
 
         if ($setupToRun.Count -gt 0) {
             Add-Content -LiteralPath $logFile -Value "`n-- PREPARACAO ($($setupToRun.Count) script(s)) --" -Encoding UTF8
             Write-Host "`n  Executando $($setupToRun.Count) script(s) de preparacao...`n" -ForegroundColor DarkYellow
 
-            foreach ($s in $setupToRun) {
+            for ($si = 0; $si -lt $setupToRun.Count; $si++) {
+                $s = $setupToRun[$si]
                 Write-Host "  >> $($s.Display) [$($s.Type.ToUpper())] ..." -ForegroundColor DarkYellow
                 $res = Invoke-TestScript -Test $s -LogFile $logFile -TraceRunDir $traceRunDir
+
+                # Pedido de reinicio: monta a fila (este setup e os seguintes). Na
+                # vez $ResumeMaxReboots seguida do mesmo setup vira FAIL.
+                $rebootQueue = $null
+                if ($res.Status -eq "REINICIAR") {
+                    $rebootQueue = New-ResumeQueue -ScenarioDir $scenarioDir -RunId $currentRunId -Remaining @($setupToRun[$si..($setupToRun.Count - 1)]) -RequestedBy "$($s.Name).$($s.Type)" -Previous $resumeQueue
+                    if ($rebootQueue.reinicios -ge $ResumeMaxReboots) {
+                        $res.Status       = "FAIL"
+                        $res.ErrorSnippet = "pediu reinicio $ResumeMaxReboots vezes seguidas"
+                        Add-Content -LiteralPath $logFile -Value "[AVISO] $($s.Name).$($s.Type) pediu reinicio $ResumeMaxReboots vezes seguidas: tratado como FAIL" -Encoding UTF8
+                        $rebootQueue = $null
+                    }
+                }
+
                 $allResults.Add($res)
                 $setupResults.Add($res)
 
@@ -2277,12 +2470,22 @@ if (-not $SkipSetup) {
                 $statusClr = if ($res.Status -eq "PASS") { "Green" } elseif ($res.Status -eq "FAIL") { "Red" } else { "Yellow" }
                 Write-Host "  >> Resultado: $($res.Status) ($([Math]::Round($res.Duration,2))s)`n" -ForegroundColor $statusClr
 
+                if ($null -ne $rebootQueue) {
+                    $decision = Request-RebootAndResume -Queue $rebootQueue -TraceRunDir $traceRunDir -HubPath $PSCommandPath -LogFile $logFile
+                    if ($decision -eq "reboot") {
+                        Show-Summary -Results $allResults.ToArray() -LogFile $logFile -ResultsFile $resultsFile -TotalSec ((Get-Date) - $runStart).TotalSeconds
+                        exit 0
+                    }
+                    continue
+                }
+
                 if ($res.Status -ne "PASS") {
                     Write-Host "  [!] Script de preparacao falhou. Deseja continuar? (S para continuar)" -ForegroundColor Yellow
                     Clear-KeyBuffer
                     $confirm = [Console]::ReadKey($true)
                     if ($confirm.KeyChar -ne 's' -and $confirm.KeyChar -ne 'S') {
                         Write-Host "`n  Execucao abortada.`n" -ForegroundColor Red
+                        if ($null -ne $resumeQueue) { Remove-ResumeQueue -TraceRunDir $traceRunDir }
                         Show-Summary -Results $allResults.ToArray() -LogFile $logFile -ResultsFile $resultsFile -TotalSec ((Get-Date) - $runStart).TotalSeconds
                         exit 1
                     }
@@ -2291,6 +2494,9 @@ if (-not $SkipSetup) {
         } else { Write-Host "`n  Nenhum setup selecionado.`n" -ForegroundColor DarkGray }
     }
 }
+
+# Retomada concluida (ou a fila ficou vazia): a fila sai do cenario
+if ($null -ne $resumeQueue) { Remove-ResumeQueue -TraceRunDir $traceRunDir }
 
 Update-SessionPath
 

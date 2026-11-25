@@ -2,8 +2,9 @@
 # Setup: Podman e WSL2 para o modulo 10 (containers)
 #
 # 1. Confere a virtualizacao (BIOS/hipervisor).
-# 2. Ativa o WSL2 se faltar (pode exigir reinicio: o script avisa e sai FAIL;
-#    reinicie e rode de novo).
+# 2. Ativa o WSL2 se faltar. Se o Windows precisar reiniciar, sai com 3010
+#    (reinicio necessario): o hub mostra REINICIAR, oferece reiniciar agora e
+#    retoma a fila no proximo logon.
 # 3. Instala o Podman CLI via winget (machine).
 # 4. Cria a podman machine rootful (se nao existir) e liga.
 # 5. Confere com "podman info" e "podman compose version".
@@ -26,6 +27,13 @@ function Exit-Falha {
     param([string]$Mensagem)
     Write-Host "`n[FALHA] $Mensagem" -ForegroundColor Red
     exit 1
+}
+
+# Codigo padrao do Windows para "reinicio necessario"; o hub trata como REINICIAR.
+function Exit-Reinicio {
+    param([string]$Mensagem)
+    Write-Host "`n[REINICIAR] $Mensagem" -ForegroundColor Yellow
+    exit 3010
 }
 
 Write-Host "--- Podman + WSL2 (modulo 10) ---" -ForegroundColor Green
@@ -62,7 +70,7 @@ foreach ($r in $recursos) {
     }
 }
 if ($pendentes.Count -gt 0) {
-    Exit-Falha "Recursos ativados aguardando reinicio ($($pendentes -join ', ')). REINICIE o Windows e rode este script de novo."
+    Exit-Reinicio "Recursos ativados aguardando reinicio ($($pendentes -join ', ')). Reinicie o Windows e rode este script de novo."
 }
 wsl.exe --version *> $null
 if ($LASTEXITCODE -ne 0) {
@@ -70,7 +78,7 @@ if ($LASTEXITCODE -ne 0) {
     wsl.exe --install --no-distribution
     if ($LASTEXITCODE -ne 0) { Exit-Falha "wsl --install falhou (codigo $LASTEXITCODE). Confira a rede e rode de novo." }
     wsl.exe --version *> $null
-    if ($LASTEXITCODE -ne 0) { Exit-Falha "WSL instalado mas sem responder. Reinicie e rode de novo." }
+    if ($LASTEXITCODE -ne 0) { Exit-Reinicio "WSL instalado mas sem responder. Reinicie o Windows e rode este script de novo." }
 }
 Write-Host "OK" -ForegroundColor Green
 

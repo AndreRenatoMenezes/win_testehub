@@ -343,10 +343,10 @@ Na Fase de Setup, rode:
 | Setup | Quando |
 |-------|--------|
 | `7_install_devtools_dev` | Sempre (Git, .NET SDK 10, Go, uv e docker-compose) |
-| `10_preparar_podman` | Para o módulo 10. Se ele pedir para **reiniciar** (ativação do WSL2), reinicie e rode de novo |
+| `10_preparar_podman` | Para o módulo 10. Se ele pedir para **reiniciar** (ativação do WSL2), o hub mostra `REINICIAR` e pergunta "Reiniciar agora? (S/N)". Com **S**, o Windows reinicia em 15 s e, depois do logon, o hub abre sozinho e continua a fila de setups no mesmo cenário. Com **N**, a fila segue e o 10 fica para rodar de novo depois que você reiniciar |
 | `11_ca_corporativa_dev` | Só em rede com inspeção TLS. Na rede do laboratório ele confere e sai sem alterar nada |
 
-Depois dos setups, **feche e reabra o hub** para o PATH novo valer.
+O hub relê o PATH antes de cada script: o que um setup instala já vale para os setups e testes seguintes, sem reabrir o hub.
 
 **2. Siga as regras de comparação**
 
@@ -598,11 +598,11 @@ O amostrador não roda nos setups nem no teste 5 (bateria), para não acordar a 
 | Wi-Fi FT: painel não abriu | Edge bloqueado por política | Abra no navegador a URL "Painel ao vivo" registrada no log `teste_wifi_ft_*.log`; o teste roda mesmo sem o painel |
 | Wi-Fi FT: métricas de internet `N/A` | Ping para `8.8.8.8` bloqueado pelo firewall | Esperado em redes corporativas; não reprova |
 | Cargas dev: FAIL "Notebook na bateria" | Carregador desconectado | Conecte o carregador e execute de novo; o módulo não mede na bateria |
-| Cargas dev: FAIL "'go'/'dotnet'/'uv'/'podman' nao encontrado no PATH" | Setup de ferramentas não rodou, ou o hub foi aberto antes da instalação | Rode o setup `7_install_devtools_dev` (e o `10_preparar_podman` para containers), feche e reabra o hub |
+| Cargas dev: FAIL "'go'/'dotnet'/'uv'/'podman' nao encontrado no PATH" | Setup de ferramentas não rodou | Rode o setup `7_install_devtools_dev` (e o `10_preparar_podman` para containers) |
 | Cargas dev: carga `TEMPO_EXCEDIDO` | A tarefa levou mais de 10x o tempo do notebook de referência | Confira no log da carga se houve espera de rede; se não, a máquina é inadequada para essa tarefa de desenvolvimento |
 | Cargas dev: carga `FALHOU` | Build/teste quebrou, rede caiu no `setup` ou a VM do Podman parou | Veja o motivo no CSV e a saída completa em `Traces/<módulo>/logs/<carga>.log` |
 | Cargas dev: aviso "sem referencia.json" | Módulo ainda não calibrado | Rode a calibração no notebook de referência (seção 4.8); até lá o módulo só reprova por falha |
-| Podman: setup pede para reiniciar | O WSL2 acabou de ser ativado | Reinicie o Windows e rode o `10_preparar_podman` de novo |
+| Podman: setup fica `REINICIAR` | O WSL2 acabou de ser ativado | Responda **S** na pergunta do hub (reinicia e retoma sozinho) ou reinicie depois e rode o `10_preparar_podman` de novo. Na 3ª vez seguida ele vira FAIL: confira a virtualização e o WSL |
 | Podman: "Habilite a virtualização" | VT-x/AMD-V desligado na BIOS | Habilite a virtualização na BIOS/UEFI |
 | Teste de boot/shutdown não completa os 5 ciclos | Task Scheduler falhou ou máquina não reiniciou | Verifique se a tarefa agendada `HardwareTestHub_Reiniciador` existe no Agendador de Tarefas |
 | Bateria: "Este teste exige um notebook com bateria reconhecida pelo Windows" | Desktop ou bateria não reconhecida | O teste só roda em notebook; confira a bateria no Gerenciador de Dispositivos. Nada foi alterado na máquina |

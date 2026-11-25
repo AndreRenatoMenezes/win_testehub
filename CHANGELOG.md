@@ -8,6 +8,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- **Reinício com retomada (Setup 10):** quando o WSL2 precisa de reinício, o Setup 10 sai com o código 3010 e o hub mostra `REINICIAR` (não mais FAIL) no console, no resumo e nos relatórios. O hub pergunta "Reiniciar agora? (S/N)": com S, grava a fila restante em `Traces/_retomar.json`, agenda a tarefa `WinTestHub-Retomar` (no logon, como administrador) e reinicia em 15 s; depois do logon o hub abre com `-Retomar`, remove a tarefa e roda a fila no mesmo cenário e no mesmo run. Na 3ª vez seguida que o mesmo setup pede reinício ele vira FAIL.
 - **Teste de rede unificado (`3_teste_rede.py`):** o speedtest interno e o fast.com são medidos no mesmo teste, em rodadas intercaladas (10 de cada + 1 de aquecimento, configurável no bloco `Rede` do `config.json` ou com `HUB_REDE_RODADAS`). O resultado por fonte é a **mediana**, com P25, P75, CV % e `Estavel` (CV do download e do upload até 10%). Uma fonte fora do ar (URL não configurada, fast.com bloqueado, 3 falhas seguidas) vira **aviso**: o teste passa quando pelo menos uma fonte tem 8 ou mais rodadas válidas.
 - **Menos variação na medição de rede:**
   - o interno espera o fim real do speedtest ("All done"), e não mais 60 s fixos;

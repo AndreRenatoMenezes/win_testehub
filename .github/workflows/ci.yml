@@ -147,6 +147,12 @@ jobs:
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-RunState.ps1
           exit $LASTEXITCODE
 
+      - name: Teste de regressão do hub (reinício com retomada)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-ResumeQueue.ps1
+          exit $LASTEXITCODE
+
       - name: Teste de regressão do hub (caminho com colchetes / -LiteralPath)
         shell: pwsh
         run: |

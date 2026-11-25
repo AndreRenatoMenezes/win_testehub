@@ -809,7 +809,7 @@ li {
 </tr>
 <tr>
 <td><code>10_preparar_podman</code></td>
-<td>Para o módulo 10. Se ele pedir para <strong>reiniciar</strong> (ativação do WSL2), reinicie e rode de novo</td>
+<td>Para o módulo 10. Se ele pedir para <strong>reiniciar</strong> (ativação do WSL2), o hub mostra <code>REINICIAR</code> e pergunta "Reiniciar agora? (S/N)". Com <strong>S</strong>, o Windows reinicia em 15 s e, depois do logon, o hub abre sozinho e continua a fila de setups no mesmo cenário. Com <strong>N</strong>, a fila segue e o 10 fica para rodar de novo depois que você reiniciar</td>
 </tr>
 <tr>
 <td><code>11_ca_corporativa_dev</code></td>
@@ -817,7 +817,7 @@ li {
 </tr>
 </tbody>
 </table>
-<p>Depois dos setups, <strong>feche e reabra o hub</strong> para o PATH novo valer.</p>
+<p>O hub relê o PATH antes de cada script: o que um setup instala já vale para os setups e testes seguintes, sem reabrir o hub.</p>
 <p><strong>2. Siga as regras de comparação</strong></p>
 <ul>
 <li>Notebook <strong>na tomada</strong> (na bateria o módulo reprova sem medir) e plano de energia no padrão do hub (setup <code>2_opcoes_energia</code>, <strong>Equilibrado</strong>), o mesmo da calibração da referência. O plano em uso fica registrado no JSON do módulo.</li>
@@ -1270,8 +1270,8 @@ Exportar/
 </tr>
 <tr>
 <td>Cargas dev: FAIL "'go'/'dotnet'/'uv'/'podman' nao encontrado no PATH"</td>
-<td>Setup de ferramentas não rodou, ou o hub foi aberto antes da instalação</td>
-<td>Rode o setup <code>7_install_devtools_dev</code> (e o <code>10_preparar_podman</code> para containers), feche e reabra o hub</td>
+<td>Setup de ferramentas não rodou</td>
+<td>Rode o setup <code>7_install_devtools_dev</code> (e o <code>10_preparar_podman</code> para containers)</td>
 </tr>
 <tr>
 <td>Cargas dev: carga <code>TEMPO_EXCEDIDO</code></td>
@@ -1289,9 +1289,9 @@ Exportar/
 <td>Rode a calibração no notebook de referência (seção 4.8); até lá o módulo só reprova por falha</td>
 </tr>
 <tr>
-<td>Podman: setup pede para reiniciar</td>
+<td>Podman: setup fica <code>REINICIAR</code></td>
 <td>O WSL2 acabou de ser ativado</td>
-<td>Reinicie o Windows e rode o <code>10_preparar_podman</code> de novo</td>
+<td>Responda <strong>S</strong> na pergunta do hub (reinicia e retoma sozinho) ou reinicie depois e rode o <code>10_preparar_podman</code> de novo. Na 3ª vez seguida ele vira FAIL: confira a virtualização e o WSL</td>
 </tr>
 <tr>
 <td>Podman: "Habilite a virtualização"</td>
