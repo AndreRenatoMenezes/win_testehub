@@ -343,7 +343,7 @@ Na Fase de Setup, rode:
 | Setup | Quando |
 |-------|--------|
 | `7_install_devtools_dev` | Sempre (Git, .NET SDK 10, Go, uv e docker-compose) |
-| `10_preparar_podman` | Para o módulo 10. Se ele pedir para **reiniciar** (ativação do WSL2), o hub mostra `REINICIAR` e pergunta "Reiniciar agora? (S/N)". Com **S**, o Windows reinicia em 15 s e, depois do logon, o hub abre sozinho e continua a fila de setups no mesmo cenário. Com **N**, a fila segue e o 10 fica para rodar de novo depois que você reiniciar. Se cancelar o reinício com `shutdown /a`, a retomada continua agendada: o hub abre sozinho no próximo logon |
+| `10_preparar_podman` | Para o módulo 10. Se ele pedir para **reiniciar** (ativação do WSL2), o hub mostra `REINICIAR` e pergunta "Reiniciar agora? (S/N)". Com **S**, o Windows reinicia em 15 s e, depois do logon, o hub abre sozinho e continua a fila de setups no mesmo cenário. Com **N**, a fila segue e o 10 fica para rodar de novo depois que você reiniciar. Se cancelar o reinício com `shutdown /a`, a retomada continua agendada: o hub abre sozinho no próximo logon (se você abrir o hub à mão antes disso, o agendamento é removido) |
 | `11_ca_corporativa_dev` | Só em rede com inspeção TLS. Na rede do laboratório ele confere e sai sem alterar nada |
 
 O hub relê o PATH antes de cada script: o que um setup instala já vale para os setups e testes seguintes, sem reabrir o hub.
