@@ -322,7 +322,9 @@ function New-ResumeQueue {
 
 function Write-ResumeQueue {
     param([string]$TraceRunDir, [PSCustomObject]$Queue)
-    $Queue | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $TraceRunDir $ResumeFileName) -Encoding UTF8
+    # -ErrorAction Stop: o hub roda com "Continue"; sem isto uma falha ao gravar
+    # nao cai no catch e a maquina reiniciaria sem fila para retomar.
+    $Queue | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $TraceRunDir $ResumeFileName) -Encoding UTF8 -ErrorAction Stop
 }
 
 # $null quando ausente, corrompida, incompleta ou de um cenario que nao existe mais.
@@ -370,18 +372,21 @@ function Unregister-ResumeTask {
 function Register-ResumeTask {
     param([string]$HubPath, [string]$ScenarioDir)
     Unregister-ResumeTask
-    $user = "$env:USERDOMAIN\$env:USERNAME"
+    # Nome da conta do processo (cobre AzureAD\... e contas locais)
+    $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $arg  = "-NoProfile -ExecutionPolicy Bypass -File `"$HubPath`" -Retomar `"$($ScenarioDir.TrimEnd('\'))`""
-    $action    = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $arg -WorkingDirectory (Split-Path -Parent $HubPath)
-    $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $user
-    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
-    $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
+    $action    = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $arg -WorkingDirectory (Split-Path -Parent $HubPath) -ErrorAction Stop
+    $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $user -ErrorAction Stop
+    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest -ErrorAction Stop
+    # Priority 4 = normal. O padrao (7) sobe o hub abaixo do normal, e os testes
+    # da fase 2 herdariam essa prioridade: medicao nao comparavel.
+    $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 4 -ErrorAction Stop
     Register-ScheduledTask -TaskName $ResumeTaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force -ErrorAction Stop | Out-Null
 }
 
-# Pergunta S/N. S: grava a fila, agenda a tarefa e reinicia em 15 s ("reboot").
-# N, ou qualquer erro no caminho (desfaz o que fez): "continue". O state do
-# cenario ja foi gravado pelo loop antes desta chamada.
+# Pergunta S/N. S: grava a fila e agenda a tarefa ("reboot"); o chamador grava
+# o resumo e chama Start-ResumeReboot. N, ou erro no caminho (desfaz o que
+# fez): "continue". O state do cenario ja foi gravado pelo loop.
 function Request-RebootAndResume {
     param([PSCustomObject]$Queue, [string]$TraceRunDir, [string]$HubPath, [string]$LogFile)
     Write-Host "  [!] Este setup precisa reiniciar o Windows. Reiniciar agora? (S/N)" -ForegroundColor Yellow
@@ -395,19 +400,33 @@ function Request-RebootAndResume {
     try {
         Write-ResumeQueue -TraceRunDir $TraceRunDir -Queue $Queue
         Register-ResumeTask -HubPath $HubPath -ScenarioDir $Queue.scenarioDir
-        & shutdown.exe /r /t 15 /c "WinTestHub: reiniciando para concluir $($Queue.pedidoPor)" | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "shutdown.exe retornou $LASTEXITCODE" }
     } catch {
-        Unregister-ResumeTask
-        Remove-ResumeQueue -TraceRunDir $TraceRunDir
-        Write-Host "  [!] Nao foi possivel agendar o reinicio: $($_.Exception.Message). Seguindo sem reiniciar.`n" -ForegroundColor Red
-        Add-Content -LiteralPath $LogFile -Value "[AVISO] Reinicio pedido por $($Queue.pedidoPor) nao agendado: $($_.Exception.Message)" -Encoding UTF8
+        Undo-ResumeSchedule -Queue $Queue -TraceRunDir $TraceRunDir -LogFile $LogFile -Motivo $_.Exception.Message
         return "continue"
+    }
+    return "reboot"
+}
+
+function Undo-ResumeSchedule {
+    param([PSCustomObject]$Queue, [string]$TraceRunDir, [string]$LogFile, [string]$Motivo)
+    try { Unregister-ResumeTask } catch { }
+    Remove-ResumeQueue -TraceRunDir $TraceRunDir
+    Write-Host "  [!] Nao foi possivel agendar o reinicio: $Motivo. Seguindo sem reiniciar.`n" -ForegroundColor Red
+    Add-Content -LiteralPath $LogFile -Value "[AVISO] Reinicio pedido por $($Queue.pedidoPor) nao agendado: $Motivo" -Encoding UTF8
+}
+
+# Reinicia em 15 s. $true se o shutdown foi aceito; senao desfaz fila e tarefa.
+function Start-ResumeReboot {
+    param([PSCustomObject]$Queue, [string]$TraceRunDir, [string]$LogFile)
+    & shutdown.exe /r /t 15 /c "WinTestHub: reiniciando para concluir $($Queue.pedidoPor)" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Undo-ResumeSchedule -Queue $Queue -TraceRunDir $TraceRunDir -LogFile $LogFile -Motivo "shutdown.exe retornou $LASTEXITCODE"
+        return $false
     }
     Add-Content -LiteralPath $LogFile -Value "[INFO] Reiniciando o Windows (pedido por $($Queue.pedidoPor), reinicio #$($Queue.reinicios)). Fila de retomada: $(@($Queue.fila) -join ', ')" -Encoding UTF8
     Write-Host "`n  O Windows vai reiniciar em 15 segundos (cancelar: shutdown /a)." -ForegroundColor Cyan
     Write-Host "  Depois do logon o hub abre sozinho e continua: $(@($Queue.fila) -join ', ')`n" -ForegroundColor Cyan
-    return "reboot"
+    return $true
 }
 
 # ---- Selecao de Cenario ------------------------------------------------------
@@ -426,6 +445,7 @@ function Get-ExistingScenarios {
             $total  = $latest.Count
             $pass   = @($latest.Values | Where-Object { $_.status -eq "PASS" }).Count
             $fail   = @($latest.Values | Where-Object { $_.status -eq "FAIL" }).Count
+            $rein   = @($latest.Values | Where-Object { $_.status -eq "REINICIAR" }).Count
 
             $scenarios.Add([PSCustomObject]@{
                 Name      = $d.Name
@@ -435,6 +455,7 @@ function Get-ExistingScenarios {
                 Total     = $total
                 Pass      = $pass
                 Fail      = $fail
+                Reiniciar = $rein
             })
         }
     }
@@ -465,10 +486,11 @@ function Show-ScenarioMenu {
     for ($i = 0; $i -lt $scenarios.Count; $i++) {
         $s = $scenarios[$i]
         $idx = $i + 1
-        $statusClr = if ($s.Fail -gt 0) { "Yellow" } else { "Green" }
+        $statusClr = if ($s.Fail -gt 0 -or $s.Reiniciar -gt 0) { "Yellow" } else { "Green" }
         Write-Host "  $idx. $($s.Name)" -ForegroundColor White
         $summary = "     $($s.Total) teste(s)  |  $($s.Pass) PASS"
         if ($s.Fail -gt 0) { $summary += ", $($s.Fail) FAIL" }
+        if ($s.Reiniciar -gt 0) { $summary += ", $($s.Reiniciar) REINICIAR" }
         Write-Host $summary -ForegroundColor $statusClr
     }
 
@@ -907,10 +929,12 @@ function Update-SessionPath {
 # Hoje so o Setup 10 o usa (recursos do WSL2 aguardando reinicio).
 $RebootExitCode = 3010
 
+# REINICIAR so vale para setups: a fase 2 nao tem retomada nem linha de
+# progresso para esse status.
 function Get-ScriptStatus {
-    param([int]$ExitCode)
+    param([int]$ExitCode, [string]$Kind = "setup")
     if ($ExitCode -eq 0) { return "PASS" }
-    if ($ExitCode -eq $RebootExitCode) { return "REINICIAR" }
+    if ($ExitCode -eq $RebootExitCode -and $Kind -eq "setup") { return "REINICIAR" }
     return "FAIL"
 }
 
@@ -966,7 +990,7 @@ function Invoke-TestScript {
         }
 
         $output = ($capturedOut -join "`n").Trim()
-        $status = Get-ScriptStatus -ExitCode $exitCode
+        $status = Get-ScriptStatus -ExitCode $exitCode -Kind $Test.Kind
     }
     catch {
         $status   = "ERROR"
@@ -2335,13 +2359,18 @@ Write-Host ""
 $resumeQueue = $null
 $resumeState = $null
 if (-not [string]::IsNullOrWhiteSpace($Retomar)) {
-    $resumeQueue = Read-ResumeQueue -TraceRunDir (Join-Path $Retomar.TrimEnd('\') "Traces")
+    $retomarTraces = Join-Path $Retomar.TrimEnd('\') "Traces"
+    $resumeQueue = Read-ResumeQueue -TraceRunDir $retomarTraces
+    if ($null -ne $resumeQueue -and ([string]$resumeQueue.scenarioDir).TrimEnd('\') -ne $Retomar.TrimEnd('\')) {
+        $resumeQueue = $null
+    }
     if ($null -ne $resumeQueue) {
         $resumeState = Read-StateFile -TraceRunDir (Join-Path $resumeQueue.scenarioDir "Traces")
         if ($null -eq $resumeState) { $resumeQueue = $null }
     }
     if ($null -eq $resumeQueue) {
         Write-Host "`n  [!] Fila de retomada ausente ou invalida em '$Retomar'. Abrindo o menu de cenario." -ForegroundColor Yellow
+        if (Test-Path -LiteralPath $retomarTraces) { Remove-ResumeQueue -TraceRunDir $retomarTraces }
     }
 }
 try { Unregister-ResumeTask } catch { Write-Host "  [!] Nao foi possivel remover a tarefa $ResumeTaskName`: $($_.Exception.Message)" -ForegroundColor Yellow }
@@ -2474,7 +2503,7 @@ if (-not $SkipSetup -or $null -ne $resumeQueue) {
                     $decision = Request-RebootAndResume -Queue $rebootQueue -TraceRunDir $traceRunDir -HubPath $PSCommandPath -LogFile $logFile
                     if ($decision -eq "reboot") {
                         Show-Summary -Results $allResults.ToArray() -LogFile $logFile -ResultsFile $resultsFile -TotalSec ((Get-Date) - $runStart).TotalSeconds
-                        exit 0
+                        if (Start-ResumeReboot -Queue $rebootQueue -TraceRunDir $traceRunDir -LogFile $logFile) { exit 0 }
                     }
                     continue
                 }

@@ -56,6 +56,7 @@ try {
     Assert-Condition ((Get-ScriptStatus -ExitCode 3010) -eq "REINICIAR") "exit 3010 -> REINICIAR"
     Assert-Condition ((Get-ScriptStatus -ExitCode 1) -eq "FAIL") "exit 1 -> FAIL"
     Assert-Condition ((Get-ScriptStatus -ExitCode -1) -eq "FAIL") "exit -1 -> FAIL"
+    Assert-Condition ((Get-ScriptStatus -ExitCode 3010 -Kind "test") -eq "FAIL") "exit 3010 num teste (fase 2) -> FAIL"
 
     # ---- New-ResumeQueue -------------------------------------------------------
     $rest = @((New-Script "10_preparar_podman"), (New-Script "11_ca_corporativa_dev"), (New-Script "13_remover_onedrive"))
@@ -101,6 +102,11 @@ try {
     Assert-Condition (-not (Test-Path -LiteralPath $file)) "Remove-ResumeQueue apaga a fila"
     Remove-ResumeQueue -TraceRunDir $trace
     Assert-Condition ($true) "Remove-ResumeQueue sem fila nao da erro"
+
+    # ---- Prioridade da tarefa (Register-ResumeTask nao roda sem admin) ------
+    $reg = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq "Register-ResumeTask" }, $true) | Select-Object -First 1
+    Assert-Condition ($reg.Extent.Text -match "-Priority 4") "tarefa de retomada com prioridade normal (4)"
+    Assert-Condition ((New-ScheduledTaskSettingsSet -Priority 4).Priority -eq 4) "New-ScheduledTaskSettingsSet aceita -Priority 4"
 
     # ---- Resolve-ResumeQueue ---------------------------------------------------
     $atuais = @((New-Script "13_remover_onedrive"), (New-Script "10_preparar_podman"), (New-Script "12_remover_appx_bloatware"))
