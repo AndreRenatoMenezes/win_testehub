@@ -33,6 +33,10 @@ logger.setLevel(logging.INFO)
 _fmt = logging.Formatter("[%(asctime)s] [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 _fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
 _fh.setFormatter(_fmt)
+try:
+    sys.stdout.reconfigure(errors="replace")  # caractere fora do cp1252 nao derruba o log
+except (AttributeError, ValueError):
+    pass
 _ch = logging.StreamHandler(sys.stdout)
 _ch.setFormatter(_fmt)
 logger.addHandler(_fh)

@@ -442,6 +442,9 @@ li {
 │  ┌─── Fase 2: Testes ───────────────────────────┐   │
 │  │ 11 módulos de teste + 2 variantes            │   │
 │  │ Seleção via menu checkbox interativo         │   │
+│  │ Checagem antes da fila (pré-requisitos e     │   │
+│  │ sobras de teste); sobras limpas entre testes │   │
+│  │ Frequência da CPU amostrada em cada teste    │   │
 │  └──────────────────────────────────────────────┘   │
 │                       │                             │
 │                       ▼                             │
@@ -452,6 +455,13 @@ li {
 └─────────────────────────────────────────────────────┘
 </code></pre>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> diagrama visual do fluxo de execução do framework<br><em>Salvar como: img/placeholder-diagrama-arquitetura.png</em></div>
+<h4 id="controles-que-protegem-a-medição">Controles que protegem a medição</h4>
+<ul>
+<li><strong>Checagem antes da fila.</strong> Antes de iniciar, o hub confere o que os testes selecionados precisam: o perfil <code>.wpaProfile</code> dos módulos 1 e 5, o Windows Performance Toolkit, a URL do speedtest, as ferramentas de dev e a <code>podman machine</code>, a tomada, a internet e o espaço em disco. O que impede um teste precisa de uma decisão explícita do operador (tirar o teste da fila ou continuar); a decisão fica registrada.</li>
+<li><strong>Sobras de teste.</strong> Processos que um teste abriu e não fechou (sessão do WPR, Edge da automação, <code>diskspd</code>, Python de teste, build servers do .NET, stack do Podman) consomem recursos e contaminariam o teste seguinte. A checagem aponta essas sobras, e entre um teste e outro o hub encerra as do teste que acabou. Entre testes, só são encerrados os processos que o próprio teste abriu (o hub compara com os processos que já existiam antes do teste); antes da fila, os build servers do .NET aparecem só como aviso, porque podem ser do Visual Studio do usuário. A sessão do WPR, a stack do Podman e a <code>podman machine</code> seguem a pasta do teste que as usa.</li>
+<li><strong>Frequência da CPU.</strong> Durante cada teste (exceto setups e o teste 5, de bateria), o hub registra a cada 5 s o uso da CPU, o desempenho relativo ao clock base, o MHz efetivo e a maior temperatura das zonas térmicas ACPI, em <code>&lt;módulo&gt;/frequencia_cpu.csv</code>. Uma queda do clock sob carga de 20% ou mais entre o 1º e o último minuto vira aviso de <strong>throttling</strong>: uma máquina que esquenta mede pior, e isso não deve ser atribuído ao agente. A leitura usa CIM (não <code>Get-Counter</code>, cujos nomes mudam no Windows pt-BR); o custo é uma consulta a cada 5 s, bem abaixo de 1% de CPU, e fica ativo também durante o módulo 1. As zonas ACPI servem para comparar máquinas sob a mesma carga, não como temperatura absoluta do processador.</li>
+<li><strong>Avisos da rodada.</strong> Tudo o que pode qualificar um resultado (checagem, sobras, módulo sem evidência, CSV faltando, carga de dev com falha ou sensível à rede, throttling) fica no <code>_state.json</code> e aparece no <code>_relatorio.html</code>/<code>.json</code>, junto das evidências exportadas.</li>
+</ul>
 <h3 id="22-sistema-de-cenários">2.2 Sistema de Cenários</h3>
 <p>Cada sessão de testes pertence a um <strong>cenário</strong> — uma unidade lógica que agrupa execuções (runs) e suas evidências. Cenários permitem:</p>
 <ul>
@@ -563,7 +573,7 @@ li {
 </tr>
 <tr>
 <td><code>7_install_devtools_dev</code></td>
-<td>Instala via winget Git, .NET SDK 10, Go, uv e docker-compose (idempotente)</td>
+<td>Instala Git, .NET SDK 10, Go, uv e docker-compose (idempotente). Via winget; quando o winget não executa na conta (ex.: sessão elevada com outra conta) ou não resolve um item, baixa o instalador oficial e só o executa com assinatura digital válida do fabricante (Git, .NET, Go) ou com o SHA256 publicado no release (uv, docker-compose)</td>
 <td>Ferramentas exigidas pelos módulos 7 a 11</td>
 </tr>
 <tr>
@@ -2253,6 +2263,7 @@ li {
         ├── _relatorio.json
         ├── informacoes_maquina.csv              ← inventário do setup 1
         ├── maquina.csv                          ← inventário do hub + modelo/patrimônio informados
+        ├── &lt;módulo&gt;/frequencia_cpu.csv          ← frequência da CPU durante o teste (gerado pelo hub)
         ├── 1_cpu_memo/                          ← evidências do teste de CPU
         │   ├── automacao_*.log
         │   ├── Trace_*_Run1.etl … Trace_*_Run5.etl

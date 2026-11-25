@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import csv
@@ -51,6 +52,37 @@ IDS_LEITURA = [
     ID_LOCAL_CLIENTE, ID_IP_SAIDA, ID_SERVIDORES, ID_ERRO,
 ]
 
+# O fast.com as vezes exibe o nome do servidor ja corrompido na origem
+# ("Sao Joao de Meriti, BR" aparece com U+FFFD no lugar do "a" na propria pagina): o acento
+# se perdeu antes do navegador e nao ha como recupera-lo do DOM. Cada U+FFFD
+# casa com UMA letra; o nome so e restaurado quando bate exatamente com uma
+# cidade conhecida. Fora da lista, o texto fica como veio (com U+FFFD).
+CIDADES_ACENTUADAS = [
+    "São João de Meriti", "São Paulo", "São Luís", "São José",
+    "São José dos Campos", "São José do Rio Preto", "São Bernardo do Campo",
+    "São Gonçalo", "São Leopoldo", "Brasília", "Belém", "Goiânia",
+    "Florianópolis", "Vitória", "Maceió", "João Pessoa", "Cuiabá",
+    "Ribeirão Preto", "Uberlândia", "Niterói", "Jundiaí", "Maringá",
+    "Londrina", "Paraná", "Ceará", "Pará", "Amapá", "Piauí",
+    "Espírito Santo", "Rondônia", "Goiás", "Macapá", "Teresina",
+    "Aracaju", "Contagem", "Betim", "Petrópolis", "Volta Redonda",
+    "Bogotá", "México", "Medellín", "Asunción", "Belém do Pará",
+]
+
+
+def reparar_texto(texto):
+    """Restaura nomes conhecidos em que o acento virou U+FFFD na origem."""
+    if not texto or "\ufffd" not in texto:
+        return texto
+    for nome in sorted(CIDADES_ACENTUADAS, key=len, reverse=True):
+        padrao = "".join(r"[^\s|,]" if not c.isascii() else re.escape(c) for c in nome)
+        # Ancorado nos separadores do fast.com (inicio, espaco, "|", ",", "-"):
+        # nao casa dentro de nomes maiores (ex.: "Ita?na" com U+FFFD nao vira "Itaina").
+        padrao = r"(?<![^\s|,-])" + padrao + r"(?![^\s|,-])"
+        texto = re.sub(padrao, lambda m, n=nome: n if "\ufffd" in m.group(0) else m.group(0), texto)
+    return texto
+
+
 # Le texto, classe e visibilidade de varios elementos num unico snapshot
 JS_SNAPSHOT = """
 const out = {};
@@ -90,6 +122,10 @@ _fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
 _fh.setLevel(logging.DEBUG)
 _fh.setFormatter(_fmt)
 
+try:
+    sys.stdout.reconfigure(errors="replace")  # caractere fora do cp1252 nao derruba o log
+except (AttributeError, ValueError):
+    pass
 _ch = logging.StreamHandler(sys.stdout)
 _ch.setLevel(logging.INFO)
 _ch.setFormatter(_fmt)
@@ -192,14 +228,14 @@ def interpretar_snapshot(snap):
     if upload is not None and upload <= 0:
         upload = None
 
-    servidores = " | ".join(p.strip() for p in texto(ID_SERVIDORES).split("|") if p.strip())
+    servidores = " | ".join(p.strip() for p in reparar_texto(texto(ID_SERVIDORES)).split("|") if p.strip())
 
     return {
         "download": download,
         "upload": upload,
         "ping": ping,
         "latencia_carga": latencia_carga,
-        "local_cliente": texto(ID_LOCAL_CLIENTE),
+        "local_cliente": reparar_texto(texto(ID_LOCAL_CLIENTE)),
         "ip_saida": texto(ID_IP_SAIDA),
         "servidores": servidores,
         "concluido": concluido(ID_DOWNLOAD) and concluido(ID_LATENCIA) and concluido(ID_UPLOAD),

@@ -651,7 +651,7 @@ li {
 </table>
 <p><strong>Dica:</strong> <code>P</code> não marca os testes que falharam. Para reexecutar um FAIL, marque-o com <code>Espaço</code>.</p>
 <h3 id="44-acompanhar-a-execução">4.4 Acompanhar a Execução</h3>
-<p>Após confirmar, o hub mostra um resumo dos testes selecionados e inicia a execução sequencial. Durante a execução:</p>
+<p>Após confirmar, o hub faz a checagem antes da fila (seção 4.9), mostra o resumo dos testes selecionados e inicia a execução sequencial. Durante a execução:</p>
 <ul>
 <li>O console exibe o progresso em tempo real (nome do teste, tempo decorrido)</li>
 <li>Testes com interface visual (CPU, Disco, Rede, Bateria) exibem um <strong>overlay transparente</strong> na tela com informações de progresso</li>
@@ -840,6 +840,101 @@ li {
 <p>Outras opções da execução avulsa: <code>--runs N</code> (padrão 3), <code>--only A4a,A4c</code> (só as cargas com esses prefixos; com <code>--calibrar</code>, atualiza só a referência dessas cargas e mantém as demais) e <code>--sem-overlay</code>. Fora do hub, as evidências vão para <code>_saida/</code> dentro da pasta do módulo.</p>
 <p><strong>Cargas internas <span class="tag tag-tecnico">Técnico</span></strong></p>
 <p>Para medir também repositórios internos, copie <code>workloads.local.example.json</code> para <code>workloads.local.json</code> (raiz do hub, fora do git) e descreva as cargas no mesmo formato do <code>cargas.json</code> do módulo. Elas rodam junto com as públicas, sem limite de tempo. Nunca coloque credenciais no arquivo: o clone usa o gerenciador de credenciais do git.</p>
+<h3 id="49-checagem-antes-da-fila-e-sobras-de-teste">4.9 Checagem Antes da Fila e Sobras de Teste</h3>
+<p>Depois que você escolhe os testes, e antes do resumo pré-execução, o hub confere <strong>só o que os testes selecionados precisam</strong>. Leva alguns segundos e evita descobrir horas depois que um módulo saiu vazio ou com FAIL.</p>
+<p>Cada achado aparece no resumo com um nível e com o que fazer:</p>
+<ul>
+<li><strong><code>[X]</code> Impede:</strong> o teste vai falhar com certeza.<ul>
+<li>Falta o <code>Agentes_SI_Profile.wpaProfile</code> (módulo 1) ou o <code>Agentes_SI_Bateria_Profile.wpaProfile</code> (módulo 5) na pasta do teste. Esses arquivos não são versionados.</li>
+<li>Falta o <code>wpr.exe</code> ou o <code>wpaexporter.exe</code> (módulos 1 e 5).</li>
+<li>A URL do speedtest interno não está configurada (módulo 3).</li>
+<li>Falta uma ferramenta de dev, ou ela está abaixo da versão mínima do <code>cargas.json</code> (módulos 7 a 11). A ação manda rodar o Setup 7 ou o Setup 10.</li>
+<li>A <code>podman machine</code> está desligada (módulo 10).</li>
+<li>O notebook está na bateria (módulos 7 a 11, que dão FAIL fora da tomada).</li>
+</ul>
+</li>
+<li><strong><code>[!]</code> Atenção:</strong> o teste roda, mas a medição pode sair comprometida.<ul>
+<li>Notebook na bateria (demais testes; o teste 5 é o único que deve rodar na bateria).</li>
+<li>Sem internet (módulos 3.1 e 7 a 11).</li>
+<li>Pouco espaço livre no disco do hub (padrão: menos de 20 GB).</li>
+<li><strong>Sobra de teste:</strong> um processo que um teste abriu e não fechou direito, consumindo recursos.</li>
+<li>Processo qualquer usando muita CPU (os 5 maiores acima de 10% de um núcleo). Só aviso: o hub <strong>nunca</strong> encerra processos que não são de teste.</li>
+</ul>
+</li>
+</ul>
+<p>Teclas do resumo pré-execução:</p>
+<table>
+<thead>
+<tr>
+<th>Tecla</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Enter</code></td>
+<td>Iniciar (só quando não há <code>[X]</code>)</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>Tirar da fila os testes com <code>[X]</code> e refazer a checagem (só com <code>[X]</code>)</td>
+</tr>
+<tr>
+<td><code>C</code></td>
+<td>Continuar mesmo assim: os testes com <code>[X]</code> rodam e o fato fica registrado (só com <code>[X]</code>)</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td>Encerrar as sobras de teste (pede confirmação <code>S/N</code>) e refazer a checagem (só com sobra)</td>
+</tr>
+<tr>
+<td><code>Esc</code></td>
+<td>Voltar ao menu de testes</td>
+</tr>
+</tbody>
+</table>
+<p>Com algum <code>[X]</code> na tela, o <code>Enter</code> não inicia a fila: escolha <code>R</code>, <code>C</code> ou <code>Esc</code>. Os achados e a escolha feita vão para o log da run. Quando a fila inicia (<code>Enter</code> ou <code>C</code>), os achados também entram nos avisos da rodada (seção 6.6); com <code>Esc</code>, ou recusando o <code>F</code>, ficam só no log.</p>
+<p><strong>Sobras que o hub reconhece.</strong> O Edge e o Python são reconhecidos pela linha de comando ou pela flag de automação. <code>wpaexporter.exe</code> e <code>diskspd.exe</code> são reconhecidos pelo nome, porque só existem por causa dos testes do hub.</p>
+<table>
+<thead>
+<tr>
+<th>Sobra</th>
+<th>Como o hub encerra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sessão do WPR gravando</td>
+<td><code>wpr -cancel</code></td>
+</tr>
+<tr>
+<td><code>wpaexporter.exe</code>, <code>diskspd.exe</code></td>
+<td>encerra a árvore do processo</td>
+</tr>
+<tr>
+<td>Edge da automação (<code>msedgedriver</code> e o Edge aberto por ele ou com <code>--enable-automation</code>)</td>
+<td>encerra a árvore do processo</td>
+</tr>
+<tr>
+<td>Python rodando um script de <code>Testes\</code></td>
+<td>encerra a árvore do processo</td>
+</tr>
+<tr>
+<td>Build servers do .NET (<code>MSBuild /nodeReuse</code>, <code>VBCSCompiler</code>)</td>
+<td>só entre testes: encerra os processos que o teste abriu (antes da fila, só aviso, sem <code>F</code>: podem ser do Visual Studio do usuário)</td>
+</tr>
+<tr>
+<td>Stack do módulo 10 (containers <code>wintestehub-*</code>)</td>
+<td><code>podman compose down -v</code></td>
+</tr>
+<tr>
+<td><code>podman machine</code> ligada sem o módulo 10 na fila</td>
+<td><code>podman machine stop</code></td>
+</tr>
+</tbody>
+</table>
+<p>O Edge e o Python do usuário ficam: um Edge comum (mesmo aberto para depuração pelo VS Code) e um Python fora de <code>Testes\</code> não são sobra.</p>
+<p><strong>Entre um teste e outro</strong>, o hub repete a busca só com as sobras do teste que acabou e as encerra sem perguntar, porque a fila é desassistida. Entre os processos, ele só encerra os que <strong>o próprio teste abriu</strong>: o que já existia antes do teste começar (ex.: o Visual Studio do usuário) fica. A sessão do WPR, a stack do módulo 10 e a <code>podman machine</code> não são processos; elas seguem a pasta do teste que acabou de rodar. A <code>podman machine</code> só é desligada quando nenhum teste do módulo 10 vem depois. Cada encerramento vai para o log e para os avisos da rodada.</p>
 </div>
 
 <div class="section">
@@ -1020,10 +1115,54 @@ Exportar/
 <li><strong><code>Traces/</code> não é alterada.</strong> Os <code>.etl</code> e logs originais continuam em <code>Execucoes/</code> para abrir no WPA ou investigar falhas.</li>
 <li><strong>A pasta é recriada a cada execução</strong> e reflete o estado atual do cenário. Arquivos colocados à mão nela são perdidos, e um ZIP anterior dela é removido por estar desatualizado.</li>
 <li>Ao final, o hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora (ex.: <code>12 .etl, 3600 MB</code>).</li>
-<li>Se um módulo tinha só <code>.etl</code> e logs, ele some da exportação e o hub avisa com <code>[!] &lt;módulo&gt; ficou fora da exportacao</code>. Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o <code>.wpaProfile</code> dos módulos 1 e 5, e o WPA não exporta. As evidências continuam só em <code>Execucoes/</code>. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos <code>.etl</code>.</li>
+<li>Se um módulo tinha só <code>.etl</code> e logs, o hub avisa com <code>[!] &lt;módulo&gt; sem evidencias do teste na exportacao</code> (o <code>frequencia_cpu.csv</code>, gerado pelo próprio hub, não conta como evidência). Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o <code>.wpaProfile</code> dos módulos 1 e 5, e o WPA não exporta. As evidências continuam só em <code>Execucoes/</code>. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos <code>.etl</code>.</li>
 <li>Em seguida, pergunta se deseja <strong>compactar em ZIP</strong>. O ZIP fica ao lado da pasta (<code>3440 - 050221.zip</code>), contém a pasta como raiz e é validado pela contagem de arquivos. Nenhuma pasta é apagada.</li>
 <li>A opção <strong><code>[E]</code></strong> do menu inicial faz o mesmo para um cenário existente, sem rodar testes.</li>
 </ul>
+<h3 id="66-avisos-da-rodada-e-frequência-da-cpu">6.6 Avisos da Rodada e Frequência da CPU</h3>
+<p>O <code>_relatorio.html</code> e o <code>_relatorio.json</code> (em <code>Traces/</code>, e portanto também na exportação) têm duas seções a mais:</p>
+<p><strong>Avisos da rodada</strong>, com a run, a fonte e o texto de cada aviso:</p>
+<table>
+<thead>
+<tr>
+<th>Fonte</th>
+<th>Quando aparece</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>checagem</code></td>
+<td>Achados da checagem antes da fila, o teste tirado com <code>R</code> ou a escolha <code>C</code></td>
+</tr>
+<tr>
+<td><code>sobra</code></td>
+<td>Sobra de teste encerrada antes da fila (<code>F</code>) ou entre testes</td>
+</tr>
+<tr>
+<td><code>modulo_vazio</code></td>
+<td>Módulo executado que ficaria só com <code>.etl</code>/logs na exportação</td>
+</tr>
+<tr>
+<td><code>csv_faltando</code></td>
+<td>Teste executado que não gerou o CSV temático</td>
+</tr>
+<tr>
+<td><code>carga_dev</code></td>
+<td>Carga dos módulos 7 a 11 com status diferente de <code>OK</code>, com o motivo</td>
+</tr>
+<tr>
+<td><code>rede</code></td>
+<td>Carga de dev sensível à internet do lab (ex.: <code>pip install</code>, <code>podman build</code>)</td>
+</tr>
+<tr>
+<td><code>throttling</code></td>
+<td>Queda do clock sob carga acima do limite (padrão 20%)</td>
+</tr>
+</tbody>
+</table>
+<p>Os avisos ficam guardados no <code>_state.json</code> e se acumulam: os de uma run anterior continuam no relatório, identificados pelo número da run. Quem abre a pasta no Drive vê as ressalvas da rodada sem abrir os CSVs.</p>
+<p><strong>Frequência da CPU por módulo.</strong> Enquanto cada teste roda, o hub grava <code>&lt;módulo&gt;/frequencia_cpu.csv</code> com uma amostra a cada 5 s: uso da CPU, desempenho em % (acima de 100 = turbo), MHz efetivo e a maior temperatura das zonas térmicas ACPI, quando o firmware expõe. O relatório mostra o MHz médio, o MHz no começo e no fim e a queda. A queda (aviso a partir de 20%) compara a mediana do 1º e do último minuto <strong>com a CPU sob carga</strong> (uso de pelo menos 50%), porque em ocioso o clock cai sem ser throttling. Testes curtos ou ociosos aparecem sem queda (<code>-</code>).</p>
+<p>O amostrador não roda nos setups nem no teste 5 (bateria), para não acordar a CPU a cada poucos segundos durante horas. No teste 4, a máquina reinicia e o CSV fica parcial; com menos de 3 amostras, ele é ignorado.</p>
 </div>
 
 <div class="section">
@@ -1263,9 +1402,64 @@ Exportar/
     &quot;Settings&quot;: {
         &quot;PythonVenvName&quot;: &quot;.venv&quot;,
         &quot;HtmlReportTitle&quot;: &quot;WinTestHub - Relatório Final&quot;
+    },
+    &quot;Preflight&quot;: {
+        &quot;MinFreeGB&quot;: 20,
+        &quot;CpuAlertPct&quot;: 10,
+        &quot;InternetHost&quot;: &quot;www.msftconnecttest.com&quot;
+    },
+    &quot;CpuSampler&quot;: {
+        &quot;Enabled&quot;: true,
+        &quot;IntervalSec&quot;: 5,
+        &quot;ThrottleAlertPct&quot;: 20,
+        &quot;LoadMinPct&quot;: 50,
+        &quot;SkipFolders&quot;: [&quot;5_bateria&quot;]
     }
 }
 </code></pre>
+<p>As seções <code>Preflight</code> e <code>CpuSampler</code> são opcionais: um <code>config.json</code> antigo, sem elas, usa os valores acima.</p>
+<table>
+<thead>
+<tr>
+<th>Chave</th>
+<th>Uso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Preflight.MinFreeGB</code></td>
+<td>Espaço livre mínimo no disco do hub antes de avisar</td>
+</tr>
+<tr>
+<td><code>Preflight.CpuAlertPct</code></td>
+<td>% de um núcleo a partir da qual um processo aparece como "usando CPU"</td>
+</tr>
+<tr>
+<td><code>Preflight.InternetHost</code></td>
+<td>Host testado na porta 443 para a checagem de internet</td>
+</tr>
+<tr>
+<td><code>CpuSampler.Enabled</code></td>
+<td>Liga/desliga o <code>frequencia_cpu.csv</code> (<code>false</code> sem aspas)</td>
+</tr>
+<tr>
+<td><code>CpuSampler.IntervalSec</code></td>
+<td>Intervalo entre amostras, em segundos (mínimo 1)</td>
+</tr>
+<tr>
+<td><code>CpuSampler.ThrottleAlertPct</code></td>
+<td>Queda do clock sob carga que vira aviso de throttling</td>
+</tr>
+<tr>
+<td><code>CpuSampler.LoadMinPct</code></td>
+<td>Uso de CPU a partir do qual a amostra conta como "sob carga"</td>
+</tr>
+<tr>
+<td><code>CpuSampler.SkipFolders</code></td>
+<td>Pastas de teste em que o amostrador não roda</td>
+</tr>
+</tbody>
+</table>
 <p>Valores internos ficam em <code>config.local.json</code>, na raiz do hub. Esse arquivo não vai para o repositório; o modelo é o <code>config.local.example.json</code>:</p>
 <table>
 <thead>
@@ -1324,6 +1518,37 @@ Exportar/
 <tr>
 <td><code>Esc</code></td>
 <td>Cancelar</td>
+</tr>
+</tbody>
+</table>
+<h3 id="resumo-pré-execução-checagem">Resumo Pré-execução (Checagem)</h3>
+<table>
+<thead>
+<tr>
+<th>Tecla</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Enter</code></td>
+<td>Iniciar (sem itens <code>[X]</code>)</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>Tirar da fila os testes com <code>[X]</code> (só com <code>[X]</code>)</td>
+</tr>
+<tr>
+<td><code>C</code></td>
+<td>Continuar mesmo assim (só com <code>[X]</code>)</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td>Encerrar as sobras de teste (só com sobra)</td>
+</tr>
+<tr>
+<td><code>Esc</code></td>
+<td>Voltar ao menu</td>
 </tr>
 </tbody>
 </table>

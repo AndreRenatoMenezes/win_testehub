@@ -78,6 +78,9 @@ jobs:
       - name: Compila todos os scripts
         run: python -m compileall -q Testes/ docs/
 
+      - name: Teste de regressão (reparo do nome do servidor no teste 3.1)
+        run: python -I -X utf8 .github/scripts/test_reparar_texto.py
+
       - name: HTML da documentação em sincronia com o Markdown
         run: python docs/gerar_html.py --check
 
@@ -124,6 +127,30 @@ jobs:
         shell: pwsh
         run: |
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-StopSignal.ps1
+          exit $LASTEXITCODE
+
+      - name: Teste de regressão do hub (checagem antes da fila e sobras de teste)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-Preflight.ps1
+          exit $LASTEXITCODE
+
+      - name: Teste de regressão do hub (avisos da rodada e frequência da CPU)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-RunWarnings.ps1
+          exit $LASTEXITCODE
+
+      - name: Teste de regressão do hub (caminho com colchetes / -LiteralPath)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-LiteralPath.ps1
+          exit $LASTEXITCODE
+
+      - name: Teste de regressão do Setup 7 (verificação do instalador oficial)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-Setup7Verificacao.ps1
           exit $LASTEXITCODE
 
       - name: PSScriptAnalyzer (severidade Error)
