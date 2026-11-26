@@ -615,16 +615,16 @@ li {
 <div class="section">
 <h2 id="4-módulo-1--cpu-e-memória">4. Módulo 1 — CPU e Memória</h2>
 <h3 id="41-objetivo">4.1 Objetivo</h3>
-<p>Avaliar o desempenho e a estabilidade do processador e da memória sob carga de escritório local e 100% offline no <strong>LibreOffice</strong> (Writer e Calc), medindo o tempo de abertura dos aplicativos, o tempo de recálculo e exportação de uma planilha complexa com 5.000 linhas e o consumo contínuo de CPU e RAM do sistema e do LibreOffice sob captura WPR/WPA.</p>
+<p>Avaliar o desempenho e a estabilidade do processador e da memória sob carga de escritório local e 100% offline no <strong>LibreOffice</strong> (Writer e Calc), medindo o tempo de abertura dos aplicativos, o tempo de relógio e a CPU consumida no recálculo de uma planilha pesada (a <strong>planilha R2</strong>: 5.000 linhas e 100.000 fórmulas, a mesma carga do teste do macOS) e o consumo contínuo de CPU e RAM do sistema e do LibreOffice sob captura WPR/WPA.</p>
 <h3 id="42-ferramenta-utilizada">4.2 Ferramenta Utilizada</h3>
 <ul>
 <li><strong>LibreOffice Writer e Calc</strong> (<code>soffice.exe</code> / <code>soffice.bin</code>) — executados com subperfis temporários isolados (<code>-env:UserInstallation=file:///.../wintesthub_lo_profile_&lt;papel&gt;</code> onde <code>&lt;papel&gt;</code> é <code>batch</code>, <code>writer</code> ou <code>calc</code>) e flags <code>--norestore --nologo --nodefault --nolockcheck</code>, garantindo <em>cold start</em> real, processos independentes e execução 100% offline sem necessidade de login</li>
-<li><strong>Gerador determinístico de fixtures ODF</strong> (<code>zipfile</code> + XML da stdlib Python) — cria localmente <code>workload_doc.odt</code> (título e 20 parágrafos iniciais) e <code>workload_calc_complexo.ods</code> (semente <code>random.Random(42)</code>, 1 linha de cabeçalho e 5.000 linhas de dados com 5 colunas base <code>A..E</code> e 5 colunas de fórmulas OpenFormula <code>F..J</code>: <code>SUM</code>, <code>IF</code>, <code>AVERAGE</code>, <code>VLOOKUP</code> e <code>COUNTIF</code> gravadas com <code>office:value="0"</code> para forçar recálculo completo)</li>
+<li><strong>Gerador determinístico das planilhas de carga</strong> (<code>zipfile</code> + XML da stdlib Python) — cria localmente <code>workload_doc.odt</code> (título e 20 parágrafos iniciais) e <code>workload_calc_r2.xlsx</code>, a <strong>planilha R2</strong> do teste do macOS (<code>gen_cpu_r2_workload.py</code>): aba <code>Data</code> com 5.000 linhas (<code>seq</code>, <code>value</code>, <code>category</code>, <code>date</code>), aba <code>Calc</code> com 5.000 × 20 fórmulas — agregações condicionais sobre a coluna inteira (<code>SUMIFS</code>, <code>COUNTIFS</code>, <code>AVERAGEIFS</code>, <code>MAXIFS</code>), buscas (<code>INDEX</code>/<code>MATCH</code>, <code>VLOOKUP</code>, <code>XLOOKUP</code>, <code>INDIRECT</code>), estatística em janela móvel (<code>STDEV</code>, <code>VAR</code>, <code>PERCENTILE</code>, <code>RANK</code>), financeiras (<code>NPV</code>, <code>PMT</code>, <code>FV</code>, <code>IPMT</code>) e texto/lógica —, aba <code>Trigger</code> (onde a edição GUI digita) e aba <code>Sentinel</code> (soma os cantos da aba <code>Calc</code> e prova que o recálculo aconteceu). As fórmulas são gravadas sem valor em cache, então o LibreOffice calcula as 100.000; o texto é idêntico ao do macOS, só <code>MAXIFS</code> e <code>XLOOKUP</code> levam o prefixo <code>_xlfn.</code> do Excel (sem ele o LibreOffice mostra <code>#NOME?</code>)</li>
 <li><strong>Windows Performance Recorder (<code>wpr.exe</code>) e Windows Performance Analyzer (<code>wpaexporter.exe</code>)</strong> — captura <code>Power.light</code> + <code>VirtualAllocation.light</code> e exportação CSV com o perfil <code>Agentes_SI_Profile.wpaProfile</code></li>
 <li><strong><code>psutil</code> + <code>pyautogui</code> / <code>pyperclip</code></strong> — thread amostradora contínua (intervalo de 1,0 s) coletando CPU (%) e RAM (MB e %) do sistema e da árvore de processos <code>soffice.exe</code>/<code>soffice.bin</code> do teste, combinada com automação GUI real no Writer e no Calc</li>
 </ul>
 <h3 id="43-procedimento">4.3 Procedimento</h3>
-<p>Antes do Ciclo 1, o script valida a presença do <code>soffice.exe</code> (via <code>HUB_LIBREOFFICE_PATH</code>, <code>PATH</code> ou caminhos padrão em <code>C:\Program Files\LibreOffice\program\soffice.exe</code> e <code>C:\Program Files (x86)\LibreOffice\program\soffice.exe</code>) e gera os arquivos <code>workload_doc.odt</code> e <code>workload_calc_complexo.ods</code> em pasta temporária.</p>
+<p>Antes do Ciclo 1, o script valida a presença do <code>soffice.exe</code> (via <code>HUB_LIBREOFFICE_PATH</code>, <code>PATH</code> ou caminhos padrão em <code>C:\Program Files\LibreOffice\program\soffice.exe</code> e <code>C:\Program Files (x86)\LibreOffice\program\soffice.exe</code>) e gera os arquivos <code>workload_doc.odt</code> e <code>workload_calc_r2.xlsx</code> em pasta temporária. Os subperfis <code>batch</code> e <code>calc</code> nascem configurados para sempre recalcular <code>.xlsx</code> ao abrir e para gravar <code>.xlsx</code> sem o diálogo de formato.</p>
 <table>
 <thead>
 <tr>
@@ -646,7 +646,7 @@ li {
 </tr>
 <tr>
 <td>3</td>
-<td><strong>Etapa 1 — Cálculo de fórmulas complexas (<code>Tempo_Calculo_Formulas_s</code>):</strong> executa <code>soffice.exe --headless --convert-to pdf</code> com subperfil <code>wintesthub_lo_profile_batch</code> sobre <code>workload_calc_complexo.ods</code>, cronometrando até o término e a gravação do PDF recalculado (&gt; 0 bytes)</td>
+<td><strong>Etapa 1 — Cálculo de fórmulas complexas (<code>Tempo_Calculo_Formulas_s</code> e <code>CPU_Calculo_Formulas_s</code>):</strong> executa <code>soffice.exe --headless --convert-to ods</code> com subperfil <code>wintesthub_lo_profile_batch</code> sobre a planilha R2, cronometrando o tempo de relógio até o término e somando a CPU (usuário + sistema, todos os núcleos) dos processos <code>soffice</code> desse subperfil. Confere no <code>.ods</code> gerado que <code>Sentinel.A2</code> tem valor diferente de zero (senão o ciclo é FAIL) e conta as células com erro da aba <code>Calc</code> — o esperado são 50 <code>#N/A</code> na coluna <code>f6</code>, da própria planilha R2</td>
 <td>dentro da janela de 300 s (timeout 180 s)</td>
 </tr>
 <tr>
@@ -656,12 +656,12 @@ li {
 </tr>
 <tr>
 <td>5</td>
-<td><strong>Etapa 3 — Abertura do Calc (<code>Tempo_Abertura_Calc_s</code>):</strong> inicia <code>soffice.exe --calc</code> com subperfil <code>wintesthub_lo_profile_calc</code> abrindo <code>workload_calc_complexo.ods</code>, cronometrando até o processo <code>soffice.bin</code> estar ativo e sua janela principal visível</td>
-<td>dentro da janela de 300 s (timeout 60 s)</td>
+<td><strong>Etapa 3 — Abertura do Calc (<code>Tempo_Abertura_Calc_s</code>):</strong> inicia <code>soffice.exe --calc</code> com subperfil <code>wintesthub_lo_profile_calc</code> abrindo a planilha R2 (que é recalculada inteira ao abrir), cronometrando até o processo <code>soffice.bin</code> estar ativo e sua janela principal visível; antes da edição, espera o Calc terminar o recálculo (CPU do <code>soffice.bin</code> abaixo de 5% de um núcleo)</td>
+<td>dentro da janela de 300 s (timeout 180 s)</td>
 </tr>
 <tr>
 <td>6</td>
-<td><strong>Etapa 4 — Edição GUI contínua:</strong> no restante da janela de 300 s, alterna o foco confirmado (<code>SetForegroundWindow</code>/<code>GetForegroundWindow</code>) entre Writer (digitação de parágrafos, negrito <code>Ctrl+A</code>/<code>Ctrl+B</code>, <code>Ctrl+S</code>) e Calc (navegação na grade, inserção de linhas, recálculo forçado <code>Ctrl+Shift+F9</code>, <code>Ctrl+S</code>)</td>
+<td><strong>Etapa 4 — Edição GUI contínua:</strong> no restante da janela de 300 s, alterna o foco confirmado (<code>SetForegroundWindow</code>/<code>GetForegroundWindow</code>) entre Writer (digitação de parágrafos, negrito <code>Ctrl+A</code>/<code>Ctrl+B</code>, <code>Ctrl+S</code>) e Calc (na aba <code>Trigger</code>: inserção de linhas, recálculo completo forçado <code>Ctrl+Shift+F9</code> das 100.000 fórmulas, espera até o Calc ficar ocioso e <code>Ctrl+S</code> mantendo <code>.xlsx</code>)</td>
 <td>restante dos 300 segundos (5 min)</td>
 </tr>
 <tr>
@@ -701,12 +701,12 @@ li {
 <tr>
 <td><code>cpu_memoria.csv</code></td>
 <td>Script Python + <code>psutil</code> + WPA</td>
-<td>CSV temático (<code>Metrica,Valor,Unidade</code>): <code>Versao_Teste</code> (<code>2.0</code>), <code>Ciclos_Executados</code>, <code>Duracao_Por_Ciclo</code>, <code>Tempo_Abertura_Writer_Media</code>/<code>_Max</code>, <code>Tempo_Abertura_Calc_Media</code>/<code>_Max</code>, <code>Tempo_Calculo_Formulas_Media</code>/<code>_Max</code>/<code>_Min</code>, <code>CPU_Sistema_Media</code>/<code>_Pico</code>, <code>RAM_Sistema_Media_MB</code>/<code>_Pico_MB</code>/<code>_Media_Pct</code>/<code>_Pico_Pct</code>, <code>LibreOffice_CPU_Media</code>/<code>_Pico</code>, <code>LibreOffice_RAM_Media_MB</code>/<code>_Pico_MB</code>, métricas legadas de hardware (<code>CPU_Frequencia_*</code>, <code>CPU_Nucleos_*</code>, <code>RAM_*</code>) e <code>WPA_&lt;Arquivo&gt;_&lt;Metrica&gt;_Soma_Media</code>/<code>_Media</code>/<code>_Max</code>/<code>_Min</code></td>
+<td>CSV temático (<code>Metrica,Valor,Unidade</code>): <code>Versao_Teste</code> (<code>2.1</code>), <code>Ciclos_Executados</code>, <code>Duracao_Por_Ciclo</code>, <code>Tempo_Abertura_Writer_Media</code>/<code>_Max</code>, <code>Tempo_Abertura_Calc_Media</code>/<code>_Max</code>, <code>Tempo_Calculo_Formulas_Media</code>/<code>_Max</code>/<code>_Min</code>, <code>CPU_Calculo_Formulas_Media</code>/<code>_Max</code>/<code>_Min</code> (CPU do cálculo, em s), <code>CPU_Sistema_Media</code>/<code>_Pico</code>, <code>RAM_Sistema_Media_MB</code>/<code>_Pico_MB</code>/<code>_Media_Pct</code>/<code>_Pico_Pct</code>, <code>LibreOffice_CPU_Media</code>/<code>_Pico</code>, <code>LibreOffice_RAM_Media_MB</code>/<code>_Pico_MB</code>, métricas legadas de hardware (<code>CPU_Frequencia_*</code>, <code>CPU_Nucleos_*</code>, <code>RAM_*</code>) e <code>WPA_&lt;Arquivo&gt;_&lt;Metrica&gt;_Soma_Media</code>/<code>_Media</code>/<code>_Max</code>/<code>_Min</code></td>
 </tr>
 <tr>
 <td><code>ciclos_libreoffice.csv</code></td>
 <td>Script Python + <code>psutil</code></td>
-<td>CSV detalhado por ciclo (5 linhas, ciclos <code>1</code> a <code>5</code>): <code>Ciclo,Timestamp_Inicio,Tempo_Abertura_Writer_s,Tempo_Abertura_Calc_s,Tempo_Calculo_Formulas_s,Linhas_Editadas_Calc,Paragrafos_Digitados_Writer,CPU_Sistema_Media_Pct,CPU_Sistema_Pico_Pct,RAM_Sistema_Media_MB,RAM_Sistema_Pico_MB,RAM_Sistema_Media_Pct,RAM_Sistema_Pico_Pct,LibreOffice_CPU_Media_Pct,LibreOffice_CPU_Pico_Pct,LibreOffice_RAM_Media_MB,LibreOffice_RAM_Pico_MB,Cooldown_Duracao_s</code></td>
+<td>CSV detalhado por ciclo (5 linhas, ciclos <code>1</code> a <code>5</code>): <code>Ciclo,Timestamp_Inicio,Tempo_Abertura_Writer_s,Tempo_Abertura_Calc_s,Tempo_Calculo_Formulas_s,CPU_Calculo_Formulas_s,Linhas_Editadas_Calc,Paragrafos_Digitados_Writer,CPU_Sistema_Media_Pct,CPU_Sistema_Pico_Pct,RAM_Sistema_Media_MB,RAM_Sistema_Pico_MB,RAM_Sistema_Media_Pct,RAM_Sistema_Pico_Pct,LibreOffice_CPU_Media_Pct,LibreOffice_CPU_Pico_Pct,LibreOffice_RAM_Media_MB,LibreOffice_RAM_Pico_MB,Cooldown_Duracao_s</code></td>
 </tr>
 <tr>
 <td><code>Resultados_Consolidados/</code></td>
@@ -715,6 +715,7 @@ li {
 </tr>
 </tbody>
 </table>
+<div class="callout callout-info"><strong>Versões do teste</strong><code>Versao_Teste = 2.1</code> usa a planilha R2 (100.000 fórmulas; cerca de 18 s de CPU no cálculo numa máquina de 12 threads). A <code>2.0</code> usava uma planilha de 25.000 fórmulas simples (cerca de 2 s de CPU). Os tempos e o consumo das duas versões <b>não se comparam</b>: compare <code>ImagemLimpa</code> e <code>ComAgentes</code> sempre com a mesma versão.</div>
 <h3 id="45-critério-de-aprovação">4.5 Critério de Aprovação</h3>
 <table>
 <thead>

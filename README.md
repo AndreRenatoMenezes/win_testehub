@@ -46,7 +46,7 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 
 | # | Módulo | Script | O que mede | Duração | PASS quando |
 |:-:|--------|--------|------------|:-------:|-------------|
-| 1 | CPU e Memória | `1_automacao_performance.py` | Carga de escritório local no LibreOffice (Writer e Calc: abertura, cálculo de planilha complexa de 5.000 linhas e edição GUI) com amostragem `psutil`, captura WPR e exportação WPA: 5 ciclos de 5 min com cooldown inteligente | ~50 min | os 5 ciclos terminam sem erro |
+| 1 | CPU e Memória | `1_automacao_performance.py` | Carga de escritório local no LibreOffice (Writer e Calc: abertura, cálculo da planilha R2 — 100 mil fórmulas, a mesma carga do teste do macOS — e edição GUI) com amostragem `psutil`, captura WPR e exportação WPA: 5 ciclos de 5 min com cooldown inteligente | ~50 min | os 5 ciclos terminam sem erro |
 | 1.1 | CPU e Memória — DLP/USB | `1-1_automacao_performance_dlp.py` | Variante do Módulo 1: cópias para pendrive durante a captura, para medir o custo do agente de DLP | 5 ciclos de 60 s | os ciclos terminam sem erro |
 | 2 | Disco | `2_teste_disco.py` | Leitura e escrita sequenciais com DiskSpd (bloco de 1 MB, arquivo de 8 GB), 10 baterias | ~25 min | as 10 baterias terminam e o CSV é gerado |
 | 2.1 | Disco — DLP/USB | `2-1_teste_disco_dlp.py` | Cópia PC ↔ pendrive de um arquivo de 2 GB, 5 baterias | 5 baterias | as baterias terminam sem erro |
