@@ -109,6 +109,38 @@ flowchart LR
 - `docs/manual-de-execucao.md`: atualizar seções `2.2` (Software), `3.3` (`3_softwares_msStore`) e `4.9` (checagem pré-fila do `soffice.exe` e sobra "LibreOffice da automação").
 - Regerar `docs/metodologia-de-testes.html` e `docs/manual-de-execucao.html` com `python docs/gerar_html.py` e validar com `python docs/gerar_html.py --check`.
 
+### 2.5. Revisão 2 — planilha R2 e CPU do cálculo (WP-04 a WP-06)
+
+Tudo em `Testes/1_cpu_memo/1_automacao_performance.py`, mais testes e docs. Nenhuma mudança no `hub.ps1`, no Setup ou no contrato de sobras (`wintesthub_lo_profile` continua igual).
+
+1. **Gerador R2 (`generate_r2_xlsx(path)` + `_r2_formula(col_index, row)`):**
+   - `_r2_formula` devolve o texto do contrato 3 da `spec.md` (cópia literal das 20 fórmulas do `gen_cpu_r2_workload.py`, sem `=`), trocando só `MAXIFS(` → `_xlfn.MAXIFS(` e `XLOOKUP(` → `_xlfn.XLOOKUP(`.
+   - Escreve o pacote OOXML com `zipfile.ZipFile(..., ZIP_DEFLATED)` e `zipfile.ZipInfo(nome, date_time=(1980, 1, 1, 0, 0, 0))` para bytes determinísticos. Partes: `[Content_Types].xml`, `_rels/.rels`, `xl/workbook.xml` (4 `<sheet>` + `<bookViews><workbookView activeTab="2"/></bookViews>`), `xl/_rels/workbook.xml.rels`, `xl/worksheets/sheet1..4.xml`.
+   - Células: número `<c r="B2"><v>…</v></c>` com `repr(float)`; texto `<c r="C2" t="inlineStr"><is><t>…</t></is></c>`; fórmula `<c r="A2"><f>…</f></c>` sem `<v>`. Escapar com `xml_escape` (já importado). Referência de coluna por função `_col_letter(i)` (A..T).
+   - Monta as linhas com `"".join` / lista de strings (100 mil células: evitar concatenação quadrática). Meta: gerar em < 3 s.
+   - `generate_odf_fixtures(work_dir)` passa a devolver `(odt_path, xlsx_path)` e deixa de gerar o `workload_calc_complexo.ods`. Remover `_build_ods_content_xml`, `ODS_HEADERS` e `ODS_DEPARTMENTS` se ficarem sem uso.
+2. **Semente do perfil (`seed_lo_profile(profile_dir)`):** cria `<profile_dir>/user/registrymodifications.xcu` (UTF-8) com:
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+   <item oor:path="/org.openoffice.Office.Calc/Formula/Load"><prop oor:name="OOXMLRecalcMode" oor:op="fuse"><value>0</value></prop></item>
+   <item oor:path="/org.openoffice.Office.Common/Save/Document"><prop oor:name="WarnAlienFormat" oor:op="fuse"><value>false</value></prop></item>
+   </oor:items>
+   ```
+   Chamada em `run_test_cycle` logo após criar `profile_batch_dir` e `profile_calc_dir`.
+3. **Etapa 1 (`measure_formula_calculation`):**
+   - `--convert-to ods` no lugar de `pdf`; saída esperada `<cycle_dir>/workload_calc_r2.ods` (ou o nome da cópia).
+   - No laço de espera (hoje `sleep(0.1)`), a cada iteração ler `cpu_times()` dos processos `soffice*` do subperfil `batch` (reaproveitar `_find_profile_libreoffice_pids(profile_marker, root_pid=proc.pid)`) e guardar o último `user + system` por PID. `CPU_Calculo_Formulas_s = soma`.
+   - Retorna `(elapsed, cpu_s)`; `run_test_cycle` grava `CPU_Calculo_Formulas_s` no `cycle_record`.
+   - Validação nova `read_r2_sentinel(ods_path)` (função pura): abre o `content.xml` do `.ods`, acha a tabela `Sentinel`, lê `office:value` da `A2`; ausente ou `0` → `RuntimeError("Recalculo nao confirmado: Sentinel.A2 ...")`. Função irmã `count_r2_errors(ods_path)` conta, na tabela `Calc`, células cujo `<text:p>` comece com `#` ou `Err:` e devolve `{coluna: n}`; se houver, `logger.warning` com o resumo.
+4. **Etapa 3 e 4 (Calc GUI):**
+   - `measure_app_launch(..., "--calc", xlsx_gui_copy, uri_calc, timeout=CALC_LAUNCH_TIMEOUT)` com `CALC_LAUNCH_TIMEOUT = 180` (Writer segue com `APP_LAUNCH_TIMEOUT = 60`).
+   - `simulate_calc_editing`: a aba ativa já é `Trigger` (`activeTab=2`); `_navigate_to_row` e `_write_row` seguem iguais (escrevem a partir de `A2` da aba ativa). `Ctrl+Shift+F9` passa a reavaliar as 100 mil fórmulas. `Ctrl+S` grava `.xlsx` sem diálogo (semente do perfil).
+   - Como cada `Ctrl+Shift+F9` pode levar segundos, depois dele esperar o Calc ficar ocioso antes do `Ctrl+S`: aguardar até a CPU do `soffice.bin` do subperfil `calc` cair abaixo de 5% de um núcleo por 2 leituras de 0,5 s, com teto de 60 s (estourar o teto → `RuntimeError`, ciclo FAIL).
+5. **CSVs e versão:** `VERSAO_TESTE = "2.1"`; `CICLOS_CSV_COLUMNS` ganha `CPU_Calculo_Formulas_s` logo depois de `Tempo_Calculo_Formulas_s`; `write_ciclos_csv` formata com `.2f`; `write_cpu_memoria_csv` grava `CPU_Calculo_Formulas_Media/_Max/_Min` logo depois de `Tempo_Calculo_Formulas_Min`.
+6. **Testes (`.github/scripts/test_cpu_memo_libreoffice.py`):** trocar as asserções da `.ods` antiga pelas da R2 (spec, "Evidência de validação" 1 e 1b), atualizar as de CSV (coluna nova, `2.1`) e o mock de `measure_formula_calculation` (agora devolve tupla). Para `read_r2_sentinel`/`count_r2_errors`, montar um `.ods` mínimo em memória no próprio teste.
+7. **Docs (WP-06):** `docs/metodologia-de-testes.md` seção 4 (ferramenta, procedimento Etapas 1/3/4, métricas 4.4 com `CPU_Calculo_Formulas_*` e `Versao_Teste 2.1`, nota de que `2.0` e `2.1` não se comparam), linha do Módulo 1 no `README.md`, HTMLs regerados.
+
 ## 3. Fronteiras de arquivo e paralelismo sugerido
 
 As mudanças dividem-se em **3 frentes independentes sem sobreposição de arquivos**, que podem rodar em paralelo:
@@ -129,6 +161,9 @@ As mudanças dividem-se em **3 frentes independentes sem sobreposição de arqui
 
 | Risco | Mitigação aplicada no desenho |
 |---|---|
+| (rev. 2) Versão futura do LibreOffice mudar o padrão de recálculo de `.xlsx` ou o aviso de formato | O perfil é semeado com `OOXMLRecalcMode = 0` e `WarnAlienFormat = false`; o `Sentinel.A2` prova o recálculo a cada ciclo. |
+| (rev. 2) Edição GUI travar a interface enquanto o Calc recalcula a R2 (foco perdido, teclas no lugar errado) | Espera de ociosidade do `soffice.bin` após `Ctrl+Shift+F9` antes de qualquer tecla nova; a checagem de foco existente continua valendo. |
+| (rev. 2) relatorio_lab comparar `2.0` com `2.1` | `Versao_Teste` muda; a coluna nova é só acréscimo. Item no INBOX para o relatorio_lab considerar a versão. |
 | `1_automacao_performance.py` importar `tkinter`/`pyautogui` no topo e falhar ao ser importado pelo teste unitário em runner Linux headless no CI | Estruturar os imports dependentes de display (`pyautogui`, `pynput`) ou o `Display` com guardas/lazy-import ou mock no teste unitário, mantendo as funções `generate_odf_fixtures`, `consolidate_results` e escrita de CSVs 100% executáveis em ambiente headless Linux (`ubuntu-latest` do job `python` no CI). |
 | Segunda instância do LibreOffice (`--calc`) ser absorvida pelo processo `soffice.bin` já aberto pelo `--writer` | Cada instância usa seu próprio diretório `-env:UserInstallation` (`wintesthub_lo_profile_writer` vs `wintesthub_lo_profile_calc`), forçando processos `soffice.bin` distintos e janelas independentes. |
 | `Test-Preflight.ps1` falhar em máquinas que tenham ou não tenham LibreOffice instalado em `C:\Program Files\LibreOffice` | Toda verificação de existência do LibreOffice no `hub.ps1` passa pela função de sonda `Test-LibreOfficeAvailable`, que é substituída por mock determinístico em `Test-Preflight.ps1`. |

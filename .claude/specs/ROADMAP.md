@@ -6,7 +6,6 @@ Mantido pelo Arquiteto. Cada spec aparece em exatamente uma seção; ideias de o
 
 | Spec | Ideias | Onde roda | Desde |
 |---|---|---|---|
-| [001 — Módulo 1 com workloads locais no LibreOffice](current/001-cpu-memo-libreoffice/spec.md) | #1 | Ground | 2026-11-25 |
 
 ## 🛣️ Próximas, em ordem
 
@@ -30,6 +29,7 @@ flowchart LR
 
 | Spec | Ideias | Entrega | Data |
 |---|---|---|---|
+| [001 — Módulo 1 com workloads locais no LibreOffice](current/001-cpu-memo-libreoffice/spec.md) — revisão 2 (carga R2) | #1 | `feat/001-cpu-memo-libreoffice` | 2026-11-26 |
 
 ## 🗑️ Descartadas
 
