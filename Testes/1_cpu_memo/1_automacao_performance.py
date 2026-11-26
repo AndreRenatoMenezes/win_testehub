@@ -47,7 +47,7 @@ except Exception:
 # =============================================================================
 # CONFIGURACOES DO TESTE
 # =============================================================================
-VERSAO_TESTE = "2.0"
+VERSAO_TESTE = "2.1"
 TEST_RUNS = 5
 DURATION_SECONDS = 300
 STABILIZE_SECONDS = 15
@@ -60,37 +60,26 @@ LO_PROFILE_PREFIX = "wintesthub_lo_profile"
 LO_COMMON_FLAGS = ["--norestore", "--nologo", "--nodefault", "--nolockcheck"]
 CALC_BATCH_TIMEOUT = 180
 APP_LAUNCH_TIMEOUT = 60
+CALC_LAUNCH_TIMEOUT = 180       # (s) o Calc recalcula a R2 inteira ao abrir
+LO_IDLE_TIMEOUT = 60            # (s) teto da espera de ociosidade apos recalculo na GUI
+LO_IDLE_CPU_PCT = 5.0           # (% de 1 nucleo) abaixo disso o soffice.bin esta ocioso
+LO_IDLE_SAMPLES = 2             # leituras consecutivas abaixo do limite
+LO_IDLE_INTERVAL = 0.5          # (s) intervalo entre leituras
 
 DEFAULT_LO_PATHS = (
     r"C:\Program Files\LibreOffice\program\soffice.exe",
     r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
 )
 
-ODS_DEPARTMENTS = (
-    "Vendas",
-    "Marketing",
-    "TI",
-    "RH",
-    "Operacoes",
-    "Financeiro",
-    "Logistica",
-    "Juridico",
-    "Suporte",
-    "Engenharia",
-)
-
-ODS_HEADERS = (
-    "Departamento",
-    "Receita",
-    "Despesa",
-    "Imposto_Taxa",
-    "Indice_Lookup",
-    "Saldo_Liquido",
-    "Status_Margem",
-    "Media_Movel_50",
-    "Busca_Cruzada",
-    "Contagem_Acima",
-)
+# Planilha R2 (mesma carga do teste do macOS: LabTesting/MacVersion/tools/gen_cpu_r2_workload.py)
+R2_ROWS = 5000
+R2_FORMULA_COLS = 20
+R2_CATEGORIES = ("alpha", "beta", "gamma", "delta", "epsilon")
+R2_XLSX_NAME = "workload_calc_r2.xlsx"
+R2_ZIP_DATE = (1980, 1, 1, 0, 0, 0)
+# Erros que a propria R2 produz em qualquer planilha (Excel, Numbers, LibreOffice):
+# f6 = VLOOKUP(MOD(seq, 100), ...) nao acha a chave 0 nas 50 linhas com seq multiplo de 100 (#N/A).
+R2_EXPECTED_ERRORS = {"f6": R2_ROWS // 100}
 
 CICLOS_CSV_COLUMNS = [
     "Ciclo",
@@ -98,6 +87,7 @@ CICLOS_CSV_COLUMNS = [
     "Tempo_Abertura_Writer_s",
     "Tempo_Abertura_Calc_s",
     "Tempo_Calculo_Formulas_s",
+    "CPU_Calculo_Formulas_s",
     "Linhas_Editadas_Calc",
     "Paragrafos_Digitados_Writer",
     "CPU_Sistema_Media_Pct",
@@ -436,97 +426,303 @@ def _build_odt_content_xml():
     )
 
 
-def _build_ods_content_xml(num_data_rows=5000, seed=42):
+def _r2_formula(col_index, row):
     """
-    Constroi o content.xml de workload_calc_complexo.ods com:
-    - 1 linha de cabecalho (linha 1)
-    - 5.000 linhas de dados deterministicos (linhas 2..5001) com random.Random(42)
-    - 5 colunas de dados base (A..E) e 5 colunas de formulas OpenFormula (F..J)
+    Texto da formula Calc!<col><row> da planilha R2 (sem o '=' inicial).
+    Copia literal do gen_cpu_r2_workload.py do teste do macOS; so MAXIFS e
+    XLOOKUP ganham o prefixo _xlfn. (como o Excel grava), senao o LibreOffice
+    devolve #NOME? nessas colunas.
     """
-    rng = random.Random(seed)
-    rows_xml = []
-
-    header_cells = "".join(
-        f'<table:table-cell office:value-type="string"><text:p>{xml_escape(h)}</text:p></table:table-cell>'
-        for h in ODS_HEADERS
+    R = row
+    last = R2_ROWS + 1
+    win_lo = max(2, R - 50)
+    win_hi = min(last, R + 50)
+    formulas = (
+        f"SUMIFS(Data!B$2:B${last}, Data!C$2:C${last}, Data!C{R})",
+        f'COUNTIFS(Data!C$2:C${last}, Data!C{R}, Data!B$2:B${last}, ">"&Data!B{R}/2)',
+        f"AVERAGEIFS(Data!B$2:B${last}, Data!C$2:C${last}, Data!C{R})",
+        f"_xlfn.MAXIFS(Data!B$2:B${last}, Data!C$2:C${last}, Data!C{R})",
+        f"INDEX(Data!B$2:B${last}, MATCH(Data!A{R}, Data!A$2:A${last}, 0))",
+        f"VLOOKUP(MOD(Data!A{R}, 100), Data!A$2:B${last}, 2, FALSE)",
+        f"_xlfn.XLOOKUP(Data!C{R}, Data!C$2:C${last}, Data!B$2:B${last})",
+        f'INDIRECT("Data!B" & (1 + MOD(Data!A{R} * 7, {R2_ROWS})))',
+        f"STDEV(Data!B{win_lo}:B{win_hi})",
+        f"VAR(Data!B{win_lo}:B{win_hi})",
+        f"PERCENTILE(Data!B{win_lo}:B{win_hi}, 0.95)",
+        f"RANK(Data!B{R}, Data!B{win_lo}:B{win_hi}, 0)",
+        f"NPV(0.05, Data!B{max(2, R - 10)}:B{min(last, R + 10)})",
+        f"PMT(Data!B{R}/12000, 360, -100000)",
+        f"FV(Data!B{R}/12000, 360, -500, -10000)",
+        f"IPMT(0.05/12, MOD(Data!A{R}, 360) + 1, 360, -100000)",
+        f'IF(Data!B{R} > 500, "high", IF(Data!B{R} > 100, "mid", "low"))',
+        f'Data!C{R} & "-" & TEXT(Data!B{R}, "0.00")',
+        f"LEN(Data!C{R}) * Data!B{R}",
+        f"IFERROR(SQRT(Data!B{R} - 250), 0)",
     )
-    rows_xml.append(f"        <table:table-row>{header_cells}</table:table-row>")
+    return formulas[col_index]
 
-    last_row = num_data_rows + 1
-    for r in range(2, last_row + 1):
-        dept = ODS_DEPARTMENTS[(r - 2) % len(ODS_DEPARTMENTS)]
-        receita = round(rng.uniform(1000.0, 100000.0), 2)
-        despesa = round(rng.uniform(500.0, 95000.0), 2)
-        imposto = round(rng.uniform(0.05, 0.27), 4)
-        indice_lookup = float(r - 1)
 
-        f_saldo = f"of:=[.B{r}]-[.C{r}]-([.B{r}]*[.D{r}])"
-        f_margem = f"of:=IF([.F{r}]>0;([.F{r}]/[.B{r}])*100;-100)"
-        f_media_movel = f"of:=AVERAGE([.B{max(2, r - 49)}:.B{r}])"
-        target_idx = ((r - 2 + 2500) % num_data_rows) + 1
-        f_vlookup = f"of:=VLOOKUP({target_idx};[.E$2:.F${last_row}];2;0)"
-        if r % 10 == 0:
-            f_col_j = f'of:=COUNTIF([.B$2:.B${last_row}];&quot;>50000&quot;)'
-        else:
-            f_col_j = f"of:=SUM([.B{max(2, r - 20)}:.C{r}])"
+def _col_letter(index):
+    """0 -> A, 19 -> T, 26 -> AA."""
+    letters = ""
+    n = index + 1
+    while n:
+        n, rem = divmod(n - 1, 26)
+        letters = chr(65 + rem) + letters
+    return letters
 
-        row_str = (
-            "        <table:table-row>"
-            f'<table:table-cell office:value-type="string"><text:p>{dept}</text:p></table:table-cell>'
-            f'<table:table-cell office:value-type="float" office:value="{receita}"><text:p>{receita}</text:p></table:table-cell>'
-            f'<table:table-cell office:value-type="float" office:value="{despesa}"><text:p>{despesa}</text:p></table:table-cell>'
-            f'<table:table-cell office:value-type="float" office:value="{imposto}"><text:p>{imposto}</text:p></table:table-cell>'
-            f'<table:table-cell office:value-type="float" office:value="{indice_lookup}"><text:p>{indice_lookup}</text:p></table:table-cell>'
-            f'<table:table-cell table:formula="{f_saldo}" office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>'
-            f'<table:table-cell table:formula="{f_margem}" office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>'
-            f'<table:table-cell table:formula="{f_media_movel}" office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>'
-            f'<table:table-cell table:formula="{f_vlookup}" office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>'
-            f'<table:table-cell table:formula="{f_col_j}" office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>'
-            "</table:table-row>"
-        )
-        rows_xml.append(row_str)
 
-    all_rows = "\n".join(rows_xml)
+def _xlsx_cell_str(ref, text):
+    return f'<c r="{ref}" t="inlineStr"><is><t>{xml_escape(text)}</t></is></c>'
+
+
+def _xlsx_cell_num(ref, value):
+    return f'<c r="{ref}"><v>{value!r}</v></c>'
+
+
+def _xlsx_cell_formula(ref, formula):
+    # Sem <v>: nenhum valor em cache, o LibreOffice tem de calcular tudo
+    return f'<c r="{ref}"><f>{xml_escape(formula)}</f></c>'
+
+
+def _xlsx_sheet_xml(rows_xml, selected=False):
+    view = '<sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews>' if selected else ""
     return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<office:document-content '
-        'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
-        'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
-        'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
-        'office:version="1.2">\n'
-        '  <office:body>\n'
-        '    <office:spreadsheet>\n'
-        '      <table:table table:name="Planilha1">\n'
-        f'{all_rows}\n'
-        '      </table:table>\n'
-        '    </office:spreadsheet>\n'
-        '  </office:body>\n'
-        '</office:document-content>\n'
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f"{view}<sheetData>{''.join(rows_xml)}</sheetData></worksheet>"
     )
+
+
+def _r2_sheets():
+    """Retorna [(nome, xml)] das 4 abas da R2: Data, Calc, Trigger, Sentinel."""
+    last = R2_ROWS + 1
+
+    data_rows = ['<row r="1">' + "".join(
+        _xlsx_cell_str(f"{c}1", t) for c, t in zip("ABCD", ("seq", "value", "category", "date"))
+    ) + "</row>"]
+    for seq in range(1, R2_ROWS + 1):
+        r = seq + 1
+        data_rows.append(
+            f'<row r="{r}">'
+            + _xlsx_cell_num(f"A{r}", seq)
+            + _xlsx_cell_num(f"B{r}", (seq * 1.000173) % 1000.0)
+            + _xlsx_cell_str(f"C{r}", R2_CATEGORIES[seq % len(R2_CATEGORIES)])
+            + _xlsx_cell_formula(f"D{r}", f"DATE(2020, 1, 1) + MOD({seq}, 1825)")
+            + "</row>"
+        )
+
+    cols = [_col_letter(c) for c in range(R2_FORMULA_COLS)]
+    calc_rows = ['<row r="1">' + "".join(
+        _xlsx_cell_str(f"{cols[c]}1", f"f{c + 1}") for c in range(R2_FORMULA_COLS)
+    ) + "</row>"]
+    for r in range(2, last + 1):
+        calc_rows.append(
+            f'<row r="{r}">'
+            + "".join(_xlsx_cell_formula(f"{cols[c]}{r}", _r2_formula(c, r)) for c in range(R2_FORMULA_COLS))
+            + "</row>"
+        )
+
+    trigger_rows = [
+        '<row r="1">' + _xlsx_cell_str("A1", "seed") + "</row>",
+        '<row r="2">' + _xlsx_cell_num("A2", 0) + "</row>",
+    ]
+    sentinel_rows = [
+        '<row r="1">' + _xlsx_cell_str("A1", "total") + "</row>",
+        '<row r="2">' + _xlsx_cell_formula(
+            "A2", f"Calc!A2 + Calc!A{last} + Calc!T2 + Calc!T{last} + Trigger!A2*0"
+        ) + "</row>",
+    ]
+    return [
+        ("Data", _xlsx_sheet_xml(data_rows)),
+        ("Calc", _xlsx_sheet_xml(calc_rows)),
+        ("Trigger", _xlsx_sheet_xml(trigger_rows, selected=True)),
+        ("Sentinel", _xlsx_sheet_xml(sentinel_rows)),
+    ]
+
+
+def generate_r2_xlsx(target_path):
+    """
+    Grava a planilha R2 (contrato 3 da spec 001) como OOXML minimo via zipfile:
+    4 abas, 5.000 linhas de dados e 100.000 formulas sem valor em cache, aba
+    Trigger ativa. Bytes identicos a cada chamada (date_time fixo no ZIP).
+    """
+    sheets = _r2_sheets()
+    ns_rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        + "".join(
+            f'<Override PartName="/xl/worksheets/sheet{i}.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            for i in range(1, len(sheets) + 1)
+        )
+        + "</Types>"
+    )
+    root_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        f'<Relationship Id="rId1" Type="{ns_rel}/officeDocument" Target="xl/workbook.xml"/>'
+        "</Relationships>"
+    )
+    workbook = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        f'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="{ns_rel}">'
+        '<bookViews><workbookView activeTab="2"/></bookViews><sheets>'
+        + "".join(
+            f'<sheet name="{name}" sheetId="{i}" r:id="rId{i}"/>'
+            for i, (name, _) in enumerate(sheets, start=1)
+        )
+        + "</sheets></workbook>"
+    )
+    workbook_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + "".join(
+            f'<Relationship Id="rId{i}" Type="{ns_rel}/worksheet" Target="worksheets/sheet{i}.xml"/>'
+            for i in range(1, len(sheets) + 1)
+        )
+        + "</Relationships>"
+    )
+    parts = [
+        ("[Content_Types].xml", content_types),
+        ("_rels/.rels", root_rels),
+        ("xl/workbook.xml", workbook),
+        ("xl/_rels/workbook.xml.rels", workbook_rels),
+    ] + [(f"xl/worksheets/sheet{i}.xml", xml) for i, (_, xml) in enumerate(sheets, start=1)]
+
+    with zipfile.ZipFile(target_path, "w") as zf:
+        for name, xml in parts:
+            info = zipfile.ZipInfo(name, date_time=R2_ZIP_DATE)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            zf.writestr(info, xml.encode("utf-8"))
+    return target_path
+
+
+_LO_REGISTRY_SEED = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<oor:items xmlns:oor="http://openoffice.org/2001/registry" '
+    'xmlns:xs="http://www.w3.org/2001/XMLSchema" '
+    'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n'
+    '<item oor:path="/org.openoffice.Office.Calc/Formula/Load">'
+    '<prop oor:name="OOXMLRecalcMode" oor:op="fuse"><value>0</value></prop></item>\n'
+    '<item oor:path="/org.openoffice.Office.Common/Save/Document">'
+    '<prop oor:name="WarnAlienFormat" oor:op="fuse"><value>false</value></prop></item>\n'
+    '</oor:items>\n'
+)
+
+
+def seed_lo_profile(profile_dir):
+    """
+    Cria <profile_dir>/user/registrymodifications.xcu com recalculo sempre ao
+    carregar .xlsx e sem aviso de formato ao salvar (contrato 2 da spec 001).
+    """
+    user_dir = os.path.join(profile_dir, "user")
+    os.makedirs(user_dir, exist_ok=True)
+    xcu_path = os.path.join(user_dir, "registrymodifications.xcu")
+    with open(xcu_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(_LO_REGISTRY_SEED)
+    return xcu_path
+
+
+_ODF_NS_OFFICE = "urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+_ODF_NS_TABLE = "urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+_ODF_NS_TEXT = "urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+
+
+def _scan_r2_ods(ods_path):
+    """
+    Le o content.xml do .ods gerado pela Etapa 1 em streaming e devolve
+    (valor de Sentinel.A2 ou None, {"f1".."f20": celulas com erro na aba Calc}).
+    """
+    import xml.etree.ElementTree as ET
+
+    t_table = f"{{{_ODF_NS_TABLE}}}table"
+    t_row = f"{{{_ODF_NS_TABLE}}}table-row"
+    t_cell = f"{{{_ODF_NS_TABLE}}}table-cell"
+    t_covered = f"{{{_ODF_NS_TABLE}}}covered-table-cell"
+    t_p = f"{{{_ODF_NS_TEXT}}}p"
+    a_name = f"{{{_ODF_NS_TABLE}}}name"
+    a_rows_rep = f"{{{_ODF_NS_TABLE}}}number-rows-repeated"
+    a_cols_rep = f"{{{_ODF_NS_TABLE}}}number-columns-repeated"
+    a_value = f"{{{_ODF_NS_OFFICE}}}value"
+
+    sentinel = None
+    errors = {}
+    table = None
+    row_idx = 0
+    col_idx = 0
+
+    with zipfile.ZipFile(ods_path) as zf, zf.open("content.xml") as fh:
+        for event, el in ET.iterparse(fh, events=("start", "end")):
+            tag = el.tag
+            if event == "start":
+                if tag == t_table:
+                    table = el.get(a_name)
+                    row_idx = 0
+                elif tag == t_row:
+                    row_idx += 1
+                    col_idx = 0
+                continue
+
+            if tag in (t_cell, t_covered):
+                reps = int(el.get(a_cols_rep, "1"))
+                if table == "Sentinel" and row_idx == 2 and col_idx == 0:
+                    raw = el.get(a_value)
+                    try:
+                        sentinel = float(raw) if raw is not None else None
+                    except ValueError:
+                        sentinel = None
+                elif table == "Calc" and row_idx >= 2 and col_idx < R2_FORMULA_COLS:
+                    p = el.find(t_p)
+                    txt = (p.text or "") if p is not None else ""
+                    if txt.startswith("#") or txt.startswith("Err:"):
+                        for c in range(col_idx, min(col_idx + reps, R2_FORMULA_COLS)):
+                            key = f"f{c + 1}"
+                            errors[key] = errors.get(key, 0) + 1
+                col_idx += reps
+                el.clear()
+            elif tag == t_row:
+                row_idx += int(el.get(a_rows_rep, "1")) - 1
+                el.clear()
+            elif tag == t_table:
+                table = None
+                el.clear()
+    return sentinel, errors
+
+
+def read_r2_sentinel(ods_path):
+    """Valor de Sentinel.A2 no .ods recalculado (None se ausente)."""
+    return _scan_r2_ods(ods_path)[0]
+
+
+def count_r2_errors(ods_path):
+    """Celulas com erro (#..., Err:...) por coluna f1..f20 da aba Calc."""
+    return _scan_r2_ods(ods_path)[1]
 
 
 def generate_odf_fixtures(work_dir):
     """
-    Gera os arquivos ODF de carga em work_dir:
+    Gera os arquivos de carga em work_dir:
     - workload_doc.odt
-    - workload_calc_complexo.ods (5.001 linhas com formulas OpenFormula)
-    Retorna (odt_path, ods_path).
+    - workload_calc_r2.xlsx (planilha R2: 5.000 linhas, 100.000 formulas)
+    Retorna (odt_path, xlsx_path).
     """
     os.makedirs(work_dir, exist_ok=True)
     odt_path = os.path.join(work_dir, "workload_doc.odt")
-    ods_path = os.path.join(work_dir, "workload_calc_complexo.ods")
+    xlsx_path = os.path.join(work_dir, R2_XLSX_NAME)
 
     _write_odf_zip(
         odt_path,
         "application/vnd.oasis.opendocument.text",
         _build_odt_content_xml(),
     )
-    _write_odf_zip(
-        ods_path,
-        "application/vnd.oasis.opendocument.spreadsheet",
-        _build_ods_content_xml(num_data_rows=5000, seed=42),
-    )
-    return odt_path, ods_path
+    generate_r2_xlsx(xlsx_path)
+    return odt_path, xlsx_path
 
 
 # =============================================================================
@@ -543,6 +739,40 @@ def _is_test_libreoffice_proc(name, cmdline_list, profile_marker=LO_PROFILE_PREF
     return profile_marker.lower() in cmd_str
 
 
+# soffice.exe lancados pelo teste no ciclo atual. Os laços cronometrados seguem a
+# arvore deles (pid/ppid, um snapshot rapido) em vez de ler o cmdline de todos os
+# processos: com o hub elevado, process_iter(['cmdline']) leva ~3 s por varredura
+# na maquina com agentes de seguranca e chega a nao enxergar o soffice.bin.
+_lo_roots = set()
+
+
+def _lo_tree_procs(roots, known):
+    """
+    Atualiza e devolve `known` ({pid: psutil.Process}) com as raizes vivas e todos
+    os descendentes delas; remove os que ja terminaram. Processos vistos uma vez
+    continuam acompanhados mesmo se a raiz morrer antes deles.
+    """
+    if psutil is None:
+        return known
+    for r in list(roots):
+        try:
+            rp = known.get(r)
+            if rp is None:
+                rp = psutil.Process(r)
+                known[r] = rp
+            for child in rp.children(recursive=True):
+                known.setdefault(child.pid, child)
+        except psutil.Error:
+            continue
+    for pid, pr in list(known.items()):
+        try:
+            if not pr.is_running():
+                known.pop(pid, None)
+        except psutil.Error:
+            known.pop(pid, None)
+    return known
+
+
 def kill_test_libreoffice(ui=None, run_index=0):
     """
     Encerra apenas processos soffice.exe / soffice.bin cujo cmdline contenha
@@ -553,14 +783,15 @@ def kill_test_libreoffice(ui=None, run_index=0):
     if psutil is None:
         return
 
-    targets = []
+    by_pid = dict(_lo_tree_procs(set(_lo_roots), {}))
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
             info = proc.info
             if _is_test_libreoffice_proc(info.get('name'), info.get('cmdline')):
-                targets.append(proc)
+                by_pid.setdefault(proc.pid, proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             continue
+    targets = list(by_pid.values())
 
     if not targets:
         return
@@ -584,7 +815,7 @@ class ResourceSampler:
     Amostrador em thread que coleta a cada 1.0s:
     - CPU (%) e RAM (MB e %) do sistema
     - Soma de CPU (%) normalizada por nucleos logicos e RAM RSS (MB) dos processos
-      soffice.exe / soffice.bin com wintesthub_lo_profile no cmdline.
+      do LibreOffice do teste (arvore dos soffice.exe registrados em _lo_roots).
     """
 
     def __init__(self, interval=1.0):
@@ -593,6 +824,7 @@ class ResourceSampler:
         self._thread = None
         self._lock = threading.Lock()
         self._proc_cache = {}
+        self._primed = set()
         self.sys_cpu_samples = []
         self.sys_ram_mb_samples = []
         self.sys_ram_pct_samples = []
@@ -628,18 +860,13 @@ class ResourceSampler:
             lo_cpu_sum = 0.0
             lo_ram_mb_sum = 0.0
 
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            known = _lo_tree_procs(set(_lo_roots), self._proc_cache)
+            for pid, cached in list(known.items()):
                 try:
-                    info = proc.info
-                    if not _is_test_libreoffice_proc(info.get('name'), info.get('cmdline')):
-                        continue
-                    pid = info['pid']
                     active_pids.add(pid)
-                    cached = self._proc_cache.get(pid)
-                    if cached is None:
-                        cached = proc
-                        self._proc_cache[pid] = cached
-                        cached.cpu_percent(interval=None)
+                    if pid not in self._primed:
+                        self._primed.add(pid)
+                        cached.cpu_percent(interval=None)  # 1a leitura so arma o contador (vale 0)
                     cpu_val = max(0.0, float(cached.cpu_percent(interval=None))) / logical_cpus
                     rss_mb = float(cached.memory_info().rss) / (1024 ** 2)
                     lo_cpu_sum += cpu_val
@@ -719,10 +946,23 @@ def cancel_wpr_if_active():
     )
 
 
-def measure_formula_calculation(soffice_path, ods_path, cycle_dir, profile_uri, timeout=CALC_BATCH_TIMEOUT):
+def _read_lo_cpu_seconds(procs, cpu_by_pid):
+    """Atualiza cpu_by_pid com user+system de cada psutil.Process vivo."""
+    for pid, pr in list(procs.items()):
+        try:
+            ct = pr.cpu_times()
+            cpu_by_pid[pid] = float(ct.user) + float(ct.system)
+        except Exception:
+            procs.pop(pid, None)
+
+
+def measure_formula_calculation(soffice_path, xlsx_path, cycle_dir, profile_uri, timeout=CALC_BATCH_TIMEOUT):
     """
-    Etapa 1: Executa soffice.exe em modo batch (--headless --convert-to pdf) sobre
-    uma copia de workload_calc_complexo.ods e cronometra ate o termino e gravacao do PDF.
+    Etapa 1: converte a planilha R2 para .ods em modo batch (--headless --convert-to ods),
+    obrigando o LibreOffice a calcular as 100.000 formulas.
+    Retorna (tempo_relogio_s, cpu_s), onde cpu_s soma user+system dos processos
+    soffice da arvore do soffice.exe lancado (polling a cada ~0,1 s).
+    Falha se o .ods nao existir ou se Sentinel.A2 estiver ausente ou valer 0.
     """
     cmd = [
         soffice_path,
@@ -730,31 +970,39 @@ def measure_formula_calculation(soffice_path, ods_path, cycle_dir, profile_uri, 
         "--headless",
         *LO_COMMON_FLAGS,
         "--convert-to",
-        "pdf",
+        "ods",
         "--outdir",
         cycle_dir,
-        ods_path,
+        xlsx_path,
     ]
-    base_no_ext = os.path.splitext(os.path.basename(ods_path))[0]
-    pdf_path = os.path.join(cycle_dir, f"{base_no_ext}.pdf")
-    if os.path.exists(pdf_path):
+    base_no_ext = os.path.splitext(os.path.basename(xlsx_path))[0]
+    ods_out = os.path.join(cycle_dir, f"{base_no_ext}.ods")
+    if os.path.exists(ods_out):
         try:
-            os.remove(pdf_path)
+            os.remove(ods_out)
         except OSError:
             pass
 
-    logger.info("Etapa 1: Iniciando calculo de formulas complexas e exportacao PDF...")
+    procs = {}
+    cpu_by_pid = {}
+
+    logger.info("Etapa 1: Iniciando calculo de formulas complexas (planilha R2 -> .ods)...")
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    _lo_roots.add(proc.pid)
     try:
         while proc.poll() is None:
             check_stop()
-            if (time.perf_counter() - t0) > timeout:
+            now = time.perf_counter()
+            if (now - t0) > timeout:
                 proc.kill()
                 kill_test_libreoffice()
                 raise TimeoutError(
                     f"Timeout de {timeout}s excedido no calculo de formulas complexas do LibreOffice Calc."
                 )
+            if psutil is not None:
+                _lo_tree_procs({proc.pid}, procs)
+                _read_lo_cpu_seconds(procs, cpu_by_pid)
             time.sleep(0.1)
     except Exception:
         if proc.poll() is None:
@@ -765,18 +1013,30 @@ def measure_formula_calculation(soffice_path, ods_path, cycle_dir, profile_uri, 
         raise
 
     elapsed = time.perf_counter() - t0
+    cpu_s = sum(cpu_by_pid.values())
     _, stderr_out = proc.communicate()
     if proc.returncode != 0:
         raise RuntimeError(
             f"LibreOffice batch falhou com codigo {proc.returncode}: {(stderr_out or '').strip()}"
         )
-    if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) <= 0:
-        raise RuntimeError(
-            f"PDF recalculado nao foi gerado ou esta vazio: {pdf_path}"
+    if not os.path.exists(ods_out) or os.path.getsize(ods_out) <= 0:
+        raise RuntimeError(f"Planilha recalculada (.ods) nao foi gerada ou esta vazia: {ods_out}")
+
+    sentinel, errors = _scan_r2_ods(ods_out)
+    if not sentinel:
+        raise RuntimeError(f"Recalculo nao confirmado: Sentinel.A2 = {sentinel!r} em {ods_out}")
+    if errors != R2_EXPECTED_ERRORS:
+        resumo = ", ".join(f"{k}={v}" for k, v in sorted(errors.items(), key=lambda kv: int(kv[0][1:]))) or "nenhum"
+        esperado = ", ".join(f"{k}={v}" for k, v in R2_EXPECTED_ERRORS.items())
+        logger.warning(
+            f"Planilha R2 com celulas com erro fora do esperado na aba Calc: {resumo} (esperado: {esperado})"
         )
 
-    logger.info(f"Etapa 1 concluida em {elapsed:.2f}s (PDF: {os.path.getsize(pdf_path)} bytes).")
-    return elapsed
+    logger.info(
+        f"Etapa 1 concluida em {elapsed:.2f}s (CPU {cpu_s:.2f}s, Sentinel.A2={sentinel:.3f}, "
+        f".ods {os.path.getsize(ods_out)} bytes)."
+    )
+    return elapsed, cpu_s
 
 
 def _find_visible_window_for_pids(target_pids):
@@ -808,26 +1068,6 @@ def _find_visible_window_for_pids(target_pids):
         return None
 
 
-def _find_profile_libreoffice_pids(profile_marker, root_pid=None):
-    """Retorna o conjunto de PIDs soffice.exe/soffice.bin associados ao subperfil."""
-    pids = set()
-    if root_pid:
-        pids.add(root_pid)
-    if psutil is None:
-        return pids
-
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
-        try:
-            info = proc.info
-            if _is_test_libreoffice_proc(info.get('name'), info.get('cmdline'), profile_marker):
-                pids.add(info['pid'])
-            elif root_pid and info.get('ppid') == root_pid:
-                pids.add(info['pid'])
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            continue
-    return pids
-
-
 def measure_app_launch(soffice_path, mode, file_path, profile_uri, timeout=APP_LAUNCH_TIMEOUT):
     """
     Etapas 2 e 3: Inicia soffice.exe (--writer ou --calc) com subperfil isolado e
@@ -845,6 +1085,8 @@ def measure_app_launch(soffice_path, mode, file_path, profile_uri, timeout=APP_L
     logger.info(f"Iniciando LibreOffice ({mode}) com perfil {profile_marker}...")
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _lo_roots.add(proc.pid)
+    known = {}
 
     while True:
         check_stop()
@@ -855,11 +1097,11 @@ def measure_app_launch(soffice_path, mode, file_path, profile_uri, timeout=APP_L
                 f"Timeout de {timeout}s ao aguardar abertura do LibreOffice ({mode})."
             )
 
-        pids = _find_profile_libreoffice_pids(profile_marker, root_pid=proc.pid)
+        pids = {proc.pid} | set(_lo_tree_procs({proc.pid}, known))
         hwnd = _find_visible_window_for_pids(pids)
         if pids and (hwnd is not None or os.name != "nt"):
             time.sleep(0.5)
-            pids_after = _find_profile_libreoffice_pids(profile_marker, root_pid=proc.pid)
+            pids_after = {proc.pid} | set(_lo_tree_procs({proc.pid}, known))
             hwnd_after = _find_visible_window_for_pids(pids_after) if os.name == "nt" else 1
             if pids_after and hwnd_after is not None:
                 elapsed = time.perf_counter() - t0
@@ -870,6 +1112,51 @@ def measure_app_launch(soffice_path, mode, file_path, profile_uri, timeout=APP_L
                 return elapsed, chosen_pid, hwnd_after
 
         time.sleep(0.1)
+
+
+def _wait_lo_idle(hwnd, timeout=None, user32=None):
+    """
+    Espera o soffice.bin dono da janela hwnd ficar ocioso (CPU < LO_IDLE_CPU_PCT
+    de um nucleo por LO_IDLE_SAMPLES leituras de LO_IDLE_INTERVAL s).
+    Retorna os segundos esperados. Sem user32/psutil (CI), retorna 0 sem esperar.
+    Estourar o teto levanta RuntimeError (ciclo FAIL).
+    """
+    timeout = LO_IDLE_TIMEOUT if timeout is None else timeout
+    u32 = _get_user32() if user32 is None else user32
+    if u32 is None or psutil is None or not hasattr(u32, "GetWindowThreadProcessId") or not hwnd:
+        return 0.0
+    try:
+        import ctypes
+        from ctypes import wintypes
+        pid = wintypes.DWORD()
+        u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            # HWND invalido ou ja fechado: pid 0 seria o processo Idle do sistema
+            logger.debug(f"Espera de ociosidade ignorada: HWND={hwnd} sem processo dono.")
+            return 0.0
+        proc = psutil.Process(int(pid.value))
+        proc.cpu_percent(interval=None)
+    except Exception as e:
+        logger.debug(f"Espera de ociosidade ignorada (HWND={hwnd}): {e}")
+        return 0.0
+
+    t0 = time.perf_counter()
+    quietas = 0
+    while True:
+        check_stop()
+        time.sleep(LO_IDLE_INTERVAL)
+        try:
+            cpu = float(proc.cpu_percent(interval=None))
+        except Exception:
+            return time.perf_counter() - t0
+        quietas = quietas + 1 if cpu < LO_IDLE_CPU_PCT else 0
+        elapsed = time.perf_counter() - t0
+        if quietas >= LO_IDLE_SAMPLES:
+            return elapsed
+        if elapsed > timeout:
+            raise RuntimeError(
+                f"LibreOffice nao ficou ocioso em {timeout}s apos o recalculo (CPU={cpu:.0f}% de 1 nucleo, HWND={hwnd})."
+            )
 
 
 def _get_user32():
@@ -1057,9 +1344,10 @@ def _write_row(values):
 
 def simulate_calc_editing(hwnd_calc):
     """
-    Simula edicao no LibreOffice Calc:
-    foca a grade, navega para proxima linha, insere linhas de dados, forca recalculo
-    (Ctrl+Shift+F9) e salva (Ctrl+S). Retorna quantidade de linhas editadas.
+    Simula edicao no LibreOffice Calc sobre a planilha R2 (aba Trigger, ativa ao abrir):
+    foca a grade, navega para proxima linha, insere linhas de dados, forca o recalculo
+    completo das 100.000 formulas (Ctrl+Shift+F9), espera o Calc ficar ocioso e salva
+    (Ctrl+S, .xlsx sem dialogo gracas a semente do perfil). Retorna linhas editadas.
     """
     global _sheet_state
     logger.debug("Simulando edicao e recalculo no LibreOffice Calc...")
@@ -1078,6 +1366,9 @@ def simulate_calc_editing(hwnd_calc):
 
     pyautogui.hotkey('ctrl', 'shift', 'f9')
     time.sleep(0.5)
+    # Ctrl+Shift+F9 reavalia as 100.000 formulas da R2: nenhuma tecla ate o Calc terminar
+    _wait_lo_idle(hwnd_calc)
+    _verify_window_focused(hwnd_calc)
     pyautogui.hotkey('ctrl', 's')
     time.sleep(random.uniform(0.5, 1.0))
     _verify_window_focused(hwnd_calc)
@@ -1087,7 +1378,7 @@ def simulate_calc_editing(hwnd_calc):
 # =============================================================================
 # 6. CICLO DE TESTE PRINCIPAL
 # =============================================================================
-def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_ods_path):
+def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
     """Executa um ciclo completo de 300s com LibreOffice, psutil e captura WPR."""
     now_dt = datetime.now()
     run_ts = now_dt.strftime('%Y%m%d_%H%M%S')
@@ -1099,6 +1390,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_ods_path):
     _sheet_state = {"next_row": 1, "data_index": _sheet_state["data_index"]}
 
     kill_test_libreoffice(ui, run_index)
+    _lo_roots.clear()
     check_stop()
 
     cycle_dir = tempfile.mkdtemp(prefix=f"wintesthub_lo_cycle{run_index}_")
@@ -1106,6 +1398,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_ods_path):
     sampler = ResourceSampler(interval=1.0)
 
     tempo_calculo_s = 0.0
+    cpu_calculo_s = 0.0
     tempo_writer_s = 0.0
     tempo_calc_s = 0.0
     paragrafos_digitados = 0
@@ -1118,17 +1411,19 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_ods_path):
         os.makedirs(profile_batch_dir, exist_ok=True)
         os.makedirs(profile_writer_dir, exist_ok=True)
         os.makedirs(profile_calc_dir, exist_ok=True)
+        seed_lo_profile(profile_batch_dir)
+        seed_lo_profile(profile_calc_dir)
 
         uri_batch = build_user_installation_uri(profile_batch_dir)
         uri_writer = build_user_installation_uri(profile_writer_dir)
         uri_calc = build_user_installation_uri(profile_calc_dir)
 
-        ods_batch_copy = os.path.join(cycle_dir, "workload_calc_batch.ods")
+        xlsx_batch_copy = os.path.join(cycle_dir, "workload_calc_batch.xlsx")
         odt_writer_copy = os.path.join(cycle_dir, "workload_doc.odt")
-        ods_calc_copy = os.path.join(cycle_dir, "workload_calc_complexo.ods")
-        shutil.copy2(base_ods_path, ods_batch_copy)
+        xlsx_calc_copy = os.path.join(cycle_dir, R2_XLSX_NAME)
+        shutil.copy2(base_xlsx_path, xlsx_batch_copy)
         shutil.copy2(base_odt_path, odt_writer_copy)
-        shutil.copy2(base_ods_path, ods_calc_copy)
+        shutil.copy2(base_xlsx_path, xlsx_calc_copy)
 
         for i in range(STABILIZE_SECONDS, 0, -1):
             check_stop()
@@ -1151,8 +1446,8 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_ods_path):
         cycle_start = time.time()
 
         ui.atualizar(run_index, "Etapa 1: Calculando planilha complexa...", DURATION_SECONDS)
-        tempo_calculo_s = measure_formula_calculation(
-            soffice_path, ods_batch_copy, cycle_dir, uri_batch, timeout=CALC_BATCH_TIMEOUT
+        tempo_calculo_s, cpu_calculo_s = measure_formula_calculation(
+            soffice_path, xlsx_batch_copy, cycle_dir, uri_batch, timeout=CALC_BATCH_TIMEOUT
         )
         check_stop()
 
@@ -1166,9 +1461,13 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_ods_path):
         remaining = max(1, int(DURATION_SECONDS - (time.time() - cycle_start)))
         ui.atualizar(run_index, "Etapa 3: Abrindo LibreOffice Calc...", remaining)
         tempo_calc_s, _, hwnd_calc = measure_app_launch(
-            soffice_path, "--calc", ods_calc_copy, uri_calc, timeout=APP_LAUNCH_TIMEOUT
+            soffice_path, "--calc", xlsx_calc_copy, uri_calc, timeout=CALC_LAUNCH_TIMEOUT
         )
         check_stop()
+        # A janela aparece antes do fim do recalculo da R2: nao digitar antes disso
+        espera_s = _wait_lo_idle(hwnd_calc, timeout=CALC_LAUNCH_TIMEOUT)
+        if espera_s:
+            logger.info(f"Calc ocioso {espera_s:.1f}s depois de abrir a janela (recalculo da R2).")
 
         turn = 0
         while True:
@@ -1258,6 +1557,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_ods_path):
         "Tempo_Abertura_Writer_s": tempo_writer_s,
         "Tempo_Abertura_Calc_s": tempo_calc_s,
         "Tempo_Calculo_Formulas_s": tempo_calculo_s,
+        "CPU_Calculo_Formulas_s": cpu_calculo_s,
         "Linhas_Editadas_Calc": linhas_editadas,
         "Paragrafos_Digitados_Writer": paragrafos_digitados,
         "CPU_Sistema_Media_Pct": stats["CPU_Sistema_Media_Pct"],
@@ -1548,6 +1848,7 @@ def write_ciclos_csv(cycle_metrics, output_path):
                 f"{float(item.get('Tempo_Abertura_Writer_s', 0.0)):.2f}",
                 f"{float(item.get('Tempo_Abertura_Calc_s', 0.0)):.2f}",
                 f"{float(item.get('Tempo_Calculo_Formulas_s', 0.0)):.2f}",
+                f"{float(item.get('CPU_Calculo_Formulas_s', 0.0)):.2f}",
                 int(item.get("Linhas_Editadas_Calc", 0)),
                 int(item.get("Paragrafos_Digitados_Writer", 0)),
                 f"{float(item.get('CPU_Sistema_Media_Pct', 0.0)):.1f}",
@@ -1621,6 +1922,9 @@ def write_cpu_memoria_csv(cycle_metrics, summary_data, output_path):
         writer.writerow(["Tempo_Calculo_Formulas_Media", f"{_mean('Tempo_Calculo_Formulas_s'):.2f}", "s"])
         writer.writerow(["Tempo_Calculo_Formulas_Max", f"{_max('Tempo_Calculo_Formulas_s'):.2f}", "s"])
         writer.writerow(["Tempo_Calculo_Formulas_Min", f"{_min('Tempo_Calculo_Formulas_s'):.2f}", "s"])
+        writer.writerow(["CPU_Calculo_Formulas_Media", f"{_mean('CPU_Calculo_Formulas_s'):.2f}", "s"])
+        writer.writerow(["CPU_Calculo_Formulas_Max", f"{_max('CPU_Calculo_Formulas_s'):.2f}", "s"])
+        writer.writerow(["CPU_Calculo_Formulas_Min", f"{_min('CPU_Calculo_Formulas_s'):.2f}", "s"])
         writer.writerow(["CPU_Sistema_Media", f"{_mean('CPU_Sistema_Media_Pct'):.1f}", "%"])
         writer.writerow(["CPU_Sistema_Pico", f"{_max('CPU_Sistema_Pico_Pct'):.1f}", "%"])
         writer.writerow(["RAM_Sistema_Media_MB", f"{_mean('RAM_Sistema_Media_MB'):.1f}", "MB"])
@@ -1812,13 +2116,13 @@ def worker_thread(ui):
 
         ui.atualizar(0, "Gerando arquivos ODF de benchmark...", "--")
         fixtures_dir = tempfile.mkdtemp(prefix="wintesthub_lo_fixtures_")
-        base_odt_path, base_ods_path = generate_odf_fixtures(fixtures_dir)
+        base_odt_path, base_xlsx_path = generate_odf_fixtures(fixtures_dir)
         logger.info(f"Fixtures ODF gerados em: {fixtures_dir}")
 
         _cycle_metrics = []
         for run in range(1, TEST_RUNS + 1):
             check_stop()
-            cycle_record = run_test_cycle(run, ui, soffice_path, base_odt_path, base_ods_path)
+            cycle_record = run_test_cycle(run, ui, soffice_path, base_odt_path, base_xlsx_path)
 
             if run < TEST_RUNS:
                 cooldown_s = smart_cooldown(run, ui)
@@ -1868,7 +2172,7 @@ def worker_thread(ui):
 # =============================================================================
 if __name__ == "__main__":
     _init_file_logging()
-    logger.info("=== Automacao de Testes de Performance — Versao 2.0 (LibreOffice) ===")
+    logger.info(f"=== Automacao de Testes de Performance — Versao {VERSAO_TESTE} (LibreOffice, planilha R2) ===")
     logger.info(f"Diretorio base: {BASE_DIR}")
     logger.info(f"Saida: {OUTPUT_PATH}")
     logger.info(f"Log: {LOG_FILE}")
