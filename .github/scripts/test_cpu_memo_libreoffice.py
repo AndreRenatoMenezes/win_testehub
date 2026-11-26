@@ -5,8 +5,9 @@ Valida:
 1. Ausencia total de importacoes/referencias a selenium ou msedge no script.
 2. Ordem de resolucao do executavel soffice.exe (HUB_LIBREOFFICE_PATH, PATH,
    caminhos padrao do Windows) e isolamento de subperfis wintesthub_lo_profile.
-3. Geracao deterministica dos arquivos ODF (.odt e .ods com 5.001 linhas e
-   5 colunas de formulas OpenFormula: SUM, IF, AVERAGE, VLOOKUP, COUNTIF).
+3. Geracao deterministica do .odt e da planilha R2 (.xlsx com as abas Data,
+   Calc, Trigger e Sentinel; 100.000 formulas sem cache, texto igual ao do
+   teste do macOS), semente do perfil do LibreOffice e leitura do Sentinel.
 4. Consolidacao de metricas e geracao de ciclos_libreoffice.csv e
    cpu_memoria.csv (com e sem CSVs do WPA, incluindo Soma_Media).
 
@@ -14,6 +15,8 @@ Rodar: python -I -X utf8 .github/scripts/test_cpu_memo_libreoffice.py
 """
 import csv
 import importlib.util
+import os
+import shutil
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
@@ -109,22 +112,21 @@ confere(
     "ignora processo soffice.bin do usuario sem wintesthub_lo_profile",
 )
 
-# --- 3. Geracao deterministica de fixtures ODF (.odt e .ods) ------------------
+# --- 3. Geracao deterministica do .odt e da planilha R2 ----------------------
 NS = {
     "office": "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
     "table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
     "text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
 }
-ATTR_VALUE_TYPE = f"{{{NS['office']}}}value-type"
-ATTR_VALUE = f"{{{NS['office']}}}value"
-ATTR_FORMULA = f"{{{NS['table']}}}formula"
-ATTR_TABLE_NAME = f"{{{NS['table']}}}name"
+NS_X = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 
 with tempfile.TemporaryDirectory() as tmp1, tempfile.TemporaryDirectory() as tmp2:
-    odt1, ods1 = mod.generate_odf_fixtures(tmp1)
-    odt2, ods2 = mod.generate_odf_fixtures(tmp2)
+    odt1, xlsx1 = mod.generate_odf_fixtures(tmp1)
+    odt2, xlsx2 = mod.generate_odf_fixtures(tmp2)
 
-    confere(Path(odt1).is_file() and Path(ods1).is_file(), "arquivos workload_doc.odt e workload_calc_complexo.ods criados")
+    confere(Path(odt1).is_file() and Path(xlsx1).is_file(), "arquivos workload_doc.odt e workload_calc_r2.xlsx criados")
+    confere(Path(xlsx1).name == "workload_calc_r2.xlsx", "planilha R2 com o nome do contrato")
+    confere(not any(Path(tmp1).glob("*.ods")), "planilha .ods antiga (workload_calc_complexo.ods) nao e mais gerada")
 
     # Valida ODT
     with zipfile.ZipFile(odt1, "r") as zf_odt:
@@ -141,90 +143,186 @@ with tempfile.TemporaryDirectory() as tmp1, tempfile.TemporaryDirectory() as tmp
     paragrafos_odt = root_odt.findall(".//text:p", NS)
     confere(len(paragrafos_odt) == 20, f"ODT: 20 paragrafos iniciais (obtido {len(paragrafos_odt)})")
 
-    # Valida ODS
-    with zipfile.ZipFile(ods1, "r") as zf_ods1, zipfile.ZipFile(ods2, "r") as zf_ods2:
-        names_ods = zf_ods1.namelist()
-        info_mime_ods = zf_ods1.getinfo("mimetype")
-        mime_ods = zf_ods1.read("mimetype").decode("ascii")
-        xml_ods1 = zf_ods1.read("content.xml")
-        xml_ods2 = zf_ods2.read("content.xml")
+    # Valida R2
+    confere(Path(xlsx1).read_bytes() == Path(xlsx2).read_bytes(), "R2: bytes identicos em duas geracoes (deterministica)")
+    with zipfile.ZipFile(xlsx1, "r") as zx:
+        nomes_x = set(zx.namelist())
+        partes = {n: zx.read(n) for n in nomes_x}
+    esperadas = {
+        "[Content_Types].xml", "_rels/.rels", "xl/workbook.xml", "xl/_rels/workbook.xml.rels",
+        "xl/worksheets/sheet1.xml", "xl/worksheets/sheet2.xml", "xl/worksheets/sheet3.xml", "xl/worksheets/sheet4.xml",
+    }
+    confere(esperadas <= nomes_x, "R2: pacote OOXML com workbook, rels e 4 worksheets")
 
-    confere(names_ods[0] == "mimetype", "ODS: 'mimetype' e a primeira entrada do ZIP")
-    confere(info_mime_ods.compress_type == zipfile.ZIP_STORED, "ODS: 'mimetype' gravado com ZIP_STORED")
-    confere(mime_ods == "application/vnd.oasis.opendocument.spreadsheet", "ODS: mimetype correto")
-    confere(xml_ods1 == xml_ods2, "ODS: geracao 100% deterministica (random.Random(42))")
+    wb = ET.fromstring(partes["xl/workbook.xml"])
+    abas = [sh.get("name") for sh in wb.findall(".//x:sheets/x:sheet", NS_X)]
+    confere(abas == ["Data", "Calc", "Trigger", "Sentinel"], f"R2: abas na ordem Data, Calc, Trigger, Sentinel (obtido {abas})")
+    view = wb.find(".//x:bookViews/x:workbookView", NS_X)
+    confere(view is not None and view.get("activeTab") == "2", "R2: aba Trigger (indice 2) abre ativa")
 
-    root_ods = ET.fromstring(xml_ods1)
-    tabela = root_ods.find(".//table:table", NS)
-    confere(tabela is not None and tabela.get(ATTR_TABLE_NAME) == "Planilha1", "ODS: tabela Planilha1 presente")
+    def _celulas(xml_bytes):
+        root = ET.fromstring(xml_bytes)
+        out = {}
+        for c in root.iter(f"{{{NS_X['x']}}}c"):
+            f = c.find("x:f", NS_X)
+            v = c.find("x:v", NS_X)
+            t = c.find("x:is/x:t", NS_X)
+            out[c.get("r")] = {
+                "f": f.text if f is not None else None,
+                "v": v.text if v is not None else None,
+                "t": t.text if t is not None else None,
+            }
+        return out
 
-    linhas_ods = tabela.findall("table:table-row", NS)
-    confere(len(linhas_ods) == 5001, f"ODS: exatamente 5.001 linhas (1 cabecalho + 5.000 dados, obtido {len(linhas_ods)})")
+    data = _celulas(partes["xl/worksheets/sheet1.xml"])
+    confere([data[f"{c}1"]["t"] for c in "ABCD"] == ["seq", "value", "category", "date"], "R2 Data: cabecalho seq, value, category, date")
+    confere(len([k for k in data if k.startswith("A")]) == 5001, "R2 Data: 1 cabecalho + 5.000 linhas")
+    confere(data["A2"]["v"] == "1" and perto(data["B2"]["v"], 1.000173, 1e-9) and data["C2"]["t"] == "beta", "R2 Data linha 2: seq=1, value=1.000173, category=beta")
+    confere(data["D2"]["f"] == "DATE(2020, 1, 1) + MOD(1, 1825)", f"R2 Data D2: {data['D2']['f']}")
+    confere(data["A5001"]["v"] == "5000" and perto(data["B5001"]["v"], (5000 * 1.000173) % 1000.0, 1e-9) and data["C5001"]["t"] == "alpha", "R2 Data linha 5001: seq=5000, value=(5000*1.000173)%1000, category=alpha")
 
-    # Cabecalho (linha 1)
-    celulas_cab = linhas_ods[0].findall("table:table-cell", NS)
-    textos_cab = [c.find("text:p", NS).text for c in celulas_cab]
+    calc = _celulas(partes["xl/worksheets/sheet2.xml"])
+    formulas_calc = [k for k, c in calc.items() if c["f"] is not None]
+    confere(len(formulas_calc) == 100_000, f"R2 Calc: 5.000 x 20 = 100.000 formulas (obtido {len(formulas_calc)})")
+    confere(all(calc[k]["v"] is None for k in formulas_calc), "R2 Calc: nenhuma formula com valor em cache (<v>)")
+    confere([calc[f"{mod._col_letter(c)}1"]["t"] for c in range(20)] == [f"f{i}" for i in range(1, 21)], "R2 Calc: cabecalho f1..f20")
+    esperadas_l2 = [
+        "SUMIFS(Data!B$2:B$5001, Data!C$2:C$5001, Data!C2)",
+        'COUNTIFS(Data!C$2:C$5001, Data!C2, Data!B$2:B$5001, ">"&Data!B2/2)',
+        "AVERAGEIFS(Data!B$2:B$5001, Data!C$2:C$5001, Data!C2)",
+        "_xlfn.MAXIFS(Data!B$2:B$5001, Data!C$2:C$5001, Data!C2)",
+        "INDEX(Data!B$2:B$5001, MATCH(Data!A2, Data!A$2:A$5001, 0))",
+        "VLOOKUP(MOD(Data!A2, 100), Data!A$2:B$5001, 2, FALSE)",
+        "_xlfn.XLOOKUP(Data!C2, Data!C$2:C$5001, Data!B$2:B$5001)",
+        'INDIRECT("Data!B" & (1 + MOD(Data!A2 * 7, 5000)))',
+        "STDEV(Data!B2:B52)",
+        "VAR(Data!B2:B52)",
+        "PERCENTILE(Data!B2:B52, 0.95)",
+        "RANK(Data!B2, Data!B2:B52, 0)",
+        "NPV(0.05, Data!B2:B12)",
+        "PMT(Data!B2/12000, 360, -100000)",
+        "FV(Data!B2/12000, 360, -500, -10000)",
+        "IPMT(0.05/12, MOD(Data!A2, 360) + 1, 360, -100000)",
+        'IF(Data!B2 > 500, "high", IF(Data!B2 > 100, "mid", "low"))',
+        'Data!C2 & "-" & TEXT(Data!B2, "0.00")',
+        "LEN(Data!C2) * Data!B2",
+        "IFERROR(SQRT(Data!B2 - 250), 0)",
+    ]
+    obtidas_l2 = [calc[f"{mod._col_letter(c)}2"]["f"] for c in range(20)]
+    confere(obtidas_l2 == esperadas_l2, "R2 Calc linha 2: as 20 formulas com o texto exato do contrato 3")
+    if obtidas_l2 != esperadas_l2:
+        for k in [k for k, (o, e) in enumerate(zip(obtidas_l2, esperadas_l2)) if o != e]:
+            print(f"          f{k + 1}: obtido {obtidas_l2[k]!r}")
+    confere(calc["I2600"]["f"] == "STDEV(Data!B2550:B2650)" and calc["M2600"]["f"] == "NPV(0.05, Data!B2590:B2610)", "R2 Calc linha 2600: janelas +-50 e +-10 no meio da planilha")
+    confere(calc["I5001"]["f"] == "STDEV(Data!B4951:B5001)" and calc["M5001"]["f"] == "NPV(0.05, Data!B4991:B5001)", "R2 Calc linha 5001: janelas truncadas no fim")
+    confere(calc["T5001"]["f"] == "IFERROR(SQRT(Data!B5001 - 250), 0)", "R2 Calc T5001: ultima formula")
+    sheet2_txt = partes["xl/worksheets/sheet2.xml"].decode("utf-8")
+    confere("&quot;" not in sheet2_txt and '"&gt;"&amp;Data!B2/2' in sheet2_txt, "R2 Calc: aspas literais e & / > escapados no XML")
+
+    trig = _celulas(partes["xl/worksheets/sheet3.xml"])
+    confere(trig["A1"]["t"] == "seed" and trig["A2"]["v"] == "0", "R2 Trigger: A1=seed, A2=0")
+    confere(b'tabSelected="1"' in partes["xl/worksheets/sheet3.xml"], "R2 Trigger: aba selecionada (tabSelected)")
+    sent = _celulas(partes["xl/worksheets/sheet4.xml"])
     confere(
-        textos_cab == [
-            "Departamento", "Receita", "Despesa", "Imposto_Taxa", "Indice_Lookup",
-            "Saldo_Liquido", "Status_Margem", "Media_Movel_50", "Busca_Cruzada", "Contagem_Acima",
+        sent["A1"]["t"] == "total" and sent["A2"]["f"] == "Calc!A2 + Calc!A5001 + Calc!T2 + Calc!T5001 + Trigger!A2*0" and sent["A2"]["v"] is None,
+        "R2 Sentinel: A2 soma os cantos da aba Calc, sem cache",
+    )
+    datas_zip = {zi.date_time for zi in zipfile.ZipFile(xlsx1).infolist()}
+    confere(datas_zip == {(1980, 1, 1, 0, 0, 0)}, "R2: entradas do ZIP com data fixa (sem relogio)")
+
+# 3b. Semente do perfil e leitura do Sentinel/erros de um .ods recalculado
+with tempfile.TemporaryDirectory() as tmp_prof:
+    xcu = Path(mod.seed_lo_profile(str(Path(tmp_prof) / "wintesthub_lo_profile_calc")))
+    confere(xcu == Path(tmp_prof) / "wintesthub_lo_profile_calc" / "user" / "registrymodifications.xcu", "semente do perfil em <perfil>/user/registrymodifications.xcu")
+    rx = ET.parse(xcu).getroot()
+    itens = {}
+    for item in rx:
+        for prop in item:
+            itens[(item.get("{http://openoffice.org/2001/registry}path"), prop.get("{http://openoffice.org/2001/registry}name"))] = prop.find("value").text
+    confere(itens.get(("/org.openoffice.Office.Calc/Formula/Load", "OOXMLRecalcMode")) == "0", "semente: OOXMLRecalcMode = 0 (sempre recalcular .xlsx)")
+    confere(itens.get(("/org.openoffice.Office.Common/Save/Document", "WarnAlienFormat")) == "false", "semente: WarnAlienFormat = false (Ctrl+S sem dialogo de formato)")
+
+
+def _ods_fake(path, sentinel_cell, calc_rows):
+    """Monta um .ods minimo com as abas Calc e Sentinel."""
+    def row(cells):
+        return "<table:table-row>" + "".join(cells) + "</table:table-row>"
+    calc_xml = row(['<table:table-cell office:value-type="string"><text:p>f1</text:p></table:table-cell>']) + "".join(row(r) for r in calc_rows)
+    sent_xml = row(['<table:table-cell office:value-type="string"><text:p>total</text:p></table:table-cell>']) + row([sentinel_cell])
+    content = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        f'<office:document-content xmlns:office="{NS["office"]}" xmlns:table="{NS["table"]}" xmlns:text="{NS["text"]}">'
+        "<office:body><office:spreadsheet>"
+        f'<table:table table:name="Calc">{calc_xml}</table:table>'
+        f'<table:table table:name="Sentinel">{sent_xml}</table:table>'
+        "</office:spreadsheet></office:body></office:document-content>"
+    )
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("content.xml", content)
+    return path
+
+
+ok_cell = '<table:table-cell office:value-type="float" office:value="12.5"><text:p>12,5</text:p></table:table-cell>'
+err_cell = '<table:table-cell office:value-type="string"><text:p>#N/D</text:p></table:table-cell>'
+erro_lo = '<table:table-cell office:value-type="string"><text:p>Err:502</text:p></table:table-cell>'
+with tempfile.TemporaryDirectory() as tmp_ods:
+    ods_ok = _ods_fake(
+        str(Path(tmp_ods) / "ok.ods"),
+        '<table:table-cell office:value-type="float" office:value="996865.173"><text:p>996865,17</text:p></table:table-cell>',
+        [
+            [ok_cell] * 5 + [err_cell] + [ok_cell] * 14,
+            [ok_cell, f'<table:table-cell table:number-columns-repeated="3" office:value-type="string"><text:p>#NOME?</text:p></table:table-cell>'] + [ok_cell] * 16,
+            [erro_lo] + [ok_cell] * 19,
         ],
-        "ODS: 10 colunas de cabecalho na ordem do contrato",
     )
+    confere(perto(mod.read_r2_sentinel(ods_ok), 996865.173, 1e-6), "read_r2_sentinel le o office:value de Sentinel.A2")
+    erros = mod.count_r2_errors(ods_ok)
+    confere(erros == {"f6": 1, "f2": 1, "f3": 1, "f4": 1, "f1": 1}, f"count_r2_errors conta #..., Err:... e respeita number-columns-repeated (obtido {erros})")
+    ods_zero = _ods_fake(str(Path(tmp_ods) / "zero.ods"), '<table:table-cell office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>', [[ok_cell] * 20])
+    confere(mod.read_r2_sentinel(ods_zero) == 0.0, "read_r2_sentinel devolve 0 quando o Sentinel nao foi recalculado")
+    ods_sem = _ods_fake(str(Path(tmp_ods) / "sem.ods"), '<table:table-cell/>', [[ok_cell] * 20])
+    confere(mod.read_r2_sentinel(ods_sem) is None, "read_r2_sentinel devolve None quando Sentinel.A2 nao tem valor")
+    confere(mod.R2_EXPECTED_ERRORS == {"f6": 50}, "erros esperados da propria R2: f6 = 50 (#N/A do VLOOKUP com chave 0)")
 
-    # Linha 2 (primeiro registro de dados, r=2)
-    c_r2 = linhas_ods[1].findall("table:table-cell", NS)
-    confere(len(c_r2) == 10, "ODS linha 2: 10 celulas")
-    confere(
-        c_r2[0].get(ATTR_VALUE_TYPE) == "string" and c_r2[0].find("text:p", NS).text == "Vendas",
-        "ODS linha 2 col A: Departamento 'Vendas'",
-    )
-    confere(
-        c_r2[4].get(ATTR_VALUE_TYPE) == "float" and float(c_r2[4].get(ATTR_VALUE)) == 1.0,
-        "ODS linha 2 col E: Indice_Lookup = 1.0",
-    )
-    confere(
-        c_r2[5].get(ATTR_FORMULA) == "of:=[.B2]-[.C2]-([.B2]*[.D2])",
-        f"ODS linha 2 col F (Saldo_Liquido): {c_r2[5].get(ATTR_FORMULA)}",
-    )
-    confere(
-        c_r2[6].get(ATTR_FORMULA) == "of:=IF([.F2]>0;([.F2]/[.B2])*100;-100)",
-        f"ODS linha 2 col G (Status_Margem IF): {c_r2[6].get(ATTR_FORMULA)}",
-    )
-    confere(
-        c_r2[7].get(ATTR_FORMULA) == "of:=AVERAGE([.B2:.B2])",
-        f"ODS linha 2 col H (Media_Movel_50 AVERAGE): {c_r2[7].get(ATTR_FORMULA)}",
-    )
-    confere(
-        c_r2[8].get(ATTR_FORMULA) == "of:=VLOOKUP(2501;[.E$2:.F$5001];2;0)",
-        f"ODS linha 2 col I (Busca_Cruzada VLOOKUP): {c_r2[8].get(ATTR_FORMULA)}",
-    )
-    confere(
-        c_r2[9].get(ATTR_FORMULA) == "of:=SUM([.B2:.C2])",
-        f"ODS linha 2 col J (Contagem_Acima SUM em r%10!=0): {c_r2[9].get(ATTR_FORMULA)}",
-    )
-    confere(
-        all(c_r2[idx].get(ATTR_VALUE_TYPE) == "float" and c_r2[idx].get(ATTR_VALUE) == "0" for idx in range(5, 10)),
-        "ODS linha 2 cols F..J: office:value-type='float' e office:value='0' (forca recalculo)",
-    )
+    # measure_formula_calculation: Sentinel ausente/zero reprova; .ods valido devolve (tempo, cpu)
+    orig_popen = mod.subprocess.Popen
 
-    # Linha 10 (indice 9 na lista linhas_ods, r=10 -> multiplo de 10 usa COUNTIF)
-    c_r10 = linhas_ods[9].findall("table:table-cell", NS)
-    confere(
-        c_r10[9].get(ATTR_FORMULA) == 'of:=COUNTIF([.B$2:.B$5001];">50000")',
-        f"ODS linha 10 col J (COUNTIF em r%10==0): {c_r10[9].get(ATTR_FORMULA)}",
-    )
+    class _FakeProc:
+        pid = 424242
+        returncode = 0
 
-    # Linha 5001 (ultimo registro, r=5001)
-    c_r5001 = linhas_ods[5000].findall("table:table-cell", NS)
-    confere(
-        float(c_r5001[4].get(ATTR_VALUE)) == 5000.0,
-        "ODS linha 5001 col E: Indice_Lookup = 5000.0",
-    )
-    confere(
-        c_r5001[7].get(ATTR_FORMULA) == "of:=AVERAGE([.B4952:.B5001])",
-        f"ODS linha 5001 col H (janela movel 50 linhas): {c_r5001[7].get(ATTR_FORMULA)}",
-    )
+        def __init__(self, cmd, *a, **kw):
+            self.cmd = cmd
+            outdir = cmd[cmd.index("--outdir") + 1]
+            base = os.path.splitext(os.path.basename(cmd[-1]))[0]
+            shutil.copy(_FakeProc.fonte, os.path.join(outdir, base + ".ods"))
+            _FakeProc.ultimo = cmd
+
+        def poll(self):
+            return 0
+
+        def communicate(self):
+            return "", ""
+
+    try:
+        mod.subprocess.Popen = _FakeProc
+        xlsx_in = str(Path(tmp_ods) / "entrada.xlsx")
+        Path(xlsx_in).write_bytes(b"x")
+        _FakeProc.fonte = ods_ok
+        res = mod.measure_formula_calculation("soffice.exe", xlsx_in, tmp_ods, "file:///C:/T/wintesthub_lo_profile_batch")
+        confere(isinstance(res, tuple) and len(res) == 2, "measure_formula_calculation devolve (tempo_relogio_s, cpu_s)")
+        cmd = _FakeProc.ultimo
+        confere(cmd[cmd.index("--convert-to") + 1] == "ods" and "--headless" in cmd, "Etapa 1 converte para .ods em modo headless (nao mais PDF)")
+        for fonte, desc in ((ods_zero, "Sentinel.A2 = 0"), (ods_sem, "Sentinel.A2 ausente")):
+            _FakeProc.fonte = fonte
+            reprovou = False
+            try:
+                mod.measure_formula_calculation("soffice.exe", xlsx_in, tmp_ods, "file:///C:/T/wintesthub_lo_profile_batch")
+            except RuntimeError as e:
+                reprovou = "recalculo nao confirmado" in str(e).lower()
+            confere(reprovou, f"Etapa 1 reprova com RuntimeError quando {desc}")
+    finally:
+        mod.subprocess.Popen = orig_popen
 
 # --- 4. Consolidacao e contratos de ciclos_libreoffice.csv e cpu_memoria.csv --
 ciclos_fake = [
@@ -234,6 +332,7 @@ ciclos_fake = [
         "Tempo_Abertura_Writer_s": 1.20 + i * 0.10,
         "Tempo_Abertura_Calc_s": 2.00 + i * 0.20,
         "Tempo_Calculo_Formulas_s": 3.50 + i * 0.30,
+        "CPU_Calculo_Formulas_s": 15.00 + i,
         "Linhas_Editadas_Calc": 6,
         "Paragrafos_Digitados_Writer": 4,
         "CPU_Sistema_Media_Pct": 20.0 + i,
@@ -267,6 +366,12 @@ with tempfile.TemporaryDirectory() as tmp_sem_wpa:
         linhas_ciclos = list(csv.reader(f))
 
     confere(linhas_ciclos[0] == mod.CICLOS_CSV_COLUMNS, "ciclos_libreoffice.csv: cabecalho identico ao contrato")
+    confere(
+        mod.CICLOS_CSV_COLUMNS[mod.CICLOS_CSV_COLUMNS.index("Tempo_Calculo_Formulas_s") + 1] == "CPU_Calculo_Formulas_s",
+        "ciclos_libreoffice.csv: CPU_Calculo_Formulas_s logo depois de Tempo_Calculo_Formulas_s",
+    )
+    col_cpu = linhas_ciclos[0].index("CPU_Calculo_Formulas_s")
+    confere([r[col_cpu] for r in linhas_ciclos[1:]] == ["16.00", "17.00", "18.00", "19.00", "20.00"], "ciclos_libreoffice.csv: CPU_Calculo_Formulas_s por ciclo (.2f)")
     confere(len(linhas_ciclos) == 6, "ciclos_libreoffice.csv: 1 cabecalho + 5 linhas de ciclo")
     confere(
         [r[0] for r in linhas_ciclos[1:]] == ["1", "2", "3", "4", "5"],
@@ -279,7 +384,7 @@ with tempfile.TemporaryDirectory() as tmp_sem_wpa:
     confere(linhas_cm[0] == ["Metrica", "Valor", "Unidade"], "cpu_memoria.csv: cabecalho Metrica,Valor,Unidade")
     mapa_cm = {r[0]: (r[1], r[2]) for r in linhas_cm[1:]}
 
-    confere(mapa_cm.get("Versao_Teste") == ("2.0", ""), "cpu_memoria.csv: Versao_Teste = 2.0")
+    confere(mapa_cm.get("Versao_Teste") == ("2.1", ""), "cpu_memoria.csv: Versao_Teste = 2.1")
     confere(mapa_cm.get("Ciclos_Executados") == ("5", "un"), "cpu_memoria.csv: Ciclos_Executados = 5 un")
     confere(mapa_cm.get("Duracao_Por_Ciclo") == ("300", "s"), "cpu_memoria.csv: Duracao_Por_Ciclo = 300 s")
     confere(mapa_cm.get("Tempo_Abertura_Writer_Media") == ("1.50", "s"), "Tempo_Abertura_Writer_Media = 1.50 s")
@@ -289,6 +394,11 @@ with tempfile.TemporaryDirectory() as tmp_sem_wpa:
     confere(mapa_cm.get("Tempo_Calculo_Formulas_Media") == ("4.40", "s"), "Tempo_Calculo_Formulas_Media = 4.40 s")
     confere(mapa_cm.get("Tempo_Calculo_Formulas_Max") == ("5.00", "s"), "Tempo_Calculo_Formulas_Max = 5.00 s")
     confere(mapa_cm.get("Tempo_Calculo_Formulas_Min") == ("3.80", "s"), "Tempo_Calculo_Formulas_Min = 3.80 s")
+    confere(mapa_cm.get("CPU_Calculo_Formulas_Media") == ("18.00", "s"), "CPU_Calculo_Formulas_Media = 18.00 s")
+    confere(mapa_cm.get("CPU_Calculo_Formulas_Max") == ("20.00", "s"), "CPU_Calculo_Formulas_Max = 20.00 s")
+    confere(mapa_cm.get("CPU_Calculo_Formulas_Min") == ("16.00", "s"), "CPU_Calculo_Formulas_Min = 16.00 s")
+    ordem = [r[0] for r in linhas_cm[1:]]
+    confere(ordem.index("CPU_Calculo_Formulas_Media") == ordem.index("Tempo_Calculo_Formulas_Min") + 1, "CPU_Calculo_Formulas_* logo depois de Tempo_Calculo_Formulas_Min")
     confere(mapa_cm.get("CPU_Sistema_Media") == ("23.0", "%"), "CPU_Sistema_Media = 23.0 %")
     confere(mapa_cm.get("CPU_Sistema_Pico") == ("55.0", "%"), "CPU_Sistema_Pico = 55.0 %")
     confere(mapa_cm.get("RAM_Sistema_Media_MB") == ("4150.0", "MB"), "RAM_Sistema_Media_MB = 4150.0 MB")
@@ -552,7 +662,6 @@ with tempfile.TemporaryDirectory() as tmp_wpa_var:
             mod.pd = None
 
 # --- 5. Testes de runtime simulados (ciclo 300s com erro GUI, wpaexporter e cleanup) ---
-import os
 import time
 from types import SimpleNamespace
 
@@ -570,7 +679,7 @@ class _DummyUI:
 
 
 with tempfile.TemporaryDirectory() as tmp_rt:
-    odt_rt, ods_rt = mod.generate_odf_fixtures(tmp_rt)
+    odt_rt, ods_rt = mod.generate_odf_fixtures(tmp_rt)  # ods_rt = planilha R2 (.xlsx)
 
     orig_stabilize = mod.STABILIZE_SECONDS
     orig_duration = mod.DURATION_SECONDS
@@ -593,7 +702,7 @@ with tempfile.TemporaryDirectory() as tmp_rt:
         mod.STABILIZE_SECONDS = 0
         mod.DURATION_SECONDS = 5.0
         mod.subprocess.run = lambda *a, **kw: SimpleNamespace(returncode=0, stdout="", stderr="")
-        mod.measure_formula_calculation = lambda *a, **kw: 0.01
+        mod.measure_formula_calculation = lambda *a, **kw: (0.01, 0.02)
         mod.measure_app_launch = lambda *a, **kw: (0.01, 100, 200)
 
         gui_calls = {"writer": 0, "calc": 0}
@@ -853,6 +962,100 @@ with tempfile.TemporaryDirectory() as tmp_rt:
         mod.tempfile.mkdtemp = orig_mkdtemp
         mod.check_prerequisites = orig_check_prereq
         mod._stop_requested.clear()
+
+# --- 6. Espera de ociosidade do Calc apos recalculo da R2 (_wait_lo_idle) -------
+class _FakeU32Pid:
+    @staticmethod
+    def GetWindowThreadProcessId(_h, ref):
+        ref._obj.value = 777
+        return 1
+
+
+def _fake_psutil(leituras):
+    class _P:
+        def __init__(self, pid):
+            assert pid == 777
+            self.seq = list(leituras)
+
+        def cpu_percent(self, interval=None):
+            return self.seq.pop(0) if self.seq else 0.0
+
+    return SimpleNamespace(Process=_P)
+
+
+orig_psutil = mod.psutil
+orig_interval = mod.LO_IDLE_INTERVAL
+try:
+    mod.LO_IDLE_INTERVAL = 0.01
+    # 1a leitura (priming) + 120% (recalculando) + 90% + 2 leituras ociosas
+    mod.psutil = _fake_psutil([0.0, 120.0, 90.0, 1.0, 0.5])
+    esperou = mod._wait_lo_idle(555, timeout=5, user32=_FakeU32Pid)
+    confere(0.03 <= esperou < 1.0, f"_wait_lo_idle sai depois de {mod.LO_IDLE_SAMPLES} leituras ociosas seguidas ({esperou:.2f}s)")
+
+    mod.psutil = _fake_psutil([0.0, 1.0, 80.0, 2.0, 3.0])
+    t_ini = time.perf_counter()
+    mod._wait_lo_idle(555, timeout=5, user32=_FakeU32Pid)
+    confere(time.perf_counter() - t_ini >= 0.04, "_wait_lo_idle exige leituras ociosas consecutivas (pico no meio zera a contagem)")
+
+    mod.psutil = _fake_psutil([0.0] + [150.0] * 1000)
+    estourou = False
+    try:
+        mod._wait_lo_idle(555, timeout=0.05, user32=_FakeU32Pid)
+    except RuntimeError as e:
+        estourou = "nao ficou ocioso" in str(e)
+    confere(estourou, "_wait_lo_idle levanta RuntimeError quando o Calc nao fica ocioso no teto")
+
+    confere(mod._wait_lo_idle(555, user32=SimpleNamespace()) == 0.0, "_wait_lo_idle sem GetWindowThreadProcessId (CI/fake) retorna 0 sem esperar")
+    mod.psutil = _fake_psutil([150.0] * 1000)
+    sem_dono = SimpleNamespace(GetWindowThreadProcessId=lambda _h, ref: 0)
+    t_ini = time.perf_counter()
+    confere(mod._wait_lo_idle(555, timeout=5, user32=sem_dono) == 0.0 and time.perf_counter() - t_ini < 0.5, "_wait_lo_idle com HWND sem processo dono (pid 0 = Idle do sistema) retorna na hora")
+    confere(mod.CALC_LAUNCH_TIMEOUT == 180 and mod.APP_LAUNCH_TIMEOUT == 60, "timeouts: Calc 180 s (recalcula a R2 ao abrir), Writer 60 s")
+finally:
+    mod.psutil = orig_psutil
+    mod.LO_IDLE_INTERVAL = orig_interval
+
+# --- 7. Rastreamento pela arvore do soffice.exe lancado (_lo_tree_procs) ---------
+# Com o hub elevado, varrer o cmdline de todos os processos leva segundos e perde o
+# soffice.bin; o teste segue a arvore (pid/ppid) dos processos que ele mesmo lanca.
+if mod.psutil is not None:
+    import subprocess as _sp
+
+    neto_code = "import time; time.sleep(30)"
+    filho_code = (
+        "import subprocess, sys, time; "
+        f"p = subprocess.Popen([sys.executable, '-c', {neto_code!r}]); "
+        "print(p.pid, flush=True); time.sleep(30)"
+    )
+    raiz = _sp.Popen([sys.executable, "-c", filho_code], stdout=_sp.PIPE, text=True)
+    try:
+        neto_pid = int(raiz.stdout.readline().strip())
+        known = mod._lo_tree_procs({raiz.pid}, {})
+        confere(raiz.pid in known and neto_pid in known, "_lo_tree_procs acompanha a raiz e o neto (arvore recursiva por ppid)")
+        mod.psutil.Process(raiz.pid).kill()
+        raiz.wait(timeout=10)
+        known = mod._lo_tree_procs({raiz.pid}, known)
+        confere(raiz.pid not in known and neto_pid in known, "_lo_tree_procs remove a raiz morta e segue acompanhando o neto ja visto")
+        mod.psutil.Process(neto_pid).kill()
+        mod.psutil.wait_procs([mod.psutil.Process(neto_pid)], timeout=10) if mod.psutil.pid_exists(neto_pid) else None
+        known = mod._lo_tree_procs({raiz.pid}, known)
+        confere(neto_pid not in known, "_lo_tree_procs remove processos que terminaram")
+    finally:
+        for pid in (raiz.pid,):
+            try:
+                mod.psutil.Process(pid).kill()
+            except Exception:
+                pass
+        try:
+            mod.psutil.Process(neto_pid).kill()
+        except Exception:
+            pass
+    fonte = SCRIPT_PATH.read_text(encoding="utf-8")
+    corpo_e1 = fonte[fonte.index("def measure_formula_calculation("):fonte.index("def _find_visible_window_for_pids(")]
+    corpo_al = fonte[fonte.index("def measure_app_launch("):fonte.index("def _wait_lo_idle(")]
+    confere("process_iter" not in corpo_e1 and "process_iter" not in corpo_al, "Etapas 1-3 nao varrem o cmdline de todos os processos (process_iter) nos lacos cronometrados")
+else:
+    print("  (psutil ausente: testes de arvore de processos pulados)")
 
 print()
 if falhas:

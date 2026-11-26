@@ -44,13 +44,14 @@ O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de
 Os itens abaixo são instalados automaticamente pela **Fase de Setup** do hub. Não é necessário instalá-los manualmente antes da primeira execução:
 
 - Python 3.x (com ambiente virtual `.venv`)
-- Microsoft Edge (nativo do Windows 10/11 — usado no teste de rede)
+- LibreOffice (`TheDocumentFoundation.LibreOffice`, instalado pelo `3_softwares_msStore.ps1` — usado no Módulo 1 em modo 100% local e offline, sem login)
+- Microsoft Edge (nativo do Windows 10/11 — usado no teste de rede e na fase de escritório do teste de bateria)
 - Dependências Python: `psutil`, `speedtest-cli`, `requests`, `selenium`, `pandas`, `pyautogui`, `pyperclip`, `pynput`
 
 Para o **teste de bateria (Módulo 5)**, além disso:
 
 - **Windows Performance Toolkit** (`wpr.exe` e `wpaexporter.exe`) no PATH — o mesmo pré-requisito do Módulo 1
-- **Microsoft Edge com a conta Google já logada** (Google Docs e Sheets), como no Módulo 1
+- **Microsoft Edge com a conta Google já logada** (Google Docs e Sheets; exigido apenas no Módulo 5, pois o Módulo 1 utiliza o LibreOffice localmente)
 - **Feche o Edge antes de iniciar**: o teste encerra o Edge e reabre só com as páginas dele
 
 Para as **cargas de desenvolvimento (Módulos 7 a 11)**, os setups `7_install_devtools_dev` e `10_preparar_podman` instalam Git, .NET SDK 10, Go, uv, docker-compose, WSL2 e Podman (veja a seção 4.8).
@@ -109,7 +110,7 @@ Na primeira execução, a **Fase de Setup** será apresentada automaticamente. E
 |--------|-----------|
 | `1_captura_infos_pc` | Coleta informações do sistema (CPU, RAM, disco, bateria, SO) |
 | `2_opcoes_energia` | Configura o plano de energia (evita suspensão durante os testes) |
-| `3_softwares_msStore` | Instala via winget o Windows ADK, o CrystalDiskMark e o CrystalDiskInfo |
+| `3_softwares_msStore` | Instala via winget o Windows ADK, o CrystalDiskMark, o CrystalDiskInfo e o LibreOffice |
 | `4_install_python` | Instala o Python 3.12 |
 | `5_install_py_dependencies` | Cria o ambiente virtual e instala os pacotes Python |
 | `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias (evita interferência nos testes) |
@@ -198,7 +199,7 @@ Desmarque com `Espaço` o que não for executar agora. Os módulos 5 e 6 exigem 
 Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:
 
 ```
-[ ] 1_automacao_performance        [PY]   PASS  (361.5s)
+[ ] 1_automacao_performance        [PY]   PASS  (1842.5s)
 [ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
 [X] 3_teste_rede                   [PY]   pendente
 [X] 4_boot_shutdown_auto           [PY]   pendente
@@ -394,6 +395,7 @@ Cada achado aparece no resumo com um nível e com o que fazer:
 - **`[X]` Impede:** o teste vai falhar com certeza.
     - Falta o `Agentes_SI_Profile.wpaProfile` (módulo 1) ou o `Agentes_SI_Bateria_Profile.wpaProfile` (módulo 5) na pasta do teste. Esses arquivos não são versionados.
     - Falta o `wpr.exe` ou o `wpaexporter.exe` (módulos 1 e 5).
+    - Falta o LibreOffice (`soffice.exe`) quando `1_automacao_performance.py` está selecionado (módulo 1; não bloqueia a variante `1-1_automacao_performance_dlp.py`). A ação manda rodar o Setup `3_softwares_msStore`.
     - A URL do speedtest interno não está configurada **e** não há internet (módulo 3: nenhuma das duas fontes pode ser medida).
     - Falta uma ferramenta de dev, ou ela está abaixo da versão mínima do `cargas.json` (módulos 7 a 11). A ação manda rodar o Setup 7 ou o Setup 10.
     - A `podman machine` está desligada (módulo 10).
@@ -418,19 +420,20 @@ Teclas do resumo pré-execução:
 
 Com algum `[X]` na tela, o `Enter` não inicia a fila: escolha `R`, `C` ou `Esc`. Os achados e a escolha feita vão para o log da run. Quando a fila inicia (`Enter` ou `C`), os achados também entram nos avisos da rodada (seção 6.6); com `Esc`, ou recusando o `F`, ficam só no log.
 
-**Sobras que o hub reconhece.** O Edge e o Python são reconhecidos pela linha de comando ou pela flag de automação. `wpaexporter.exe` e `diskspd.exe` são reconhecidos pelo nome, porque só existem por causa dos testes do hub.
+**Sobras que o hub reconhece.** O LibreOffice, o Edge e o Python são reconhecidos pela linha de comando ou pela flag de automação. `wpaexporter.exe` e `diskspd.exe` são reconhecidos pelo nome, porque só existem por causa dos testes do hub.
 
 | Sobra | Como o hub encerra |
 |-------|--------------------|
 | Sessão do WPR gravando | `wpr -cancel` |
 | `wpaexporter.exe`, `diskspd.exe` | encerra a árvore do processo |
+| LibreOffice da automação (`soffice.exe` e `soffice.bin` com subperfil `wintesthub_lo_profile`) | encerra os processos do teste |
 | Edge da automação (`msedgedriver` e o Edge aberto por ele ou com `--enable-automation`) | encerra a árvore do processo |
 | Python rodando um script de `Testes\` | encerra a árvore do processo |
 | Build servers do .NET (`MSBuild /nodeReuse`, `VBCSCompiler`) | só entre testes: encerra os processos que o teste abriu (antes da fila, só aviso, sem `F`: podem ser do Visual Studio do usuário) |
 | Stack do módulo 10 (containers `wintestehub-*`) | `podman compose down -v` |
 | `podman machine` ligada sem o módulo 10 na fila | `podman machine stop` |
 
-O Edge e o Python do usuário ficam: um Edge comum (mesmo aberto para depuração pelo VS Code) e um Python fora de `Testes\` não são sobra.
+O LibreOffice, o Edge e o Python do usuário ficam: um LibreOffice aberto sem `wintesthub_lo_profile`, um Edge comum (mesmo aberto para depuração pelo VS Code) e um Python fora de `Testes\` não são sobra.
 
 **Entre um teste e outro**, o hub repete a busca só com as sobras do teste que acabou e as encerra sem perguntar, porque a fila é desassistida. Entre os processos, ele só encerra os que **o próprio teste abriu**: o que já existia antes do teste começar (ex.: o Visual Studio do usuário) fica. A sessão do WPR, a stack do módulo 10 e a `podman machine` não são processos; elas seguem a pasta do teste que acabou de rodar. A `podman machine` só é desligada quando nenhum teste do módulo 10 vem depois. Cada encerramento vai para o log e para os avisos da rodada.
 

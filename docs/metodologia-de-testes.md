@@ -103,8 +103,8 @@ O hub opera em **duas fases sequenciais**:
 
 #### Controles que protegem a medição
 
-- **Checagem antes da fila.** Antes de iniciar, o hub confere o que os testes selecionados precisam: o perfil `.wpaProfile` dos módulos 1 e 5, o Windows Performance Toolkit, a URL do speedtest, as ferramentas de dev e a `podman machine`, a tomada, a internet e o espaço em disco. O que impede um teste precisa de uma decisão explícita do operador (tirar o teste da fila ou continuar); a decisão fica registrada.
-- **Sobras de teste.** Processos que um teste abriu e não fechou (sessão do WPR, Edge da automação, `diskspd`, Python de teste, build servers do .NET, stack do Podman) consomem recursos e contaminariam o teste seguinte. A checagem aponta essas sobras, e entre um teste e outro o hub encerra as do teste que acabou. Entre testes, só são encerrados os processos que o próprio teste abriu (o hub compara com os processos que já existiam antes do teste); antes da fila, os build servers do .NET aparecem só como aviso, porque podem ser do Visual Studio do usuário. A sessão do WPR, a stack do Podman e a `podman machine` seguem a pasta do teste que as usa.
+- **Checagem antes da fila.** Antes de iniciar, o hub confere o que os testes selecionados precisam: o perfil `.wpaProfile` dos módulos 1 e 5, o Windows Performance Toolkit, o LibreOffice (`soffice.exe`) para o `1_automacao_performance.py`, a URL do speedtest, as ferramentas de dev e a `podman machine`, a tomada, a internet e o espaço em disco. O que impede um teste precisa de uma decisão explícita do operador (tirar o teste da fila ou continuar); a decisão fica registrada.
+- **Sobras de teste.** Processos que um teste abriu e não fechou (sessão do WPR, LibreOffice da automação com perfil `wintesthub_lo_profile`, Edge da automação, `diskspd`, Python de teste, build servers do .NET, stack do Podman) consomem recursos e contaminariam o teste seguinte. A checagem aponta essas sobras, e entre um teste e outro o hub encerra as do teste que acabou. Entre testes, só são encerrados os processos que o próprio teste abriu (o hub compara com os processos que já existiam antes do teste); antes da fila, os build servers do .NET aparecem só como aviso, porque podem ser do Visual Studio do usuário. A sessão do WPR, a stack do Podman e a `podman machine` seguem a pasta do teste que as usa.
 - **Frequência da CPU.** Durante cada teste (exceto setups e o teste 5, de bateria), o hub registra a cada 5 s o uso da CPU, o desempenho relativo ao clock base, o MHz efetivo e a maior temperatura das zonas térmicas ACPI, em `<módulo>/frequencia_cpu.csv`. Uma queda do clock sob carga de 20% ou mais entre o 1º e o último minuto vira aviso de **throttling**: uma máquina que esquenta mede pior, e isso não deve ser atribuído ao agente. A leitura usa CIM (não `Get-Counter`, cujos nomes mudam no Windows pt-BR); o custo é uma consulta a cada 5 s, bem abaixo de 1% de CPU, e fica ativo também durante o módulo 1. As zonas ACPI servem para comparar máquinas sob a mesma carga, não como temperatura absoluta do processador.
 - **Avisos da rodada.** Tudo o que pode qualificar um resultado (checagem, sobras, módulo sem evidência, CSV faltando, carga de dev com falha ou sensível à rede, throttling) fica no `_state.json` e aparece no `_relatorio.html`/`.json`, junto das evidências exportadas.
 
@@ -157,7 +157,7 @@ Padronizar a configuração da máquina de teste antes da execução dos módulo
 |--------|-----------|---------------|
 | `1_captura_infos_pc` | Coleta informações do sistema (CPU, RAM, disco, bateria, SO) em `informacoes_maquina.csv` | Registro de identidade da máquina para rastreabilidade |
 | `2_opcoes_energia` | Aplica o plano **Equilibrado**, desativa a suspensão e o desligamento da tela (na tomada e na bateria) e define "nada a fazer" ao fechar a tampa | Evita suspensão durante os testes e mantém o mesmo plano em todas as máquinas |
-| `3_softwares_msStore` | Instala via winget o Windows ADK, o CrystalDiskMark e o CrystalDiskInfo | Garante as ferramentas auxiliares necessárias |
+| `3_softwares_msStore` | Instala via winget o Windows ADK, o CrystalDiskMark, o CrystalDiskInfo e o LibreOffice | Garante as ferramentas auxiliares e a suíte de escritório local do Módulo 1 |
 | `4_install_python` | Instala o Python 3.12 oficial e remove o alias da Microsoft Store | Pré-requisito para os scripts de teste em Python |
 | `5_install_py_dependencies` | Cria `.venv` e instala pacotes Python | Isola dependências e garante versões corretas |
 | `6_pausa_WinUpdate` | Pausa o Windows Update por 35 dias e desliga o compartilhamento ponto a ponto do Delivery Optimization (`DODownloadMode = 0`) | Evita downloads, reinicializações e tráfego de atualizações em segundo plano durante os testes (inclusive o de rede) |
@@ -179,24 +179,30 @@ A Fase de Setup é essencial para a **comparabilidade dos resultados**. Sem ela,
 
 ### 4.1 Objetivo
 
-Avaliar o desempenho e a estabilidade do processador e da memória sob carga sustentada, simulando um cenário de uso intensivo prolongado.
+Avaliar o desempenho e a estabilidade do processador e da memória sob carga de escritório local e 100% offline no **LibreOffice** (Writer e Calc), medindo o tempo de abertura dos aplicativos, o tempo de relógio e a CPU consumida no recálculo de uma planilha pesada (a **planilha R2**: 5.000 linhas e 100.000 fórmulas, a mesma carga do teste do macOS) e o consumo contínuo de CPU e RAM do sistema e do LibreOffice sob captura WPR/WPA.
 
 ### 4.2 Ferramenta Utilizada
 
-- **Microsoft Edge** via Selenium WebDriver — para gerar carga de CPU através de workloads web
-- **Windows Performance Analyzer (WPA)** — para perfilamento detalhado do comportamento do sistema durante a carga
-- **psutil** — para monitoramento de métricas de CPU em tempo real
+- **LibreOffice Writer e Calc** (`soffice.exe` / `soffice.bin`) — executados com subperfis temporários isolados (`-env:UserInstallation=file:///.../wintesthub_lo_profile_<papel>` onde `<papel>` é `batch`, `writer` ou `calc`) e flags `--norestore --nologo --nodefault --nolockcheck`, garantindo *cold start* real, processos independentes e execução 100% offline sem necessidade de login
+- **Gerador determinístico das planilhas de carga** (`zipfile` + XML da stdlib Python) — cria localmente `workload_doc.odt` (título e 20 parágrafos iniciais) e `workload_calc_r2.xlsx`, a **planilha R2** do teste do macOS (`gen_cpu_r2_workload.py`): aba `Data` com 5.000 linhas (`seq`, `value`, `category`, `date`), aba `Calc` com 5.000 × 20 fórmulas — agregações condicionais sobre a coluna inteira (`SUMIFS`, `COUNTIFS`, `AVERAGEIFS`, `MAXIFS`), buscas (`INDEX`/`MATCH`, `VLOOKUP`, `XLOOKUP`, `INDIRECT`), estatística em janela móvel (`STDEV`, `VAR`, `PERCENTILE`, `RANK`), financeiras (`NPV`, `PMT`, `FV`, `IPMT`) e texto/lógica —, aba `Trigger` (onde a edição GUI digita) e aba `Sentinel` (soma os cantos da aba `Calc` e prova que o recálculo aconteceu). As fórmulas são gravadas sem valor em cache, então o LibreOffice calcula as 100.000; o texto é idêntico ao do macOS, só `MAXIFS` e `XLOOKUP` levam o prefixo `_xlfn.` do Excel (sem ele o LibreOffice mostra `#NOME?`)
+- **Windows Performance Recorder (`wpr.exe`) e Windows Performance Analyzer (`wpaexporter.exe`)** — captura `Power.light` + `VirtualAllocation.light` e exportação CSV com o perfil `Agentes_SI_Profile.wpaProfile`
+- **`psutil` + `pyautogui` / `pyperclip`** — thread amostradora contínua (intervalo de 1,0 s) coletando CPU (%) e RAM (MB e %) do sistema e da árvore de processos `soffice.exe`/`soffice.bin` do teste, combinada com automação GUI real no Writer e no Calc
 
 ### 4.3 Procedimento
 
+Antes do Ciclo 1, o script valida a presença do `soffice.exe` (via `HUB_LIBREOFFICE_PATH`, `PATH` ou caminhos padrão em `C:\Program Files\LibreOffice\program\soffice.exe` e `C:\Program Files (x86)\LibreOffice\program\soffice.exe`) e gera os arquivos `workload_doc.odt` e `workload_calc_r2.xlsx` em pasta temporária. Os subperfis `batch` e `calc` nascem configurados para sempre recalcular `.xlsx` ao abrir e para gravar `.xlsx` sem o diálogo de formato.
+
 | Etapa | Descrição | Duração |
 |-------|-----------|---------|
-| 1 | Abertura do Microsoft Edge com 3 abas de workload | ~10s |
-| 2 | Início do ciclo de estresse | — |
-| 3 | **Carga ativa** — CPU sob estresse sustentado | 300 segundos (5 min) |
-| 4 | **Cooldown** — aguarda CPU cair abaixo de 15% | até 300 segundos (5 min) |
-| 5 | Repetição dos passos 3-4 por **5 ciclos** | ~50 min total |
-| 6 | Coleta de perfil WPA e geração de relatório | ~30s |
+| 1 | Estabilização inicial do ciclo e criação de cópias limpas dos arquivos ODF e dos 3 subperfis `wintesthub_lo_profile_*` | 15 segundos |
+| 2 | Início da captura WPR (`Power.light` + `VirtualAllocation.light`) e do amostrador `psutil` (1,0 s) | — |
+| 3 | **Etapa 1 — Cálculo de fórmulas complexas (`Tempo_Calculo_Formulas_s` e `CPU_Calculo_Formulas_s`):** executa `soffice.exe --headless --convert-to ods` com subperfil `wintesthub_lo_profile_batch` sobre a planilha R2, cronometrando o tempo de relógio até o término e somando a CPU (usuário + sistema, todos os núcleos) dos processos `soffice` desse subperfil. Confere no `.ods` gerado que `Sentinel.A2` tem valor diferente de zero (senão o ciclo é FAIL) e conta as células com erro da aba `Calc` — o esperado são 50 `#N/A` na coluna `f6`, da própria planilha R2 | dentro da janela de 300 s (timeout 180 s) |
+| 4 | **Etapa 2 — Abertura do Writer (`Tempo_Abertura_Writer_s`):** inicia `soffice.exe --writer` com subperfil `wintesthub_lo_profile_writer` abrindo `workload_doc.odt`, cronometrando até o processo `soffice.bin` estar ativo e sua janela principal visível | dentro da janela de 300 s (timeout 60 s) |
+| 5 | **Etapa 3 — Abertura do Calc (`Tempo_Abertura_Calc_s`):** inicia `soffice.exe --calc` com subperfil `wintesthub_lo_profile_calc` abrindo a planilha R2 (que é recalculada inteira ao abrir), cronometrando até o processo `soffice.bin` estar ativo e sua janela principal visível; antes da edição, espera o Calc terminar o recálculo (CPU do `soffice.bin` abaixo de 5% de um núcleo) | dentro da janela de 300 s (timeout 180 s) |
+| 6 | **Etapa 4 — Edição GUI contínua:** no restante da janela de 300 s, alterna o foco confirmado (`SetForegroundWindow`/`GetForegroundWindow`) entre Writer (digitação de parágrafos, negrito `Ctrl+A`/`Ctrl+B`, `Ctrl+S`) e Calc (na aba `Trigger`: inserção de linhas, recálculo completo forçado `Ctrl+Shift+F9` das 100.000 fórmulas, espera até o Calc ficar ocioso e `Ctrl+S` mantendo `.xlsx`) | restante dos 300 segundos (5 min) |
+| 7 | Encerramento seletivo dos processos `soffice` do teste (`wintesthub_lo_profile`), parada do WPR (`.etl`) e exportação via `wpaexporter.exe` | ~30s |
+| 8 | **Cooldown inteligente** — aguarda 3 leituras consecutivas de CPU < 15% a cada 10 s | até 300 segundos (5 min) |
+| 9 | Repetição dos passos 1–8 por **5 ciclos** e consolidação final (`cpu_memoria.csv`, `ciclos_libreoffice.csv` e `Resultados_Consolidados/`) | ~50 min total |
 
 **Ciclo visual:**
 
@@ -210,11 +216,13 @@ Ciclo 1          Ciclo 2          Ciclo 3          Ciclo 4          Ciclo 5
 
 ### 4.4 Métricas Coletadas
 
-| Métrica | Fonte | Formato |
-|---------|-------|---------|
-| Perfil de desempenho WPA | Windows Performance Analyzer | `.wpaProfile` |
-| Tempos de cada ciclo (carga + cooldown) | Script Python | CSV |
-| Uso de CPU ao longo do teste | psutil | Log textual |
+| Arquivo / Métrica | Fonte | Formato / Descrição |
+|-------------------|-------|---------------------|
+| `cpu_memoria.csv` | Script Python + `psutil` + WPA | CSV temático (`Metrica,Valor,Unidade`): `Versao_Teste` (`2.1`), `Ciclos_Executados`, `Duracao_Por_Ciclo`, `Tempo_Abertura_Writer_Media`/`_Max`, `Tempo_Abertura_Calc_Media`/`_Max`, `Tempo_Calculo_Formulas_Media`/`_Max`/`_Min`, `CPU_Calculo_Formulas_Media`/`_Max`/`_Min` (CPU do cálculo, em s), `CPU_Sistema_Media`/`_Pico`, `RAM_Sistema_Media_MB`/`_Pico_MB`/`_Media_Pct`/`_Pico_Pct`, `LibreOffice_CPU_Media`/`_Pico`, `LibreOffice_RAM_Media_MB`/`_Pico_MB`, métricas legadas de hardware (`CPU_Frequencia_*`, `CPU_Nucleos_*`, `RAM_*`) e `WPA_<Arquivo>_<Metrica>_Soma_Media`/`_Media`/`_Max`/`_Min` |
+| `ciclos_libreoffice.csv` | Script Python + `psutil` | CSV detalhado por ciclo (5 linhas, ciclos `1` a `5`): `Ciclo,Timestamp_Inicio,Tempo_Abertura_Writer_s,Tempo_Abertura_Calc_s,Tempo_Calculo_Formulas_s,CPU_Calculo_Formulas_s,Linhas_Editadas_Calc,Paragrafos_Digitados_Writer,CPU_Sistema_Media_Pct,CPU_Sistema_Pico_Pct,RAM_Sistema_Media_MB,RAM_Sistema_Pico_MB,RAM_Sistema_Media_Pct,RAM_Sistema_Pico_Pct,LibreOffice_CPU_Media_Pct,LibreOffice_CPU_Pico_Pct,LibreOffice_RAM_Media_MB,LibreOffice_RAM_Pico_MB,Cooldown_Duracao_s` |
+| `Resultados_Consolidados/` | Windows Performance Analyzer (`wpaexporter.exe`) | CSVs consolidados por perfil `.wpaProfile` (`Media_*.csv`), `Relatorio_Resumo.csv` e `Relatorio_Resumo.html` |
+
+> **Versões do teste:** `Versao_Teste = 2.1` usa a planilha R2 (100.000 fórmulas; cerca de 18 s de CPU no cálculo numa máquina de 12 threads). A `2.0` usava uma planilha de 25.000 fórmulas simples (cerca de 2 s de CPU). Os tempos e o consumo das duas versões **não se comparam**: compare `ImagemLimpa` e `ComAgentes` sempre com a mesma versão.
 
 ### 4.5 Critério de Aprovação
 
@@ -601,7 +609,7 @@ O script é `Testes/5_bateria/5_teste_bateria.py`. Ele aparece no menu do hub na
 - **API do Windows**: `GetSystemPowerStatus` (fonte de alimentação, % de carga e estado da Economia de energia) e `powrprof` (modo de energia)
 - **powercfg**: plano e configurações de energia da bateria, relatório de bateria (`/batteryreport`, antes e depois), SRUM (`/srumutil`) e relatório de energia (`/energy`)
 - **Windows Performance Recorder** (`wpr.exe`, perfil `Power.light`) — um trace por fase — e **WPA Exporter** (`wpaexporter.exe`) com o perfil `Agentes_SI_Bateria_Profile.wpaProfile`, o mesmo do procedimento anterior
-- **Microsoft Edge** com Google Docs, Google Sheets e um PDF — a mesma simulação de uso do Módulo 1, de forma contínua
+- **Microsoft Edge** com Google Docs, Google Sheets e um PDF — simulação contínua de carga de escritório no navegador durante a fase de escritório da bateria
 - **psutil** — top 10 processos por CPU
 
 ### 8.3 Pré-voo de Padronização
@@ -615,7 +623,7 @@ O pré-voo roda **na tomada**, antes de pedir a desconexão do carregador. Cada 
 | Conferidos | Ferramentas de captura | `wpr.exe` e `wpaexporter.exe` no PATH | Perfil WPA ausente gera só aviso (a exportação CSV é ignorada) |
 | Conferidos | Conexão de rede | com acesso à internet | Registra `tipo \| rede \| sinal`; SSID ou sinal indisponíveis não reprovam |
 | Conferidos | Monitor externo | nenhum | Também pega a tampa fechada com monitor externo |
-| Conferidos | Edge e conta Google | prontos | Boas-vindas do Edge ou login do Google: janela pede o login (até 3 vezes), como no Módulo 1. Usa as páginas de lista do Docs/Sheets, sem criar documentos |
+| Conferidos | Edge e conta Google | prontos | Boas-vindas do Edge ou login do Google: janela pede o login (até 3 vezes). Usa as páginas de lista do Docs/Sheets, sem criar documentos |
 | Ajustados | Plano de energia | Equilibrado | O mesmo plano do setup `2_opcoes_energia` |
 | Ajustados | Modo de energia na bateria | Melhor desempenho | Sem a API do modo na bateria (Windows antigo): aplicado e conferido já na bateria |
 | Ajustados | Economia de energia | desligada, limite 0% | Limite 0% = não liga sozinha; ligada manualmente: `falhou` (desligar nas Configurações) |
@@ -653,7 +661,7 @@ Regras:
 | 7 | **Estabilização** na bateria, fora da medição, com a conferência de brilho, modo e Economia | 5 min |
 | 8 | **Fase ociosa**: tela ligada, nenhum aplicativo aberto pelo teste, nenhuma entrada simulada; trace WPR | 60 min |
 | 9 | Transição: salva o trace, confere se a sessão está bloqueada e abre o Edge com documento, planilha e PDF | ~1–5 min |
-| 10 | **Fase de escritório**: simulação contínua do Módulo 1, sem ciclos nem cooldown; trace WPR | 60 min |
+| 10 | **Fase de escritório**: simulação contínua de escritório no Edge (Google Docs, Google Sheets e PDF), sem ciclos nem cooldown; trace WPR | 60 min |
 | 11 | Encerramento: salva o trace, amostra final, fecha o Edge, relatório de bateria "depois" e aviso de que o carregador pode ser reconectado | ~1–5 min |
 | 12 | Pós-medição: exportação WPA dos traces, SRUM, relatório de energia (60 s de observação), `bateria.csv` e restauração | ~5–20 min |
 
@@ -929,6 +937,7 @@ Execucoes/
         │   ├── CSV_*_Run1/ … CSV_*_Run5/        ← exportação WPA de cada ciclo
         │   ├── Resultados_Consolidados/         ← Relatorio_Resumo.csv e .html
         │   ├── cpu_memoria.csv
+        │   ├── ciclos_libreoffice.csv
         │   └── dlp_usb/                         ← variante 1-1 (mesma estrutura, com cpu_memoria_dlp.csv)
         ├── 2_disco/                             ← evidências do teste de disco
         │   ├── resultado_validacao_disco_*.csv
@@ -1020,7 +1029,7 @@ O `_state.json` é a fonte de verdade para o estado do cenário. Exemplo de estr
           "folder": "1_cpu_memo",
           "status": "PASS",
           "exitCode": 0,
-          "duration": 361.5
+          "duration": 1842.5
         }
       ]
     }
@@ -1121,7 +1130,7 @@ Dados estruturados com metadados completos. Ideal para integração com APIs e s
 | **Economia de energia** | Recurso do Windows (antes "Economia de bateria") que reduz brilho e atividade em segundo plano; liga sozinho abaixo de um limite de carga. O teste o deixa desligado e sem acionamento automático |
 | **Evidência** | Arquivo gerado por um teste que comprova o resultado (CSV, screenshot, log) |
 | **Exit Code** | Código numérico retornado por um processo ao encerrar. `0` = sucesso, `≠ 0` = falha |
-| **Fase de escritório** | Fase de 60 min do teste de bateria com a simulação de uso do Módulo 1 (documento, planilha e PDF no Edge), contínua |
+| **Fase de escritório** | Fase de 60 min do teste de bateria com simulação contínua de uso de escritório no Edge (Google Docs, Google Sheets e PDF) |
 | **Fase ociosa** | Fase de 60 min do teste de bateria com a tela ligada, sem aplicativos abertos pelo teste e sem entrada simulada; mede o consumo de fundo |
 | **Hub** | O orquestrador (`hub.ps1`) que gerencia a execução dos testes |
 | **Jitter** | Variação na latência de rede entre pacotes consecutivos |
