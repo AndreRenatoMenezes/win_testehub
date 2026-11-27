@@ -6,6 +6,7 @@ Mantido pelo Arquiteto. Cada spec aparece em exatamente uma seção; ideias de o
 
 | Spec | Ideias | Onde roda | Desde |
 |---|---|---|---|
+| [005 — Módulo 5 (Bateria v2.0): LibreOffice + tempo real de bateria](current/005-bateria-libreoffice-tempo-real/spec.md) | — | `feat/005-bateria-libreoffice-tempo-real` | 2026-11-27 |
 
 ## 🛣️ Próximas, em ordem
 
