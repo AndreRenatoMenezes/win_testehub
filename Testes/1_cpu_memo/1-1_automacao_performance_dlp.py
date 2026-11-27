@@ -15,6 +15,24 @@ from tkinter import messagebox
 from datetime import datetime
 from pynput import keyboard as kb
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress, is_live_monitor_active
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+    def is_live_monitor_active():
+        return False
+
+
+def _progresso_ciclo(run_index, detalhe, duracao_s=None, aviso="Não remova o pendrive nem use a máquina durante o teste DLP"):
+    """[HUB:PROGRESS] do ciclo atual para o monitor ao vivo do hub."""
+    emit_progress(f"Ciclo {run_index}/{TEST_RUNS}", run_index, TEST_RUNS, detalhe, duracao_s=duracao_s, aviso=aviso)
+
 # =============================================================================
 # CONFIGURAÇÕES DO TESTE FOCADO EM DLP E USB
 # =============================================================================
@@ -224,8 +242,14 @@ def fix_profile_extension(ui):
         correct_name = xml_file.replace(".xml", "")
         os.rename(xml_file, correct_name)
 
+_NO_WINDOW_KW = (
+    {"creationflags": subprocess.CREATE_NO_WINDOW}
+    if hasattr(subprocess, "CREATE_NO_WINDOW")
+    else {}
+)
+
 def cancel_wpr_if_active():
-    subprocess.run("wpr.exe -cancel", shell=True, capture_output=True, text=True)
+    subprocess.run("wpr.exe -cancel", shell=True, capture_output=True, text=True, **_NO_WINDOW_KW)
 
 # =============================================================================
 # CICLO DE TESTE PRINCIPAL (CÓPIA USB / DLP)
@@ -238,6 +262,7 @@ def run_test_cycle(run_index, ui, arquivo_origem):
     # O arquivo no pendrive também deve carregar a extensão alvo do DLP
     arquivo_destino = os.path.join(USB_DRIVE, "copia_relatorio_financeiro_confidencial.xlsx")
 
+    _progresso_ciclo(run_index, f"Estabilização ({STABILIZE_SECONDS}s)", duracao_s=STABILIZE_SECONDS)
     # Estabilizar
     for i in range(STABILIZE_SECONDS, 0, -1):
         check_stop()
@@ -247,10 +272,11 @@ def run_test_cycle(run_index, ui, arquivo_origem):
     # Iniciar Captura WPR
     trace_file = os.path.join(OUTPUT_PATH, f"Trace_DLP_{run_ts}_Run{run_index}.etl")
     ui.atualizar(run_index, "Iniciando captura WPR...")
+    _progresso_ciclo(run_index, "Iniciando captura WPR")
     cancel_wpr_if_active()
 
     wpr_start = 'wpr.exe -start Power.light -start VirtualAllocation.light -filemode -compress'
-    result = subprocess.run(wpr_start, shell=True, capture_output=True, text=True)
+    result = subprocess.run(wpr_start, shell=True, capture_output=True, text=True, **_NO_WINDOW_KW)
     if result.returncode != 0:
         logger.error(f"Falha ao iniciar WPR: {result.stderr.strip()}")
         raise RuntimeError("Falha ao iniciar captura WPR.")
@@ -260,6 +286,8 @@ def run_test_cycle(run_index, ui, arquivo_origem):
     try:
         start_time = time.time()
         logger.info("Iniciando cópias sequenciais para o USB...")
+        _progresso_ciclo(run_index, f"Cópia DLP/USB + WPR ({DURATION_SECONDS}s)", duracao_s=DURATION_SECONDS)
+        alerta_dlp = False
 
         while True:
             check_stop()
@@ -279,13 +307,17 @@ def run_test_cycle(run_index, ui, arquivo_origem):
                     os.remove(arquivo_destino)
             except Exception as e:
                 logger.warning(f"Falha/Bloqueio na cópia: {e} (O DLP pode ter bloqueado)")
+                if not alerta_dlp:
+                    emit_alert(f"Ciclo {run_index}: cópia para o USB falhou/bloqueada ({e})")
+                    alerta_dlp = True
                 time.sleep(2) # Pequena pausa em caso de erro de permissão do DLP
 
         # Parar captura WPR
+        _progresso_ciclo(run_index, "Salvando trace WPR (.etl)")
         ui.atualizar(run_index, "Salvando arquivo Trace (.etl)...", "--")
         stop_result = subprocess.run(
             f'wpr.exe -stop "{trace_file}" -compress',
-            shell=True, capture_output=True, text=True
+            shell=True, capture_output=True, text=True, **_NO_WINDOW_KW
         )
         if stop_result.returncode != 0:
             raise RuntimeError("Falha ao salvar trace WPR.")
@@ -300,10 +332,11 @@ def run_test_cycle(run_index, ui, arquivo_origem):
     profile_path = os.path.join(BASE_DIR, PROFILE_NAME)
     if os.path.exists(profile_path):
         ui.atualizar(run_index, "Convertendo dados para CSV...", "--")
+        _progresso_ciclo(run_index, "Exportação WPA")
         csv_folder = os.path.join(OUTPUT_PATH, f"CSV_{run_ts}_Run{run_index}")
         os.makedirs(csv_folder, exist_ok=True)
         wpa_cmd = f'wpaexporter.exe -i "{trace_file}" -profile "{profile_path}" -outputfolder "{csv_folder}"'
-        subprocess.run(wpa_cmd, shell=True, capture_output=True, text=True)
+        subprocess.run(wpa_cmd, shell=True, capture_output=True, text=True, **_NO_WINDOW_KW)
         logger.info(f"CSVs exportados para: {csv_folder}")
 
 # =============================================================================
@@ -311,6 +344,7 @@ def run_test_cycle(run_index, ui, arquivo_origem):
 # =============================================================================
 def smart_cooldown(run_index, ui):
     logger.info("Iniciando cooldown...")
+    _progresso_ciclo(run_index, f"Cooldown (até {COOLDOWN_SECONDS}s)", duracao_s=COOLDOWN_SECONDS)
     start = time.time()
     stable_readings = 0
     required_stable = 3
@@ -362,6 +396,7 @@ def parse_numeric_column(series, fmt='br'):
 
 def consolidate_results(ui):
     ui.atualizar(0, "Consolidando arquivos CSV...", "--")
+    emit_progress("Consolidação", detalhe="CSVs do WPA e relatório")
     consolidation_folder = os.path.join(OUTPUT_PATH, "Resultados_Consolidados")
     os.makedirs(consolidation_folder, exist_ok=True)
     csv_files = glob.glob(os.path.join(OUTPUT_PATH, "CSV_*", "*.csv"))
@@ -486,10 +521,16 @@ if __name__ == "__main__":
     kb_listener.daemon = True
     kb_listener.start()
 
-    ui_overlay = MonitorOverlay()
-    script_thread = threading.Thread(target=worker_thread, args=(ui_overlay,), daemon=True)
-    script_thread.start()
+    if is_live_monitor_active():
+        class _HeadlessUI:
+            def atualizar(self, *_a, **_k): pass
+            def fechar(self): pass
 
-    ui_overlay.root.mainloop()
+        worker_thread(_HeadlessUI())
+    else:
+        ui_overlay = MonitorOverlay()
+        script_thread = threading.Thread(target=worker_thread, args=(ui_overlay,), daemon=True)
+        script_thread.start()
+        ui_overlay.root.mainloop()
     kb_listener.stop()
     sys.exit(_exit_code)

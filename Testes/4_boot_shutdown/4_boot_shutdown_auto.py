@@ -3,6 +3,17 @@ import time
 import sys
 import subprocess
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+
 # --- Caminhos dos arquivos ---
 caminho_contador = os.path.join(os.path.expanduser('~'), 'contador_reinicios.txt')
 caminho_evidence = os.path.join(os.path.expanduser('~'), 'hub_evidence_path.txt')
@@ -59,6 +70,7 @@ def criar_tarefa_agendada():
     except subprocess.CalledProcessError as e:
         erro_msg = e.stderr.decode('cp850', errors='ignore').strip() if e.stderr else 'Acesso Negado'
         print(f"\n[ERRO] O Windows bloqueou a criação da tarefa: {erro_msg}")
+        emit_alert(f"Windows bloqueou a criação da tarefa agendada: {erro_msg}", "error")
         print("-> SOLUÇÃO: Você PRECISA executar o Hub.ps1 como ADMINISTRADOR na primeira execução!")
         sys.exit(1)
 
@@ -95,6 +107,7 @@ def executar_relatorio_ps1():
         sys.exit(1)
 
     print("\n=== Iniciando Coleta de Logs do Windows (Elevado Nativamente) ===")
+    emit_progress("Coleta de eventos", detalhe="Diagnostics-Performance (eventos 100/200)")
     
     comando = [
         "powershell.exe", 
@@ -108,6 +121,7 @@ def executar_relatorio_ps1():
         print("\n[OK] Relatório finalizado com sucesso.")
     except subprocess.CalledProcessError as e:
         print(f"\n[AVISO] Relatório apontou eventos CRÍTICOS. Código: {e.returncode}")
+        emit_alert(f"Relatório de boot/shutdown apontou eventos críticos (código {e.returncode})")
 
 def main():
     contagem_atual = ler_contador()
@@ -118,6 +132,7 @@ def main():
     if contagem_atual >= 5:
         print("\n=== Automação de Reinicialização Concluída ===")
         print("O computador já completou os 5 ciclos de estresse.")
+        emit_progress("Reinícios concluídos", 5, 5, "Aguardando estabilização (120 s) para gerar o relatório")
         
         path_salvo = ler_evidence_path()
         if path_salvo and os.path.exists(path_salvo):
@@ -130,6 +145,7 @@ def main():
         
         contagem_regressiva(120, "Aguardando estabilização para gerar relatório")
         executar_relatorio_ps1()
+        emit_progress("Consolidação", detalhe="boot_shutdown.csv")
 
         # --- CSV tematico para o Hub (boot_shutdown.csv) ---
         evidence_dir = os.environ.get('HUB_EVIDENCE_DIR', pasta_atual)
@@ -161,6 +177,7 @@ def main():
             print(f"[OK] boot_shutdown.csv gerado em: {boot_csv_path}")
         except Exception as e:
             print(f"[AVISO] Erro ao gerar boot_shutdown.csv: {e}")
+            emit_alert(f"Erro ao gerar boot_shutdown.csv: {e}")
 
         if os.path.exists(caminho_evidence):
             os.remove(caminho_evidence)
@@ -174,6 +191,7 @@ def main():
     # =========================================================================
     if contagem_atual == 0:
         print("\n=== Configurando Automacao (Ciclo 1 de 5) ===")
+        emit_progress("Reinício 1/5", 1, 5, "Criando tarefa agendada e agendando o reinício (5 min)")
         criar_tarefa_agendada()
         salvar_contador(1)
         salvar_evidence_path()
@@ -189,6 +207,7 @@ def main():
     # =========================================================================
     proxima_contagem = contagem_atual + 1
     print(f"\n=== Retomando Automacao (Ciclo {proxima_contagem} de 5) ===")
+    emit_progress(f"Reinício {proxima_contagem}/5", proxima_contagem, 5, "Contagem regressiva de 5 min até o reinício")
     salvar_contador(proxima_contagem)
 
     contagem_regressiva(300, "Reiniciando a maquina em")

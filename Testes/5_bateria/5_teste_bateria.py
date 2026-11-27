@@ -25,6 +25,20 @@ import pyautogui
 import pyperclip
 from pynput import keyboard as kb
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress, is_live_monitor_active
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+    def is_live_monitor_active():
+        return False
+
+
 # =============================================================================
 # CONFIGURACOES DO TESTE
 # =============================================================================
@@ -253,8 +267,11 @@ class _PedidoJanela:
 
 class MonitorOverlay:
     # copiado de 1_automacao_performance.py (click-through), adaptado para
-    # atualizar(fase, status, detalhe) e para a fila de janelas
-    def __init__(self):
+    # atualizar(fase, status, detalhe) e para a fila de janelas.
+    # Com oculto_inicial=True (monitor ao vivo do hub ativo), a janela flutuante
+    # fica oculta no pre-voo/fase ociosa/pos-medicao e so aparece na Fase Escritorio
+    # (quando o Edge cobre o terminal); os dialogos Toplevel seguem abrindo normalmente.
+    def __init__(self, oculto_inicial=False):
         self.root = tk.Tk()
         self.root.title("Monitor do Teste de Bateria")
 
@@ -296,10 +313,13 @@ class MonitorOverlay:
 
         self._lock = threading.Lock()
         self._texto_pendente = None
+        self._visivel_pendente = None
         self._pedidos = queue.Queue()
         self._abertos = []
         self._fechar = False
         self.encerrada = threading.Event()
+        if oculto_inicial:
+            self.root.withdraw()
         # adaptado: fechar o monitor (barra de tarefas, Alt+F4) = parada segura; a janela
         # so sai com ui.fechar(), depois que a worker restaurou a maquina
         self.root.protocol("WM_DELETE_WINDOW", lambda: solicitar_parada("janela do monitor fechada pelo usuario"))
@@ -332,6 +352,14 @@ class MonitorOverlay:
     def atualizar(self, fase, status, detalhe=""):
         with self._lock:
             self._texto_pendente = (fase, status, detalhe)
+
+    def mostrar(self):
+        with self._lock:
+            self._visivel_pendente = True
+
+    def ocultar(self):
+        with self._lock:
+            self._visivel_pendente = False
 
     def pedir_janela(self, construir, esperar=True, timeout_s=None):
         """Pede uma janela a thread principal.
@@ -367,6 +395,14 @@ class MonitorOverlay:
         try:
             with self._lock:
                 texto, self._texto_pendente = self._texto_pendente, None
+                visivel, self._visivel_pendente = self._visivel_pendente, None
+            if visivel is True:
+                self.root.deiconify()
+                self.root.attributes('-topmost', True)
+                self.root.update_idletasks()
+                self._set_click_through()
+            elif visivel is False:
+                self.root.withdraw()
             if texto:
                 fase, status, detalhe = texto
                 self.lbl_fase.config(text=fase)
@@ -2323,6 +2359,7 @@ def executar_preflight(ui):
     # Conferidos antes de qualquer ajuste: rede e monitor externo e, depois,
     # a prontidao do Edge e da conta Google (login resolvido ainda na tomada).
     ui.atualizar("Pré-voo", "Conferindo rede e monitor externo...")
+    emit_progress("Pré-voo de padronização", detalhe="Rede, monitor externo, energia, brilho e Bluetooth")
     conferir_rede()
     conferir_monitor()
     falhas = itens_com_falha()
@@ -2367,6 +2404,8 @@ def registrar_encerramento(motivo, detalhe=""):
     if primeiro:
         nivel = logging.INFO if motivo == "concluido" else logging.WARNING
         logger.log(nivel, f"Encerramento da medicao: {motivo}" + (f" — {sem_acento(detalhe)}" if detalhe else ""))
+        if motivo != "concluido":
+            emit_alert(f"Medição encerrada: {motivo}" + (f" ({detalhe})" if detalhe else ""))
     _encerrar.set()
 
 
@@ -2623,6 +2662,8 @@ def estabilizar(ui, coletor):
     Falha na conferencia = encerramento controlado ('padronizacao_na_bateria').
     """
     logger.info(f"Estabilizacao: {ESTABILIZACAO_S}s na bateria antes de medir.")
+    emit_progress("Estabilização", detalhe=f"{ESTABILIZACAO_S}s na bateria, fora da medição",
+                  duracao_s=int(ESTABILIZACAO_S), aviso="NÃO USE A MÁQUINA — estabilizando na bateria")
     inicio = time.monotonic()
     pausa(min(10, ESTABILIZACAO_S))   # o Windows aplica o brilho de bateria na transicao
     ok = conferir_na_bateria(coletor)
@@ -2847,6 +2888,21 @@ class MonitorMedicao(threading.Thread):
             detalhe = f"Restam ~{(restante + 59) // 60} min"
         carga = "?" if amostra["carga_pct"] is None else amostra["carga_pct"]
         self.ui.atualizar(NOMES_FASE.get(fase, fase), f"Carga da bateria: {carga}% — não use a máquina", detalhe)
+        self._emitir_progresso(fase, amostra, carga)
+
+    def _emitir_progresso(self, fase, amostra, carga):
+        """[HUB:PROGRESS] no maximo 1x por minuto, so nas amostras ja feitas (sem timer extra)."""
+        if fase not in DURACAO_FASE or amostra["decorrido_s"] is None:
+            return
+        total_min = max(1, (DURACAO_FASE[fase] + 59) // 60)
+        minuto = min(total_min, int(amostra["decorrido_s"]) // 60 + 1)
+        if getattr(self, "_ultimo_progresso", None) == (fase, minuto):
+            return
+        self._ultimo_progresso = (fase, minuto)
+        restante_min = max(0, total_min - minuto)
+        emit_progress(NOMES_FASE.get(fase, fase), minuto, total_min,
+                      f"Minuto {minuto}/{total_min} · restam ~{restante_min} min · carga {carga}%",
+                      aviso="NÃO USE A MÁQUINA — teste de bateria em andamento")
 
     def parar(self):
         self._parar.set()
@@ -2974,7 +3030,9 @@ def executar_medicao(ui):
             _motivo_interrupcao()
             return
 
-        # Fase de escritorio: simulacao continua do Modulo 1
+        # Fase de escritorio: simulacao continua do Modulo 1 (Edge cobre o terminal -> mostra overlay)
+        if is_live_monitor_active():
+            ui.mostrar()
         wpr_iniciar("Escritorio")
         definir_fase("escritorio")
         amostra_marco("inicio_fase")
@@ -2986,6 +3044,8 @@ def executar_medicao(ui):
         except KeyboardInterrupt:
             _motivo_interrupcao()
         finally:
+            if is_live_monitor_active():
+                ui.ocultar()
             amostra_marco("fim_fase")
             _marcos["escritorio"]["completa"] = motivo_encerramento() == "concluido"
             definir_fase("encerramento")
@@ -3100,11 +3160,13 @@ def pos_medicao(ui):
         ("relatorio SRUM", gerar_srum),
         ("relatorio de energia", gerar_relatorio_energia),
     ]
+    emit_progress("SRUM/relatório", detalhe="Relatório de bateria, exportação WPA, SRUM e relatório de energia")
     for nome, etapa in etapas:
         try:
             etapa()
         except Exception as e:
             logger.warning(f"Pos-medicao: {nome} falhou ({type(e).__name__}: {e}).")
+            emit_alert(f"Pós-medição: {nome} falhou ({type(e).__name__})")
 
 
 # =============================================================================
@@ -3300,6 +3362,7 @@ def worker_thread(ui):
 
         # 6. Relatorio 'antes', coletor e dados estaticos (ainda na tomada)
         ui.atualizar("Pré-voo", "Gerando o relatório de bateria e iniciando o coletor...")
+        emit_progress("Pré-voo de padronização", detalhe="Relatório de bateria e coletor (ainda na tomada)")
         relatorios = gerar_relatorio_bateria("antes", xml=True)
         coletor = ColetorBateria()
         coletor.iniciar()
@@ -3308,6 +3371,7 @@ def worker_thread(ui):
 
         # 7. Aviso unico de desconexao
         fonte_antes = status_energia()["fonte"]
+        emit_progress("Aguardando o operador", detalhe="Desconecte o carregador e confirme o checklist")
         resultado = aviso_desconexao(ui)
         registrar_fisicos(resultado, fonte_antes)
         if resultado == "tempo_esgotado":
@@ -3394,7 +3458,7 @@ if __name__ == "__main__":
     # tkinter seria engolido; fora dele, encerraria o mainloop sem restaurar)
     signal.signal(signal.SIGINT, lambda signum, frame: solicitar_parada("Ctrl+C no console"))
 
-    ui_overlay = MonitorOverlay()
+    ui_overlay = MonitorOverlay(oculto_inicial=is_live_monitor_active())
     worker = threading.Thread(target=worker_thread, args=(ui_overlay,), daemon=True)
     worker.start()
     try:

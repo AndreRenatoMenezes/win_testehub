@@ -21,7 +21,7 @@
 
 ## 1. Visão Geral
 
-O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (CPU, memória, disco, rede, boot/shutdown, bateria, Wi-Fi e cargas reais de desenvolvimento) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.
+O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (consumo basal, CPU, memória, disco, rede, boot/shutdown, bateria, Wi-Fi e cargas reais de desenvolvimento) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.
 
 ---
 
@@ -50,7 +50,7 @@ Os itens abaixo são instalados automaticamente pela **Fase de Setup** do hub. N
 
 Para o **teste de bateria (Módulo 5)**, além disso:
 
-- **Windows Performance Toolkit** (`wpr.exe` e `wpaexporter.exe`) no PATH — o mesmo pré-requisito do Módulo 1
+- **Windows Performance Toolkit** (`wpr.exe` e `wpaexporter.exe`) no PATH — exigido pelos Módulos 0, 1 e 5
 - **Microsoft Edge com a conta Google já logada** (Google Docs e Sheets; exigido apenas no Módulo 5, pois o Módulo 1 utiliza o LibreOffice localmente)
 - **Feche o Edge antes de iniciar**: o teste encerra o Edge e reabre só com as páginas dele
 
@@ -75,7 +75,7 @@ C:\TesteHub\
 ├── config.json          # Configurações
 ├── config.local.json    # Valores internos, como a URL do speedtest (não versionado)
 ├── Setup\environment\   # Scripts de setup (13 scripts)
-├── Testes\              # Módulos de teste (11 módulos + 2 variantes DLP/USB; _lib\ = biblioteca dos módulos 7 a 11)
+├── Testes\              # Módulos de teste (12 módulos + 2 variantes DLP/USB; _lib\ = biblioteca dos módulos 7 a 11)
 ├── Execucoes\           # Logs, evidências e estado de cada cenário (criada pelo hub)
 └── Exportar\            # Traces de cada cenário prontos para o Drive, sem .etl nem logs (criada pelo hub)
 ```
@@ -90,7 +90,7 @@ C:\TesteHub\
 
 Copie toda a pasta do projeto para `C:\TesteHub` na máquina de teste.
 
-Confira se a cópia inclui os arquivos internos que **não estão no repositório do GitHub**: o `config.local.json` (URL do speedtest interno) e os perfis `Agentes_SI_Profile.wpaProfile` (em `Testes\1_cpu_memo\`) e `Agentes_SI_Bateria_Profile.wpaProfile` (em `Testes\5_bateria\`). Sem os perfis, os módulos 1 e 5 rodam, mas pulam a exportação CSV dos traces.
+Confira se a cópia inclui os arquivos internos que **não estão no repositório do GitHub**: o `config.local.json` (URL do speedtest interno) e os perfis `Agentes_SI_Profile.wpaProfile` (em `Testes\1_cpu_memo\`, também reutilizado pelo Módulo 0 ou em `Testes\0_consumo_basal\`) e `Agentes_SI_Bateria_Profile.wpaProfile` (em `Testes\5_bateria\`). Sem os perfis, os módulos 0, 1 e 5 rodam em execução avulsa, mas pulam a exportação CSV dos traces.
 
 ### 3.2 Primeira Execução
 
@@ -165,44 +165,44 @@ O nome do cenário é combinado com o hostname e a data na pasta de execução, 
 
 ### 4.2 Navegar o Menu de Testes
 
-Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupados pelo nome da pasta, sem o prefixo numérico, e os que nunca rodaram no cenário (**pendentes**) já vêm marcados:
+Após selecionar o cenário, o menu de testes é exibido. Os testes ficam em três seções, definidas em `TestSections` no `config.json` (seção 7.3):
+
+- **Escritório** (atalho `1`): módulos 0 a 5. É a bateria padrão: os que nunca rodaram no cenário (**pendentes**) já vêm marcados.
+- **Dev** (atalho `2`): módulos 7 a 11. Desmarcada.
+- **Opcional** (atalho `3`): `1-1` e `2-1` (DLP/USB), `6` (caminhada Wi-Fi) e qualquer script novo em `Testes/` que não esteja listado nas outras seções. Desmarcada.
 
 ```
--- Cpu Memo --------------------------------
-[X] 1_automacao_performance        [PY]   pendente
-[X] 1-1_automacao_performance_dlp  [PY]   pendente
--- Disco -----------------------------------
-[X] 2_teste_disco                  [PY]   pendente
-[X] 2-1_teste_disco_dlp            [PY]   pendente
--- Rede ------------------------------------
-[X] 3_teste_rede                   [PY]   pendente
--- Boot Shutdown ---------------------------
-[X] 4_boot_shutdown_auto           [PY]   pendente
--- Bateria ---------------------------------
-[X] 5_teste_bateria                [PY]   pendente
--- Wifi Fast Transition --------------------
-[X] 6_teste_fast_transition        [PY]   pendente
--- Dev Dotnet ------------------------------
-[X] 7_dev_dotnet                   [PY]   pendente
--- Dev Go ----------------------------------
-[X] 8_dev_go                       [PY]   pendente
--- Dev Python ------------------------------
-[X] 9_dev_python                   [PY]   pendente
--- Dev Containers --------------------------
-[X] 10_dev_containers              [PY]   pendente
--- Dev Git Arquivos ------------------------
-[X] 11_dev_git_arquivos            [PY]   pendente
+>> [X] == [1] Escritorio (6/6) ================================
+   [X] 0_teste_consumo_basal  [PY]                  pendente
+   [X] 1_automacao_performance  [PY]                pendente
+   [X] 2_teste_disco  [PY]                          pendente
+   [X] 3_teste_rede  [PY]                           pendente
+   [X] 4_boot_shutdown_auto  [PY]                   pendente
+   [X] 5_teste_bateria  [PY]                        pendente
+   [ ] == [2] Dev (0/5) ========================================
+   [ ] 7_dev_dotnet  [PY]                           pendente
+   [ ] 8_dev_go  [PY]                               pendente
+   [ ] 9_dev_python  [PY]                           pendente
+   [ ] 10_dev_containers  [PY]                      pendente
+   [ ] 11_dev_git_arquivos  [PY]                    pendente
+   [ ] == [3] Opcional (0/3) ===================================
+   [ ] 1-1_automacao_performance_dlp  [PY]          pendente
+   [ ] 2-1_teste_disco_dlp  [PY]                    pendente
+   [ ] 6_teste_fast_transition  [PY]                pendente
 ```
 
-Desmarque com `Espaço` o que não for executar agora. Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (`1-1` e `2-1`) só fazem sentido com um pendrive em `E:\`.
+O cabeçalho de cada seção mostra `[X]` (toda marcada), `[-]` (parte) ou `[ ]` (nenhum) e a contagem `marcados/total`. Para ligar ou desligar uma seção inteira, pressione o número dela (`1`, `2` ou `3`, na fileira de cima ou no teclado numérico) ou `Espaço` sobre o cabeçalho: se a seção estiver toda marcada, desmarca; senão, marca toda. A fila roda na ordem das seções (Escritório → Dev → Opcional) e, dentro de cada uma, na ordem numérica.
 
-Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:
+Desmarque com `Espaço` o que não for executar agora. O Módulo 0 (`0_teste_consumo_basal`, ~11 min) mede a máquina em repouso: não utilize mouse nem teclado após confirmar (qualquer toque fica registrado no relatório como interação humana, exceto `Ctrl+Q`). Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (`1-1` e `2-1`) só fazem sentido com um pendrive em `E:\`.
+
+Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes de **Escritório** vêm marcados; Dev e Opcional continuam desmarcados. Se todo o Escritório já rodou, o menu abre sem nada marcado:
 
 ```
-[ ] 1_automacao_performance        [PY]   PASS  (1842.5s)
-[ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
-[X] 3_teste_rede                   [PY]   pendente
-[X] 4_boot_shutdown_auto           [PY]   pendente
+>> [-] == [1] Escritorio (4/6) ================================
+   [ ] 1_automacao_performance  [PY]                PASS  (1842.5s)
+   [ ] 2_teste_disco  [PY]                          FAIL  (12.3s)
+   [X] 3_teste_rede  [PY]                           pendente
+   [X] 4_boot_shutdown_auto  [PY]                   pendente
 ```
 
 > ![Menu de Testes](img/placeholder-menu-testes.png)  
@@ -213,21 +213,41 @@ Num cenário com execuções anteriores, o menu mostra o último resultado e a d
 | Tecla | Ação |
 |-------|------|
 | `↑` `↓` | Navegar entre os itens |
-| `Espaço` | Marcar/desmarcar o item atual |
+| `Espaço` | Marcar/desmarcar o item atual; sobre o cabeçalho, a seção inteira |
+| `1` `2` `3` | Marcar/desmarcar a seção inteira (Escritório, Dev, Opcional) |
 | `A` | Selecionar/desselecionar **todos** |
-| `P` | Selecionar apenas os **pendentes** (nunca executados no cenário) |
+| `P` | Selecionar apenas os **pendentes** (nunca executados no cenário). Na Fase 2, só os pendentes de **Escritório** |
 | `Enter` | Confirmar seleção e iniciar execução |
 | `Esc` | Cancelar e sair |
 
-**Dica:** `P` não marca os testes que falharam. Para reexecutar um FAIL, marque-o com `Espaço`.
+**Dica:** `P` não marca os testes que falharam nem os de Dev e Opcional. Para reexecutar um FAIL, marque-o com `Espaço`; para rodar a bateria de Dev, pressione `2`.
+
+Na Fase 1 (preparação) não há seções: os scripts ficam agrupados por pasta, todos os pendentes vêm marcados e `P` marca todos os pendentes.
 
 ### 4.4 Acompanhar a Execução
 
 Após confirmar, o hub faz a checagem antes da fila (seção 4.9), mostra o resumo dos testes selecionados e inicia a execução sequencial. Durante a execução:
 
-- O console exibe o progresso em tempo real (nome do teste, tempo decorrido)
-- Testes com interface visual (CPU, Disco, Rede, Bateria) exibem um **overlay transparente** na tela com informações de progresso
-- O overlay é "click-through" — não interfere no uso da máquina
+- O console exibe o **monitor ao vivo** (seção 4.4.1), com a fila, a etapa interna do teste, a telemetria da máquina, as últimas linhas de log e os alertas
+- Testes que abrem aplicativos sobre o terminal (CPU/Memória com LibreOffice, Rede com Edge e a fase de escritório da Bateria) exibem também um **overlay transparente** ("click-through") na tela. Os demais testes (Consumo Basal, Disco, variantes DLP/USB e cargas Dev 7–11) usam apenas a TUI do terminal quando o monitor ao vivo está ativo — mantendo o overlay ao rodar fora do hub ou no painel clássico
+
+#### 4.4.1 Monitor ao vivo no terminal
+
+A cada teste, o hub limpa o console e desenha um painel que se atualiza sozinho (1 vez por segundo), em cinco blocos:
+
+| Bloco | O que mostra |
+|-------|--------------|
+| **Cabeçalho** | Cenário, máquina (`modelo - patrimônio`), `Run #N`, tempo total da rodada e a barra da fila (`[2/6]`) |
+| **Fila de Testes** | Cada teste com o status (`OK` PASS, `>>` executando, `..` aguardando, `XX` FAIL, `!!` ERROR, `--` cancelado) e o cronômetro do teste atual |
+| **Etapa Atual** | Etapa e subetapa do teste (ex.: `Ciclo 2/5` — `Calc R2`) com barra interna. Sem etapa informada pelo teste, mostra a última linha de saída |
+| **Telemetria** | CPU %, clock (MHz) e temperatura máxima (lidos do `frequencia_cpu.csv` do hub), RAM usada/total e energia (Tomada/Bateria). Sem o CSV ou sem zona térmica, aparece `MHz: -` / `Temp: -` |
+| **Saída ao Vivo e Avisos** | As últimas 8 linhas do teste e os alertas da rodada: avisos da checagem, alertas do próprio teste, linhas `[WARNING]`/`[ERRO]` e queda de clock sob carga (throttling) |
+
+O painel **só mostra**: não lê o teclado nem tira o foco das automações (LibreOffice, Edge), e o `Ctrl+Q` continua funcionando como antes. Quando um teste falha, o painel fecha o último quadro e só então aparece a pergunta `Teste falhou. Deseja continuar? (S para continuar)`. Terminal com menos de 100 colunas empilha os blocos.
+
+- **Modo baixo impacto (Testes 0 e 5):** no Consumo Basal e na Bateria o painel não lê telemetria nem redesenha por tempo; atualiza só quando o teste escreve uma linha nova ("Telemetria pausada (modo baixo impacto)"). O processo do monitor (`HUB_MONITOR_PID`) fica fora do ranking `top_processos_basal.csv`.
+- **Painel clássico:** com `LiveMonitor.Enabled: false` no `config.json`, ou se o `.venv` não tiver o pacote `rich` (Setup 5 não executado), o hub usa o painel estático anterior e registra o motivo no `run_*.log`. A execução não muda.
+- **Auditoria:** as linhas de etapa (`[HUB:PROGRESS]`) e alerta (`[HUB:ALERT]`) ficam gravadas no `Logs/run_*.log`, com a hora em que cada ciclo começou.
 
 > ![Execução em Progresso](img/placeholder-execucao-progresso.png)  
 > *Insira aqui: screenshot da execução com overlay de progresso visível*
@@ -335,7 +355,7 @@ Ao fim, o painel mostra PASS/FAIL e abre o relatório `6_wifi_fast_transition/wi
 
 ### 4.8 Cargas de Desenvolvimento (Módulos 7 a 11) — Passo a Passo do Operador
 
-Os módulos 7 a 11 cronometram tarefas reais de desenvolvimento (build, testes, `pip install`, containers, git). Cada um leva de 3 a 30 min (o 11 é o mais curto; o 8 e o 10, os mais longos), conforme a máquina e o primeiro download dos repositórios e imagens. A metodologia completa está na seção 10 da *Metodologia de Testes*.
+Os módulos 7 a 11 cronometram tarefas reais de desenvolvimento (build, testes, `pip install`, containers, git). Cada um leva de 3 a 30 min (o 11 é o mais curto; o 8 e o 10, os mais longos), conforme a máquina e o primeiro download dos repositórios e imagens. A metodologia completa está na seção 11 da *Metodologia de Testes*.
 
 **1. Prepare a máquina (uma vez)**
 
@@ -393,8 +413,8 @@ Depois que você escolhe os testes, e antes do resumo pré-execução, o hub con
 Cada achado aparece no resumo com um nível e com o que fazer:
 
 - **`[X]` Impede:** o teste vai falhar com certeza.
-    - Falta o `Agentes_SI_Profile.wpaProfile` (módulo 1) ou o `Agentes_SI_Bateria_Profile.wpaProfile` (módulo 5) na pasta do teste. Esses arquivos não são versionados.
-    - Falta o `wpr.exe` ou o `wpaexporter.exe` (módulos 1 e 5).
+    - Falta o `Agentes_SI_Profile.wpaProfile` (módulo 0 — procurado em `Testes\0_consumo_basal\` ou `Testes\1_cpu_memo\` — e módulo 1) ou o `Agentes_SI_Bateria_Profile.wpaProfile` (módulo 5). Esses arquivos não são versionados.
+    - Falta o `wpr.exe` ou o `wpaexporter.exe` (módulos 0, 1 e 5).
     - Falta o LibreOffice (`soffice.exe`) quando `1_automacao_performance.py` está selecionado (módulo 1; não bloqueia a variante `1-1_automacao_performance_dlp.py`). A ação manda rodar o Setup `3_softwares_msStore`.
     - A URL do speedtest interno não está configurada **e** não há internet (módulo 3: nenhuma das duas fontes pode ser medida).
     - Falta uma ferramenta de dev, ou ela está abaixo da versão mínima do `cargas.json` (módulos 7 a 11). A ação manda rodar o Setup 7 ou o Setup 10.
@@ -449,7 +469,7 @@ Um **cenário** é uma sessão de testes associada a uma máquina e data. Ele ag
 
 ### 5.2 Continuar um Cenário Existente
 
-Ao iniciar o hub, selecione o número do cenário que deseja continuar. O menu de testes mostrará o status da última execução de cada teste; os pendentes já vêm marcados, e os que falharam podem ser marcados com `Espaço`.
+Ao iniciar o hub, selecione o número do cenário que deseja continuar. O menu de testes mostrará o status da última execução de cada teste; os pendentes de Escritório já vêm marcados, e os que falharam (ou os de Dev e Opcional) podem ser marcados com `Espaço` ou com o atalho da seção.
 
 ### 5.3 Re-execução de Testes
 
@@ -476,6 +496,7 @@ Execucoes/
         ├── _relatorio.{html,csv,json}       # Relatório consolidado
         ├── informacoes_maquina.csv          # Inventário gerado pelo setup 1
         ├── maquina.csv                      # Modelo, série, CPU, RAM, disco, SO + modelo/patrimônio informados
+        ├── 0_consumo_basal/                 # Evidências do Módulo 0 (consumo_basal.csv, ciclos_basal.csv, top_processos_basal.csv)
         ├── 1_cpu_memo/                      # Evidências do Módulo 1
         │   └── dlp_usb/                     # Evidências da variante 1-1
         ├── 2_disco/                         # Evidências do Módulo 2 e da variante 2-1
@@ -549,7 +570,7 @@ Todo o resto vai: relatórios `_relatorio.*`, `_state.json`, `maquina.csv`, `inf
 - **`Traces/` não é alterada.** Os `.etl` e logs originais continuam em `Execucoes/` para abrir no WPA ou investigar falhas.
 - **A pasta é recriada a cada execução** e reflete o estado atual do cenário. Arquivos colocados à mão nela são perdidos, e um ZIP anterior dela é removido por estar desatualizado.
 - Ao final, o hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora (ex.: `12 .etl, 3600 MB`).
-- Se um módulo tinha só `.etl` e logs, o hub avisa com `[!] <módulo> sem evidencias do teste na exportacao` (o `frequencia_cpu.csv`, gerado pelo próprio hub, não conta como evidência). Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o `.wpaProfile` dos módulos 1 e 5, e o WPA não exporta. As evidências continuam só em `Execucoes/`. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos `.etl`.
+- Se um módulo tinha só `.etl` e logs, o hub avisa com `[!] <módulo> sem evidencias do teste na exportacao` (o `frequencia_cpu.csv`, gerado pelo próprio hub, não conta como evidência). Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o `.wpaProfile` dos módulos 0, 1 e 5, e o WPA não exporta. As evidências continuam só em `Execucoes/`. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos `.etl`.
 - Em seguida, pergunta se deseja **compactar em ZIP**. O ZIP fica ao lado da pasta (`3440 - 050221.zip`), contém a pasta como raiz e é validado pela contagem de arquivos. Nenhuma pasta é apagada.
 - A opção **`[E]`** do menu inicial faz o mesmo para um cenário existente, sem rodar testes.
 
@@ -573,7 +594,7 @@ Os avisos ficam guardados no `_state.json` e se acumulam: os de uma run anterior
 
 **Frequência da CPU por módulo.** Enquanto cada teste roda, o hub grava `<módulo>/frequencia_cpu.csv` com uma amostra a cada 5 s: uso da CPU, desempenho em % (acima de 100 = turbo), MHz efetivo e a maior temperatura das zonas térmicas ACPI, quando o firmware expõe. O relatório mostra o MHz médio, o MHz no começo e no fim e a queda. A queda (aviso a partir de 20%) compara a mediana do 1º e do último minuto **com a CPU sob carga** (uso de pelo menos 50%), porque em ocioso o clock cai sem ser throttling. Testes curtos ou ociosos aparecem sem queda (`-`).
 
-O amostrador não roda nos setups nem no teste 5 (bateria), para não acordar a CPU a cada poucos segundos durante horas. No teste 4, a máquina reinicia e o CSV fica parcial; com menos de 3 amostras, ele é ignorado.
+O amostrador não roda nos setups, no módulo 0 (`0_consumo_basal`) nem no teste 5 (bateria), para não acordar a CPU durante as medições ociosas ou de bateria. No teste 4, a máquina reinicia e o CSV fica parcial; com menos de 3 amostras, ele é ignorado.
 
 ---
 
@@ -592,6 +613,7 @@ O amostrador não roda nos setups nem no teste 5 (bateria), para não acordar a 
 | Teste de rede com aviso de fonte "parcial" ou "instavel" | Rodadas que falharam, passaram de 120 s ou foram contaminadas por tráfego de fundo; ou CV acima de 10% | Veja as colunas `Status`, `Motivo` e `Contaminada` no `resultado_afericoes.csv`. Prefira cabo, feche o que estiver baixando (atualizações) e repita |
 | Teste de rede FAIL | Nenhuma das duas fontes terminou ok | Confira os motivos no `rede.csv` (`Interno_Motivo`, `Internet_Motivo`) e no log |
 | Teste de disco falha rapidamente | Espaço insuficiente em disco | Libere pelo menos 10 GB no disco principal |
+| Aviso "Monitor ao vivo indisponivel (Python do .venv sem o pacote rich)" | `.venv` criado antes do monitor ao vivo | Re-execute o Setup 5 (dependências Python). Até lá, o hub usa o painel clássico |
 | Overlay visual não aparece | Problema com `tkinter` | Verifique se o Python foi instalado com suporte a tkinter (padrão na instalação oficial) |
 | Wi-Fi FT: "O Wi-Fi não está conectado" | Máquina no cabo, Wi-Fi desligado ou desconectado | Conecte o Wi-Fi na rede a testar e execute de novo |
 | Wi-Fi FT: FAIL "Nenhuma troca de AP aconteceu" | O operador não se afastou do AP inicial, ou só há 1 AP do SSID no percurso | Refaça a caminhada indo até áreas de outros APs (confira o inventário de APs no relatório) |
@@ -638,6 +660,7 @@ O hub injeta as seguintes variáveis de ambiente para cada teste:
 | `HUB_EVIDENCE_DIR` | Pasta onde o teste deve salvar suas evidências |
 | `HUB_TRACE_DIR` | Igual a `HUB_EVIDENCE_DIR` |
 | `HUB_TRACE_ROOT` | Pasta `Traces` do cenário atual |
+| `HUB_MONITOR_PID` | PID do monitor ao vivo (`live_monitor.py`), quando ativo. O Teste 0 o exclui do ranking de processos |
 
 Configurações em `config.json`:
 
@@ -664,12 +687,37 @@ Configurações em `config.json`:
         "IntervalSec": 5,
         "ThrottleAlertPct": 20,
         "LoadMinPct": 50,
-        "SkipFolders": ["5_bateria"]
-    }
+        "SkipFolders": ["0_consumo_basal", "5_bateria"]
+    },
+    "LiveMonitor": {
+        "Enabled": true,
+        "RefreshHz": 1,
+        "LogTailLines": 8,
+        "TelemetryIntervalSec": 2,
+        "LowImpactFolders": ["0_consumo_basal", "5_bateria"]
+    },
+    "TestSections": [
+        {
+            "Id": "escritorio", "Label": "Escritório", "Key": "1",
+            "DefaultSelected": true, "Fallback": false,
+            "Scripts": ["0_teste_consumo_basal", "1_automacao_performance", "2_teste_disco",
+                        "3_teste_rede", "4_boot_shutdown_auto", "5_teste_bateria"]
+        },
+        {
+            "Id": "dev", "Label": "Dev", "Key": "2",
+            "DefaultSelected": false, "Fallback": false,
+            "Scripts": ["7_dev_dotnet", "8_dev_go", "9_dev_python", "10_dev_containers", "11_dev_git_arquivos"]
+        },
+        {
+            "Id": "opcional", "Label": "Opcional", "Key": "3",
+            "DefaultSelected": false, "Fallback": true,
+            "Scripts": ["1-1_automacao_performance_dlp", "2-1_teste_disco_dlp", "6_teste_fast_transition"]
+        }
+    ]
 }
 ```
 
-As seções `Preflight` e `CpuSampler` são opcionais: um `config.json` antigo, sem elas, usa os valores acima.
+As seções `Preflight`, `CpuSampler`, `LiveMonitor` e `TestSections` são opcionais: um `config.json` antigo, sem elas, usa os valores acima.
 
 | Chave | Uso |
 |-------|-----|
@@ -681,6 +729,12 @@ As seções `Preflight` e `CpuSampler` são opcionais: um `config.json` antigo, 
 | `CpuSampler.ThrottleAlertPct` | Queda do clock sob carga que vira aviso de throttling |
 | `CpuSampler.LoadMinPct` | Uso de CPU a partir do qual a amostra conta como "sob carga" |
 | `CpuSampler.SkipFolders` | Pastas de teste em que o amostrador não roda |
+| `LiveMonitor.Enabled` | Liga/desliga o monitor ao vivo (TUI `rich`) da Fase 2. `false` usa o painel clássico |
+| `LiveMonitor.RefreshHz` | Redesenhos por segundo do painel |
+| `LiveMonitor.LogTailLines` | Linhas de saída mostradas no bloco "Saída ao Vivo" |
+| `LiveMonitor.TelemetryIntervalSec` | Intervalo, em segundos, da leitura de CPU %, RAM, energia e da última linha do `frequencia_cpu.csv` |
+| `LiveMonitor.LowImpactFolders` | Pastas de teste em modo baixo impacto (sem timer nem telemetria) |
+| `TestSections` | Seções do menu da Fase 2, na ordem em que aparecem e rodam. `Scripts` usa o nome do arquivo sem extensão (por isso `1` e `1-1`, da mesma pasta, ficam em seções diferentes); um script listado em duas seções fica na primeira. `DefaultSelected: true` marca os pendentes da seção ao abrir o menu e com `P`. A seção com `Fallback: true` recebe os scripts não listados (sem nenhuma, vai para a última). Seção sem script encontrado não aparece |
 
 Valores internos ficam em `config.local.json`, na raiz do hub. Esse arquivo não vai para o repositório; o modelo é o `config.local.example.json`:
 
@@ -698,9 +752,10 @@ Valores internos ficam em `config.local.json`, na raiz do hub. Esse arquivo não
 | Tecla | Ação |
 |-------|------|
 | `↑` `↓` | Navegar |
-| `Espaço` | Marcar/desmarcar item |
+| `Espaço` | Marcar/desmarcar item (no cabeçalho: a seção) |
+| `1` `2` `3` | Marcar/desmarcar a seção Escritório, Dev ou Opcional |
 | `A` | Selecionar/desselecionar todos |
-| `P` | Selecionar apenas pendentes |
+| `P` | Selecionar apenas pendentes (na Fase 2, só de Escritório) |
 | `Enter` | Confirmar e executar |
 | `Esc` | Cancelar |
 
@@ -735,7 +790,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File hub.ps1
 
 | Atalho | Teste | Ação |
 |--------|-------|------|
-| `Ctrl+Q` | CPU & Memória, Bateria, Cargas dev (7 a 11) | Interromper o teste de forma segura e **parar a fila**: os testes seguintes ficam como *cancelado* e o hub gera o relatório com o que já rodou |
+| `Ctrl+Q` | Consumo Basal, CPU & Memória, Bateria, Cargas dev (7 a 11) | Interromper o teste de forma segura e **parar a fila**: os testes seguintes ficam como *cancelado* e o hub gera o relatório com o que já rodou |
 
 O Ctrl+Q vale para a execução inteira, não só para o teste em andamento. Para pular só um teste com falha, não use o Ctrl+Q: espere a pergunta "Teste falhou. Deseja continuar?" e responda `S`. Teclas apertadas durante o teste são descartadas antes dessa pergunta, então elas não respondem por você.
 

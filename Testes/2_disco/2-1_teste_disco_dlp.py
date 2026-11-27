@@ -9,6 +9,20 @@ import tkinter as tk
 from datetime import datetime
 from pynput import keyboard as kb
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress, is_live_monitor_active
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+    def is_live_monitor_active():
+        return False
+
+
 # =============================================================================
 # CONFIGURAÇÕES DO TESTE DE PERFORMANCE NATIVO (SHUTIL)
 # =============================================================================
@@ -124,6 +138,7 @@ def create_test_file(ui):
     if not os.path.exists(arquivo_origem):
         logger.info(f"A gerar arquivo base de {FILE_SIZE_MB}MB no PC...")
         ui.atualizar(0, f"A gerar arquivo ({FILE_SIZE_MB}MB)...", "--")
+        emit_progress("Preparo", detalhe=f"Gerando arquivo base de {FILE_SIZE_MB} MB no PC")
         
         chunk = os.urandom(1024 * 1024) 
         with open(arquivo_origem, "wb") as f:
@@ -143,6 +158,8 @@ def run_test_cycle(run_index, ui, arquivo_origem, resultados_read, resultados_wr
     try:
         # 1. TESTE DE ESCRITA (PC -> USB)
         ui.atualizar(run_index, "A escrever no USB...", "--")
+        emit_progress(f"Bateria {run_index}/{TEST_RUNS}", run_index, TEST_RUNS, "Escrita PC -> pendrive (2 GB)",
+                      aviso="Não remova o pendrive durante o teste USB/DLP")
         logger.info("A copiar arquivo para o USB (Aguarde)...")
         
         mbps_escrita = 0.0
@@ -156,6 +173,7 @@ def run_test_cycle(run_index, ui, arquivo_origem, resultados_read, resultados_wr
         except Exception as e:
             # Se o DLP barrar a cópia na metade, cai aqui.
             logger.warning(f"O DLP bloqueou/interrompeu a ESCRITA: {e}")
+            emit_alert(f"Bateria {run_index}: DLP bloqueou/interrompeu a escrita no pendrive")
         
         resultados_write.append(mbps_escrita)
         check_stop()
@@ -168,10 +186,13 @@ def run_test_cycle(run_index, ui, arquivo_origem, resultados_read, resultados_wr
         if not os.path.exists(arquivo_destino_usb):
             # O DLP apagou o arquivo após a escrita!
             logger.warning("O arquivo desapareceu do pendrive! O DLP deletou ou bloqueou o acesso após a escrita.")
+            emit_alert(f"Bateria {run_index}: arquivo sumiu do pendrive após a escrita (DLP)")
             logger.info("Leitura ignorada (Bloqueio DLP) -> Registado 0.0 MB/s")
         else:
             try:
                 ui.atualizar(run_index, "A ler do USB...", "--")
+                emit_progress(f"Bateria {run_index}/{TEST_RUNS}", run_index, TEST_RUNS, "Leitura pendrive -> PC (2 GB)",
+                              aviso="Não remova o pendrive durante o teste USB/DLP")
                 logger.info("A copiar arquivo do USB para o PC (Aguarde)...")
                 
                 t0 = time.perf_counter()
@@ -246,11 +267,14 @@ def worker_thread(ui):
             run_test_cycle(run, ui, arquivo_origem, resultados_read, resultados_write)
 
             if run < TEST_RUNS:
+                emit_progress(f"Bateria {run}/{TEST_RUNS}", run, TEST_RUNS, f"Cooldown do pendrive ({COOLDOWN_SECONDS}s)",
+                              duracao_s=COOLDOWN_SECONDS, aviso="Arrefecendo pendrive — não desconecte")
                 for seg in range(COOLDOWN_SECONDS, 0, -1):
                     check_stop()
                     ui.atualizar(run, "A arrefecer pendrive (Cooldown)", seg)
                     time.sleep(1)
 
+        emit_progress("Consolidação CSV", detalhe="disco_usb.csv e resultado_validacao_usb")
         gerar_relatorios(resultados_read, resultados_write)
         
         # Limpeza Final
@@ -284,10 +308,16 @@ if __name__ == "__main__":
     kb_listener.daemon = True
     kb_listener.start()
 
-    ui_overlay = MonitorOverlay()
-    script_thread = threading.Thread(target=worker_thread, args=(ui_overlay,), daemon=True)
-    script_thread.start()
+    if is_live_monitor_active():
+        class _HeadlessUI:
+            def atualizar(self, *_a, **_k): pass
+            def fechar(self): pass
 
-    ui_overlay.root.mainloop()
+        worker_thread(_HeadlessUI())
+    else:
+        ui_overlay = MonitorOverlay()
+        script_thread = threading.Thread(target=worker_thread, args=(ui_overlay,), daemon=True)
+        script_thread.start()
+        ui_overlay.root.mainloop()
     kb_listener.stop()
     sys.exit(_exit_code)

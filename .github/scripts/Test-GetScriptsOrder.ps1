@@ -2,7 +2,7 @@
 #  Teste de regressao: Get-Scripts (hub.ps1)
 #
 #  Garante a ordenacao natural do menu ("10_" depois de "9_") e que a
-#  bibliotecas da pasta _lib (dev_cargas.py, rede_calc.py) nao viram item do menu.
+#  bibliotecas da pasta _lib (dev_cargas.py, rede_calc.py, hub_progress.py, live_monitor.py) nao viram item do menu.
 #  Executado pelo CI no Windows PowerShell 5.1 (runtime do hub).
 # =============================================================================
 Set-StrictMode -Version Latest
@@ -45,6 +45,7 @@ function New-Tree {
 
 Write-Host "`n[Testes/] ordenacao natural e exclusoes"
 $testes = New-Tree @(
+    "0_consumo_basal/0_teste_consumo_basal.py",
     "1_cpu_memo/1_automacao_performance.py",
     "1_cpu_memo/1-1_automacao_performance_dlp.py",
     "2_disco/2_teste_disco.py",
@@ -58,19 +59,23 @@ $testes = New-Tree @(
     "10_dev_containers/10_dev_containers.py",
     "11_dev_git_arquivos/11_dev_git_arquivos.py",
     "_lib/dev_cargas.py",
-    "_lib/rede_calc.py"
+    "_lib/rede_calc.py",
+    "_lib/hub_progress.py",
+    "_lib/live_monitor.py"
 )
 try {
     $nomes = @((Get-Scripts -Root $testes -Kind "test") | ForEach-Object { $_.Name })
     $esperado = @(
-        # Mesma ordem de antes para os modulos 1 a 6 (o hub usa comparacao cultural: "1_" antes de "1-1_")
-        "1_automacao_performance", "1-1_automacao_performance_dlp", "2_teste_disco", "3_teste_rede",
+        # Mesma ordem de antes para os modulos 0 a 6 (o hub usa comparacao cultural: "1_" antes de "1-1_")
+        "0_teste_consumo_basal", "1_automacao_performance", "1-1_automacao_performance_dlp", "2_teste_disco", "3_teste_rede",
         "4_boot_shutdown_auto", "6_teste_fast_transition", "7_dev_dotnet", "8_dev_go",
         "9_dev_python", "10_dev_containers", "11_dev_git_arquivos"
     )
     Assert-Condition (($nomes -join ",") -eq ($esperado -join ",")) "ordem: $($nomes -join ', ')"
     Assert-Condition (-not ($nomes -contains "dev_cargas")) "dev_cargas.py fora do menu"
     Assert-Condition (-not ($nomes -contains "rede_calc")) "rede_calc.py (biblioteca do teste 3) fora do menu"
+    Assert-Condition (-not ($nomes -contains "hub_progress")) "hub_progress.py (protocolo do monitor ao vivo) fora do menu"
+    Assert-Condition (-not ($nomes -contains "live_monitor")) "live_monitor.py (TUI do monitor ao vivo) fora do menu"
     Assert-Condition (-not ($nomes -contains "boot_shutdown_duration")) "boot_shutdown_duration.ps1 continua fora do menu"
 } finally {
     Remove-Item $testes -Recurse -Force -ErrorAction SilentlyContinue

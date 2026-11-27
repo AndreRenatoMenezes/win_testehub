@@ -44,6 +44,21 @@ try:
 except Exception:
     kb = None
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+
+def _progresso_ciclo(run_index, detalhe, duracao_s=None, aviso="NÃO USE MOUSE OU TECLADO — automação LibreOffice em andamento"):
+    """[HUB:PROGRESS] do ciclo atual para o monitor ao vivo do hub."""
+    emit_progress(f"Ciclo {run_index}/{TEST_RUNS}", run_index, TEST_RUNS, detalhe, duracao_s=duracao_s, aviso=aviso)
+
 # =============================================================================
 # CONFIGURACOES DO TESTE
 # =============================================================================
@@ -937,12 +952,19 @@ def fix_profile_extension(ui):
         logger.info(f"Profile corrigido: {os.path.basename(correct_name)}")
 
 
+_NO_WINDOW_KW = (
+    {"creationflags": subprocess.CREATE_NO_WINDOW}
+    if hasattr(subprocess, "CREATE_NO_WINDOW")
+    else {}
+)
+
+
 def cancel_wpr_if_active():
     """Cancela captura WPR pendente para evitar estado 'preso'."""
     logger.debug("Verificando/cancelando sessao WPR ativa...")
     subprocess.run(
         "wpr.exe -cancel",
-        shell=True, capture_output=True, text=True
+        shell=True, capture_output=True, text=True, **_NO_WINDOW_KW
     )
 
 
@@ -1384,6 +1406,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
     run_ts = now_dt.strftime('%Y%m%d_%H%M%S')
     timestamp_inicio = now_dt.strftime('%Y-%m-%d %H:%M:%S')
     logger.info(f"--- Iniciando Coleta {run_index} de {TEST_RUNS} ---")
+    _progresso_ciclo(run_index, "Preparando ciclo (perfis do LibreOffice)")
     check_stop()
 
     global _sheet_state
@@ -1425,6 +1448,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
         shutil.copy2(base_odt_path, odt_writer_copy)
         shutil.copy2(base_xlsx_path, xlsx_calc_copy)
 
+        _progresso_ciclo(run_index, f"Estabilização ({STABILIZE_SECONDS}s)", duracao_s=STABILIZE_SECONDS)
         for i in range(STABILIZE_SECONDS, 0, -1):
             check_stop()
             ui.atualizar(run_index, "Estabilizando ambiente antes do ciclo...", i)
@@ -1432,10 +1456,11 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
 
         trace_file = os.path.join(OUTPUT_PATH, f"Trace_{run_ts}_Run{run_index}.etl")
         ui.atualizar(run_index, "Iniciando captura WPR...")
+        _progresso_ciclo(run_index, "Iniciando captura WPR")
         cancel_wpr_if_active()
 
         wpr_start = 'wpr.exe -start Power.light -start VirtualAllocation.light -filemode -compress'
-        result = subprocess.run(wpr_start, shell=True, capture_output=True, text=True)
+        result = subprocess.run(wpr_start, shell=True, capture_output=True, text=True, **_NO_WINDOW_KW)
         if result.returncode != 0:
             logger.error(f"Falha ao iniciar WPR: {result.stderr.strip()}")
             raise RuntimeError("Falha ao iniciar captura WPR.")
@@ -1446,6 +1471,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
         cycle_start = time.time()
 
         ui.atualizar(run_index, "Etapa 1: Calculando planilha complexa...", DURATION_SECONDS)
+        _progresso_ciclo(run_index, "Calc R2 (planilha 100k fórmulas)")
         tempo_calculo_s, cpu_calculo_s = measure_formula_calculation(
             soffice_path, xlsx_batch_copy, cycle_dir, uri_batch, timeout=CALC_BATCH_TIMEOUT
         )
@@ -1453,6 +1479,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
 
         remaining = max(1, int(DURATION_SECONDS - (time.time() - cycle_start)))
         ui.atualizar(run_index, "Etapa 2: Abrindo LibreOffice Writer...", remaining)
+        _progresso_ciclo(run_index, "Abrindo LibreOffice Writer")
         tempo_writer_s, _, hwnd_writer = measure_app_launch(
             soffice_path, "--writer", odt_writer_copy, uri_writer, timeout=APP_LAUNCH_TIMEOUT
         )
@@ -1460,6 +1487,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
 
         remaining = max(1, int(DURATION_SECONDS - (time.time() - cycle_start)))
         ui.atualizar(run_index, "Etapa 3: Abrindo LibreOffice Calc...", remaining)
+        _progresso_ciclo(run_index, "Abrindo LibreOffice Calc")
         tempo_calc_s, _, hwnd_calc = measure_app_launch(
             soffice_path, "--calc", xlsx_calc_copy, uri_calc, timeout=CALC_LAUNCH_TIMEOUT
         )
@@ -1469,6 +1497,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
         if espera_s:
             logger.info(f"Calc ocioso {espera_s:.1f}s depois de abrir a janela (recalculo da R2).")
 
+        _progresso_ciclo(run_index, "Edição GUI Writer/Calc")
         turn = 0
         while True:
             check_stop()
@@ -1510,10 +1539,11 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
         sampler.stop()
         kill_test_libreoffice(ui, run_index)
 
+        _progresso_ciclo(run_index, "Salvando trace WPR (.etl)")
         ui.atualizar(run_index, "Salvando arquivo Trace (.etl)...", "--")
         stop_result = subprocess.run(
             f'wpr.exe -stop "{trace_file}" -compress',
-            shell=True, capture_output=True, text=True
+            shell=True, capture_output=True, text=True, **_NO_WINDOW_KW
         )
         if stop_result.returncode != 0:
             logger.error(f"Falha ao parar WPR: {stop_result.stderr.strip()}")
@@ -1524,6 +1554,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
         profile_path = os.path.join(BASE_DIR, PROFILE_NAME)
         if os.path.exists(profile_path):
             ui.atualizar(run_index, "Convertendo dados para CSV...", "--")
+            _progresso_ciclo(run_index, "Exportação WPA")
             csv_folder = os.path.join(OUTPUT_PATH, f"CSV_{run_ts}_Run{run_index}")
             os.makedirs(csv_folder, exist_ok=True)
             wpa_cmd = (
@@ -1531,7 +1562,7 @@ def run_test_cycle(run_index, ui, soffice_path, base_odt_path, base_xlsx_path):
                 f'-profile "{profile_path}" '
                 f'-outputfolder "{csv_folder}"'
             )
-            wpa_result = subprocess.run(wpa_cmd, shell=True, capture_output=True, text=True)
+            wpa_result = subprocess.run(wpa_cmd, shell=True, capture_output=True, text=True, **_NO_WINDOW_KW)
             if wpa_result.returncode != 0:
                 err_msg = (wpa_result.stderr or wpa_result.stdout or "").strip()
                 logger.error(f"wpaexporter retornou erro (codigo {wpa_result.returncode}): {err_msg}")
@@ -1584,6 +1615,8 @@ def smart_cooldown(run_index, ui):
         f"Iniciando cooldown (max {COOLDOWN_SECONDS}s, "
         f"alvo CPU < {COOLDOWN_CPU_THRESHOLD}%)..."
     )
+    _progresso_ciclo(run_index, f"Cooldown (até {COOLDOWN_SECONDS}s, CPU < {COOLDOWN_CPU_THRESHOLD}%)",
+                     duracao_s=COOLDOWN_SECONDS, aviso="Aguardando a máquina esfriar (não use a máquina)")
     start = time.time()
     stable_readings = 0
     required_stable = 3
@@ -1965,6 +1998,7 @@ def consolidate_results(ui=None, cycle_metrics=None, output_path=None):
     """
     if ui is not None:
         ui.atualizar(0, "Consolidando arquivos CSV...", "--")
+    emit_progress("Consolidação", detalhe="ciclos_libreoffice.csv, cpu_memoria.csv e relatório")
     logger.info("Iniciando consolidacao de resultados...")
 
     target_output = output_path or OUTPUT_PATH
@@ -2115,6 +2149,7 @@ def worker_thread(ui):
         fix_profile_extension(ui)
 
         ui.atualizar(0, "Gerando arquivos ODF de benchmark...", "--")
+        emit_progress("Preparo", detalhe="Gerando arquivos de benchmark (ODT + planilha R2)")
         fixtures_dir = tempfile.mkdtemp(prefix="wintesthub_lo_fixtures_")
         base_odt_path, base_xlsx_path = generate_odf_fixtures(fixtures_dir)
         logger.info(f"Fixtures ODF gerados em: {fixtures_dir}")

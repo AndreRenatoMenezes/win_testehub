@@ -44,6 +44,15 @@ RAIZ_HUB = os.path.abspath(os.path.join(DIRETORIO_ATUAL, "..", ".."))
 sys.path.insert(0, os.path.join(DIRETORIO_ATUAL, "..", "_lib"))
 import rede_calc as rc  # noqa: E402
 
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress  # noqa: E402
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
 # =============================================================================
 # CONFIGURACOES
 # =============================================================================
@@ -618,16 +627,20 @@ def realizar_afericoes(ui):
         for f in fontes.values():
             if f.off:
                 logger.warning(f"{f.rotulo}: off -- {f.motivo_off}")
+                emit_alert(f"{f.rotulo} indisponível: {f.motivo_off}")
                 continue
             ui.atualizar(None, f"Preparando o Edge ({f.rotulo})...")
+            emit_progress("Preparação", detalhe=f"Abrindo o Edge ({f.rotulo})")
             try:
                 f.preparar()
             except WebDriverException as e:
                 f.motivo_off = f"falha ao iniciar o Edge ({detalhe_erro(e)})"
                 logger.error(f"{f.rotulo}: {f.motivo_off}. Verifique o msedgedriver (Selenium Manager).")
+                emit_alert(f"{f.rotulo}: {f.motivo_off}", "error")
         for f in fontes.values():
             if not f.off:
                 f.ocioso()
+        emit_progress("Calmaria da rede", detalhe="Aguardando o tráfego de fundo baixar antes da 1a rodada")
         aguardar_calmaria(ui, ler_conexao(meios, host_interno)["Interface"])
 
         feitas = {n: 0 for n in fontes}
@@ -641,6 +654,14 @@ def realizar_afericoes(ui):
             rotulo_n = f"aquecimento {n + CFG['Aquecimento']}" if aquec else f"{n}/{CFG['Rodadas']}"
             progresso = texto_progresso(feitas, fontes) + (" (aquecimento)" if aquec else "")
             logger.info(f"--- {f.rotulo} {rotulo_n} ---")
+            if aquec:
+                emit_progress(f"Aquecimento — {f.rotulo}",
+                              detalhe=f"Rodada de aquecimento {n + CFG['Aquecimento']}/{CFG['Aquecimento']}",
+                              aviso="Medindo velocidade de rede — não use a máquina nem faça downloads")
+            else:
+                emit_progress(f"Rodada {n}/{CFG['Rodadas']} — {f.rotulo}", n, CFG["Rodadas"],
+                              "Speedtest interno" if nome == "interno" else "fast.com (download/upload/ping)",
+                              aviso="Medindo velocidade de rede — não use a máquina nem faça downloads")
 
             amb = ler_conexao(meios, host_interno)
             ui.atualizar(progresso, f"{f.rotulo}: medindo trafego de fundo ({CFG['JanelaFundoSeg']}s)...")
@@ -654,6 +675,7 @@ def realizar_afericoes(ui):
             if anterior and amb["Wifi_BSSID"] and amb["Wifi_BSSID"] != anterior:
                 logger.warning(f"O Wi-Fi trocou de AP antes de {rc.nome_rodada(r, CFG['Aquecimento'])} "
                                f"(BSSID {anterior} -> {amb['Wifi_BSSID']}): roaming no meio do teste.")
+                emit_alert(f"Wi-Fi trocou de AP (roaming) antes de {f.rotulo} {rotulo_n}")
             try:
                 r.update(f.medir(ui, progresso))
             except WebDriverException as e:
@@ -672,17 +694,21 @@ def realizar_afericoes(ui):
             else:
                 falhas_seguidas[nome] += 1
                 logger.warning(f"{f.rotulo} {rotulo_n}: {r['Status']} -- {r.get('Motivo')}")
+                if not f.off:
+                    emit_alert(f"{f.rotulo} {rotulo_n}: {r['Status']} ({r.get('Motivo')})")
                 if r["Status"] == "bloqueio":
                     f.motivo_off = r["Motivo"]
                 elif falhas_seguidas[nome] >= CFG["MaxFalhasSeguidas"]:
                     f.motivo_off = f"{falhas_seguidas[nome]} falhas seguidas (ultima: {r.get('Motivo')})"
                 if f.off:
                     logger.error(f"{f.rotulo}: rodadas restantes canceladas -- {f.motivo_off}")
+                    emit_alert(f"{f.rotulo} offline: rodadas restantes canceladas ({f.motivo_off})", "error")
             if not aquec:
                 feitas[nome] += 1
             if r["Contaminada"] == "sim":
                 logger.warning(f"{f.rotulo} {rotulo_n}: trafego de fundo de {fundo:.0f} kbps antes da rodada "
                                f"(limite {CFG['LimiteTrafegoFundoKbps']}): rodada fora da estatistica.")
+                emit_alert(f"{f.rotulo} {rotulo_n}: tráfego de fundo de {fundo:.0f} kbps, rodada fora da estatística")
             logger.info(
                 f"{f.rotulo} {rotulo_n}: Download={rc.fmt_br(r.get('Download'))} Mbps | "
                 f"Upload={rc.fmt_br(r.get('Upload'))} Mbps | Ping={rc.fmt_br(r.get('Ping'))} ms | "
@@ -710,6 +736,7 @@ def worker_thread(ui):
     logger.info(f"Log salvo em: {LOG_FILE}")
     try:
         rodadas, motivos = realizar_afericoes(ui)
+        emit_progress("Consolidação", detalhe="rede.csv, rodadas e estatística por fonte")
         salvar_csvs(rodadas, motivos)
         resumo = rc.resumo_fontes(rodadas, CFG, motivos)
         logger.info("=" * 60)
