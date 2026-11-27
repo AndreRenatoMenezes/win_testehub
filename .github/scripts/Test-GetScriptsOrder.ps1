@@ -45,6 +45,7 @@ function New-Tree {
 
 Write-Host "`n[Testes/] ordenacao natural e exclusoes"
 $testes = New-Tree @(
+    "0_consumo_basal/0_teste_consumo_basal.py",
     "1_cpu_memo/1_automacao_performance.py",
     "1_cpu_memo/1-1_automacao_performance_dlp.py",
     "2_disco/2_teste_disco.py",
@@ -63,8 +64,8 @@ $testes = New-Tree @(
 try {
     $nomes = @((Get-Scripts -Root $testes -Kind "test") | ForEach-Object { $_.Name })
     $esperado = @(
-        # Mesma ordem de antes para os modulos 1 a 6 (o hub usa comparacao cultural: "1_" antes de "1-1_")
-        "1_automacao_performance", "1-1_automacao_performance_dlp", "2_teste_disco", "3_teste_rede",
+        # Mesma ordem de antes para os modulos 0 a 6 (o hub usa comparacao cultural: "1_" antes de "1-1_")
+        "0_teste_consumo_basal", "1_automacao_performance", "1-1_automacao_performance_dlp", "2_teste_disco", "3_teste_rede",
         "4_boot_shutdown_auto", "6_teste_fast_transition", "7_dev_dotnet", "8_dev_go",
         "9_dev_python", "10_dev_containers", "11_dev_git_arquivos"
     )

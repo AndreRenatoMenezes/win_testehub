@@ -11,16 +11,17 @@
 1. [Introdução](#1-introdução)
 2. [Arquitetura do Framework](#2-arquitetura-do-framework)
 3. [Fase de Setup — Preparação do Ambiente](#3-fase-de-setup--preparação-do-ambiente)
-4. [Módulo 1 — CPU e Memória](#4-módulo-1--cpu-e-memória)
-5. [Módulo 2 — Disco](#5-módulo-2--disco)
-6. [Módulo 3 — Rede](#6-módulo-3--rede)
-7. [Módulo 4 — Boot e Shutdown](#7-módulo-4--boot-e-shutdown)
-8. [Módulo 5 — Bateria](#8-módulo-5--bateria)
-9. [Módulo 6 — Wi-Fi Fast Transition (802.11r)](#9-módulo-6--wi-fi-fast-transition-80211r)
-10. [Módulos 7 a 11 — Cargas de Desenvolvimento](#10-módulos-7-a-11--cargas-de-desenvolvimento)
-11. [Rastreabilidade e Evidências](#11-rastreabilidade-e-evidências)
-12. [Formatos de Relatório](#12-formatos-de-relatório)
-13. [Glossário](#13-glossário)
+4. [Módulo 0 — Consumo Basal](#4-módulo-0--consumo-basal)
+5. [Módulo 1 — CPU e Memória](#5-módulo-1--cpu-e-memória)
+6. [Módulo 2 — Disco](#6-módulo-2--disco)
+7. [Módulo 3 — Rede](#7-módulo-3--rede)
+8. [Módulo 4 — Boot e Shutdown](#8-módulo-4--boot-e-shutdown)
+9. [Módulo 5 — Bateria](#9-módulo-5--bateria)
+10. [Módulo 6 — Wi-Fi Fast Transition (802.11r)](#10-módulo-6--wi-fi-fast-transition-80211r)
+11. [Módulos 7 a 11 — Cargas de Desenvolvimento](#11-módulos-7-a-11--cargas-de-desenvolvimento)
+12. [Rastreabilidade e Evidências](#12-rastreabilidade-e-evidências)
+13. [Formatos de Relatório](#13-formatos-de-relatório)
+14. [Glossário](#14-glossário)
 
 ---
 
@@ -33,6 +34,7 @@ O **WinTestHub** (Hardware Test Hub) é um framework de validação de hardware 
 ### 1.2 Escopo
 
 **O que é testado:**
+- Consumo basal de CPU e RAM da máquina em repouso (sistema total, Top 15 processos e agentes de segurança)
 - Desempenho de CPU e memória sob estresse sustentado
 - Velocidade de leitura e escrita do disco principal
 - Velocidade de conexão de rede (download, upload, latência, jitter) no speedtest interno e na internet (fast.com)
@@ -54,7 +56,7 @@ Este documento descreve o **procedimento padronizado** de cada teste. Para audit
 1. Identifique o **cenário** em `Execucoes/` (pasta com nome, hostname e data)
 2. Abra o `Traces/_relatorio.html` do cenário para ver o resumo de resultados
 3. Compare os procedimentos descritos neste documento com as evidências coletadas
-4. Verifique a cadeia de custódia usando o `_state.json` (seção 11)
+4. Verifique a cadeia de custódia usando o `_state.json` (seção 12)
 
 ---
 
@@ -83,7 +85,7 @@ O hub opera em **duas fases sequenciais**:
 │                       │                             │
 │                       ▼                             │
 │  ┌─── Fase 2: Testes ───────────────────────────┐   │
-│  │ 11 módulos de teste + 2 variantes            │   │
+│  │ 12 módulos de teste + 2 variantes            │   │
 │  │ Seleção via menu checkbox interativo         │   │
 │  │ Checagem antes da fila (pré-requisitos e     │   │
 │  │ sobras de teste); sobras limpas entre testes │   │
@@ -103,9 +105,9 @@ O hub opera em **duas fases sequenciais**:
 
 #### Controles que protegem a medição
 
-- **Checagem antes da fila.** Antes de iniciar, o hub confere o que os testes selecionados precisam: o perfil `.wpaProfile` dos módulos 1 e 5, o Windows Performance Toolkit, o LibreOffice (`soffice.exe`) para o `1_automacao_performance.py`, a URL do speedtest, as ferramentas de dev e a `podman machine`, a tomada, a internet e o espaço em disco. O que impede um teste precisa de uma decisão explícita do operador (tirar o teste da fila ou continuar); a decisão fica registrada.
-- **Sobras de teste.** Processos que um teste abriu e não fechou (sessão do WPR, LibreOffice da automação com perfil `wintesthub_lo_profile`, Edge da automação, `diskspd`, Python de teste, build servers do .NET, stack do Podman) consomem recursos e contaminariam o teste seguinte. A checagem aponta essas sobras, e entre um teste e outro o hub encerra as do teste que acabou. Entre testes, só são encerrados os processos que o próprio teste abriu (o hub compara com os processos que já existiam antes do teste); antes da fila, os build servers do .NET aparecem só como aviso, porque podem ser do Visual Studio do usuário. A sessão do WPR, a stack do Podman e a `podman machine` seguem a pasta do teste que as usa.
-- **Frequência da CPU.** Durante cada teste (exceto setups e o teste 5, de bateria), o hub registra a cada 5 s o uso da CPU, o desempenho relativo ao clock base, o MHz efetivo e a maior temperatura das zonas térmicas ACPI, em `<módulo>/frequencia_cpu.csv`. Uma queda do clock sob carga de 20% ou mais entre o 1º e o último minuto vira aviso de **throttling**: uma máquina que esquenta mede pior, e isso não deve ser atribuído ao agente. A leitura usa CIM (não `Get-Counter`, cujos nomes mudam no Windows pt-BR); o custo é uma consulta a cada 5 s, bem abaixo de 1% de CPU, e fica ativo também durante o módulo 1. As zonas ACPI servem para comparar máquinas sob a mesma carga, não como temperatura absoluta do processador.
+- **Checagem antes da fila.** Antes de iniciar, o hub confere o que os testes selecionados precisam: o perfil `.wpaProfile` dos módulos 0, 1 e 5 (o módulo 0 reutiliza o de `1_cpu_memo` quando não há cópia própria), o Windows Performance Toolkit, o LibreOffice (`soffice.exe`) para o `1_automacao_performance.py`, a URL do speedtest, as ferramentas de dev e a `podman machine`, a tomada, a internet e o espaço em disco. O que impede um teste precisa de uma decisão explícita do operador (tirar o teste da fila ou continuar); a decisão fica registrada.
+- **Sobras de teste.** Processos que um teste abriu e não fechou (sessão do WPR, `wpaexporter`, LibreOffice da automação com perfil `wintesthub_lo_profile`, Edge da automação, `diskspd`, Python de teste, build servers do .NET, stack do Podman) consomem recursos e contaminariam o teste seguinte. A checagem aponta essas sobras, e entre um teste e outro o hub encerra as do teste que acabou. Entre testes, só são encerrados os processos que o próprio teste abriu (o hub compara com os processos que já existiam antes do teste); antes da fila, os build servers do .NET aparecem só como aviso, porque podem ser do Visual Studio do usuário. A sessão do WPR, a stack do Podman e a `podman machine` seguem a pasta do teste que as usa.
+- **Frequência da CPU.** Durante cada teste (exceto setups, o módulo 0 de consumo basal e o teste 5 de bateria), o hub registra a cada 5 s o uso da CPU, o desempenho relativo ao clock base, o MHz efetivo e a maior temperatura das zonas térmicas ACPI, em `<módulo>/frequencia_cpu.csv`. Uma queda do clock sob carga de 20% ou mais entre o 1º e o último minuto vira aviso de **throttling**: uma máquina que esquenta mede pior, e isso não deve ser atribuído ao agente. A leitura usa CIM (não `Get-Counter`, cujos nomes mudam no Windows pt-BR); o custo é uma consulta a cada 5 s, bem abaixo de 1% de CPU, e fica ativo também durante o módulo 1. As zonas ACPI servem para comparar máquinas sob a mesma carga, não como temperatura absoluta do processador. No módulo 0, o amostrador é desligado via `CpuSampler.SkipFolders` para evitar ruído de consultas WMI paralelas durante o repouso.
 - **Avisos da rodada.** Tudo o que pode qualificar um resultado (checagem, sobras, módulo sem evidência, CSV faltando, carga de dev com falha ou sensível à rede, throttling) fica no `_state.json` e aparece no `_relatorio.html`/`.json`, junto das evidências exportadas.
 
 ### 2.2 Sistema de Cenários
@@ -175,20 +177,82 @@ A Fase de Setup é essencial para a **comparabilidade dos resultados**. Sem ela,
 
 ---
 
-## 4. Módulo 1 — CPU e Memória
+## 4. Módulo 0 — Consumo Basal
 
 ### 4.1 Objetivo
 
+Medir o consumo basal de CPU e RAM da máquina 100% em repouso (sem carga de trabalho aberta), separando o consumo total do Windows, os 15 processos mais pesados e a fatia exata dos agentes de segurança (EDR, DLP, AV, Zero Trust). O módulo permite comparar a imagem limpa contra a imagem com agentes instalados com evidência rastreável.
+
+O script é `Testes/0_consumo_basal/0_teste_consumo_basal.py` e aparece no topo da Fase 2 do hub (seção **Consumo Basal**, antes do Módulo 1).
+
+### 4.2 Ferramentas Utilizadas
+
+- **`psutil`** — amostragem contínua a cada `1,0 s` de CPU total do sistema (`%`), frequência atual (`MHz`), RAM usada (`MB` e `%`), RAM disponível (`MB`) e uso de CPU/RAM RSS por processo (agrupado pelo nome do executável, excluindo `System Idle Process`/PID 0 e o próprio processo Python do Teste 0)
+- **Windows Performance Recorder (`wpr.exe`) e Windows Performance Analyzer (`wpaexporter.exe`)** — captura `Power.light` + `VirtualAllocation.light` e exportação CSV usando `Agentes_SI_Profile.wpaProfile` (procurado em `Testes/0_consumo_basal/` ou reutilizado automaticamente de `Testes/1_cpu_memo/`)
+- **`pynput`** — monitoramento passivo de teclado e mouse (marca `Interacao_Detectada = sim` no ciclo se o operador tocar na máquina, exceto `Ctrl+Q`)
+- **`tkinter`** — overlay *click-through* com o aviso `"Não utilize mouse ou teclado — medindo consumo basal"`
+
+### 4.3 Procedimento
+
+Antes de iniciar, o hub desliga o `CpuSampler` externo em PowerShell (`0_consumo_basal` está em `CpuSampler.SkipFolders` no `config.json`), evitando ruído de consultas WMI paralelas durante a coleta ociosa.
+
+| Etapa | Descrição | Duração |
+|-------|-----------|---------|
+| 1 | Verificação de pré-requisitos (`wpr.exe`, `wpaexporter.exe`, módulos Python e resolução do `.wpaProfile`) | segundos |
+| 2 | **Estabilização inicial** — aguarda a dissipação do pico de inicialização do Python/Tkinter com a máquina parada | 60 segundos |
+| 3 | **3 ciclos ociosos** — em cada ciclo: inicia captura WPR (`Power.light` + `VirtualAllocation.light`), coleta amostras `psutil` a cada `1,0 s` e monitora interações humanas | 3 × 180 segundos (3 min cada) |
+| 4 | Salva `Trace_Basal_<data>_Run<N>.etl` e exporta via `wpaexporter.exe` (quando o `.wpaProfile` está disponível) | ~15–30 s por ciclo |
+| 5 | **Cooldown** entre ciclos (após os ciclos 1 e 2) | 30 segundos |
+| 6 | Consolidação das amostras `psutil` e dos CSVs do WPA em `consumo_basal.csv`, `ciclos_basal.csv`, `top_processos_basal.csv` e `Resultados_Consolidados/` | ~5 s |
+
+**Tempo total estimado:** ~11 minutos.
+
+### 4.4 Métricas Coletadas
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| `consumo_basal.csv` | CSV temático (`Metrica,Valor,Unidade`): `Versao_Teste` (`1.0`), `Ciclos_Executados` (`3`), `Duracao_Por_Ciclo` (`180`), `Estabilizacao_Inicial` (`60`), `Amostras_Totais` (`~540`), `Interacao_Humana_Detectada` (`nao`/`sim`), `CPU_Sistema_Media`, `_Mediana`, `_P95`, `_Pico`, `_Min` (`%`), `RAM_Total_GB`, `RAM_Usada_Media_MB`, `_Mediana_MB`, `_Pico_MB`, `RAM_Usada_Media_Pct`, `RAM_Disponivel_Media_GB`, `Self_Overhead_CPU_Media`, `Self_Overhead_RAM_Media_MB`, `Top1_CPU_Processo`/`_Media`, `Top1_RAM_Processo`/`_Media_MB` e métricas WPA (`WPA_<Arquivo>_<Metrica>_Soma_Media`, `_Media`, `_Max`) |
+| `ciclos_basal.csv` | Uma linha por ciclo: `Ciclo,Timestamp_Inicio,Duracao_s,Amostras,Interacao_Detectada,CPU_Media_Pct,CPU_Mediana_Pct,CPU_P95_Pct,CPU_Pico_Pct,RAM_Usada_Media_MB,RAM_Usada_Pico_MB,RAM_Usada_Media_Pct` |
+| `top_processos_basal.csv` | Top 15 processos por CPU média (`Ranking_Por=CPU`) e Top 15 por RAM RSS média (`Ranking_Por=RAM`), somando instâncias do mesmo executável e excluindo Idle e o próprio Teste 0 |
+| `Resultados_Consolidados/` | CSVs consolidados por perfil (`Media_*.csv`), `Relatorio_Resumo.csv` e `Relatorio_Resumo.html` (incluindo `Soma_Media`, o peso agregado de todos os agentes filtrados pelo `.wpaProfile`) |
+
+> **Imagem limpa:** quando nenhum processo do filtro do `.wpaProfile` está ativo (caso esperado na imagem sem agentes de segurança), os CSVs exportados pelo WPA vêm vazios (0 linhas de dados); o teste não falha e registra `0.00` em `WPA_*_Soma_Media`, `_Media` e `_Max`.
+
+### 4.5 Critério de Aprovação
+
+| Condição | Resultado |
+|----------|-----------|
+| Os 3 ciclos completam sem erro e gravam `consumo_basal.csv`, `ciclos_basal.csv` e `top_processos_basal.csv` | **PASS** (exit code 0) |
+| Falha no WPR/`wpaexporter`, falta de pré-requisitos, ciclos incompletos ou `Ctrl+Q` | **FAIL** (exit code 1) |
+
+### 4.6 Como Interpretar `[Gestão]`
+
+- Compare `consumo_basal.csv` do cenário **ImagemLimpa** com o do cenário **ComAgentes** na mesma máquina.
+- **`CPU_Sistema_Mediana` e `CPU_Sistema_P95`** mostram o impacto basal real no sistema, sem distorção de picos pontuais.
+- **`WPA_*_Soma_Media`** mostra o peso agregado de todos os agentes de segurança monitorados pelo `.wpaProfile`.
+- **`Self_Overhead_*`** registra o custo residual do próprio script de medição (já excluído de `top_processos_basal.csv`).
+- Execuções com `Interacao_Humana_Detectada = sim` tiveram movimento de mouse ou tecla durante um ciclo; confira `ciclos_basal.csv` para saber em qual ciclo ocorreu antes de comparar cenários.
+
+### 4.7 Interrupção Segura e Detecção de Interação
+
+Movimentos de mouse ou teclas comuns durante um ciclo ativo são registrados como aviso no log e marcam `Interacao_Detectada = sim` no ciclo, sem interromper nem reprovar a execução. Pressionar **`Ctrl+Q`** cancela imediatamente a captura WPR (`wpr.exe -cancel`), fecha o overlay, sinaliza a parada da fila ao hub e encerra com exit code 1.
+
+---
+
+## 5. Módulo 1 — CPU e Memória
+
+### 5.1 Objetivo
+
 Avaliar o desempenho e a estabilidade do processador e da memória sob carga de escritório local e 100% offline no **LibreOffice** (Writer e Calc), medindo o tempo de abertura dos aplicativos, o tempo de relógio e a CPU consumida no recálculo de uma planilha pesada (a **planilha R2**: 5.000 linhas e 100.000 fórmulas, a mesma carga do teste do macOS) e o consumo contínuo de CPU e RAM do sistema e do LibreOffice sob captura WPR/WPA.
 
-### 4.2 Ferramenta Utilizada
+### 5.2 Ferramenta Utilizada
 
 - **LibreOffice Writer e Calc** (`soffice.exe` / `soffice.bin`) — executados com subperfis temporários isolados (`-env:UserInstallation=file:///.../wintesthub_lo_profile_<papel>` onde `<papel>` é `batch`, `writer` ou `calc`) e flags `--norestore --nologo --nodefault --nolockcheck`, garantindo *cold start* real, processos independentes e execução 100% offline sem necessidade de login
 - **Gerador determinístico das planilhas de carga** (`zipfile` + XML da stdlib Python) — cria localmente `workload_doc.odt` (título e 20 parágrafos iniciais) e `workload_calc_r2.xlsx`, a **planilha R2** do teste do macOS (`gen_cpu_r2_workload.py`): aba `Data` com 5.000 linhas (`seq`, `value`, `category`, `date`), aba `Calc` com 5.000 × 20 fórmulas — agregações condicionais sobre a coluna inteira (`SUMIFS`, `COUNTIFS`, `AVERAGEIFS`, `MAXIFS`), buscas (`INDEX`/`MATCH`, `VLOOKUP`, `XLOOKUP`, `INDIRECT`), estatística em janela móvel (`STDEV`, `VAR`, `PERCENTILE`, `RANK`), financeiras (`NPV`, `PMT`, `FV`, `IPMT`) e texto/lógica —, aba `Trigger` (onde a edição GUI digita) e aba `Sentinel` (soma os cantos da aba `Calc` e prova que o recálculo aconteceu). As fórmulas são gravadas sem valor em cache, então o LibreOffice calcula as 100.000; o texto é idêntico ao do macOS, só `MAXIFS` e `XLOOKUP` levam o prefixo `_xlfn.` do Excel (sem ele o LibreOffice mostra `#NOME?`)
 - **Windows Performance Recorder (`wpr.exe`) e Windows Performance Analyzer (`wpaexporter.exe`)** — captura `Power.light` + `VirtualAllocation.light` e exportação CSV com o perfil `Agentes_SI_Profile.wpaProfile`
 - **`psutil` + `pyautogui` / `pyperclip`** — thread amostradora contínua (intervalo de 1,0 s) coletando CPU (%) e RAM (MB e %) do sistema e da árvore de processos `soffice.exe`/`soffice.bin` do teste, combinada com automação GUI real no Writer e no Calc
 
-### 4.3 Procedimento
+### 5.3 Procedimento
 
 Antes do Ciclo 1, o script valida a presença do `soffice.exe` (via `HUB_LIBREOFFICE_PATH`, `PATH` ou caminhos padrão em `C:\Program Files\LibreOffice\program\soffice.exe` e `C:\Program Files (x86)\LibreOffice\program\soffice.exe`) e gera os arquivos `workload_doc.odt` e `workload_calc_r2.xlsx` em pasta temporária. Os subperfis `batch` e `calc` nascem configurados para sempre recalcular `.xlsx` ao abrir e para gravar `.xlsx` sem o diálogo de formato.
 
@@ -214,7 +278,7 @@ Ciclo 1          Ciclo 2          Ciclo 3          Ciclo 4          Ciclo 5
 └──────┴──────┘ └──────┴──────┘ └──────┴──────┘ └──────┴──────┘ └──────┴──────┘
 ```
 
-### 4.4 Métricas Coletadas
+### 5.4 Métricas Coletadas
 
 | Arquivo / Métrica | Fonte | Formato / Descrição |
 |-------------------|-------|---------------------|
@@ -224,14 +288,14 @@ Ciclo 1          Ciclo 2          Ciclo 3          Ciclo 4          Ciclo 5
 
 > **Versões do teste:** `Versao_Teste = 2.1` usa a planilha R2 (100.000 fórmulas; cerca de 18 s de CPU no cálculo numa máquina de 12 threads). A `2.0` usava uma planilha de 25.000 fórmulas simples (cerca de 2 s de CPU). Os tempos e o consumo das duas versões **não se comparam**: compare `ImagemLimpa` e `ComAgentes` sempre com a mesma versão.
 
-### 4.5 Critério de Aprovação
+### 5.5 Critério de Aprovação
 
 | Condição | Resultado |
 |----------|-----------|
 | Todos os 5 ciclos completados sem erro | **PASS** (exit code 0) |
 | Qualquer ciclo falha, crash ou timeout | **FAIL** (exit code 1) |
 
-### 4.6 O que um FAIL Significa `[Gestão]`
+### 5.6 O que um FAIL Significa `[Gestão]`
 
 Uma falha neste teste indica que o processador ou a memória da máquina não conseguiram sustentar carga contínua por 5 ciclos de estresse. Possíveis causas:
 
@@ -242,11 +306,11 @@ Uma falha neste teste indica que o processador ou a memória da máquina não co
 
 **Ação recomendada:** Investigar logs detalhados em `Execucoes/<cenário>/Logs/run_*.log` e verificar se o hardware apresenta defeitos.
 
-### 4.7 Interrupção Segura
+### 5.7 Interrupção Segura
 
 O operador pode interromper o teste a qualquer momento pressionando `Ctrl+Q`. O teste é encerrado de forma controlada: a captura WPR em andamento é cancelada, o log registra a interrupção e o resultado é **FAIL** (exit code 1).
 
-### 4.8 Variante DLP/USB `[Técnico]`
+### 5.8 Variante DLP/USB `[Técnico]`
 
 O script `1-1_automacao_performance_dlp.py` mede o custo de CPU e memória do **agente de DLP** ao inspecionar cópias para um pendrive. Ele aparece no menu na mesma seção do Módulo 1 (**Cpu Memo**) e exige um pendrive montado em `E:\` (configurável em `USB_DRIVE`, no topo do script).
 
@@ -270,18 +334,18 @@ Um bloqueio do DLP durante a cópia fica registrado como aviso no log e não int
 
 ---
 
-## 5. Módulo 2 — Disco
+## 6. Módulo 2 — Disco
 
-### 5.1 Objetivo
+### 6.1 Objetivo
 
 Medir a velocidade de leitura e escrita sustentada do disco principal, avaliando o desempenho de I/O sob operações sequenciais com blocos grandes.
 
-### 5.2 Ferramenta Utilizada
+### 6.2 Ferramenta Utilizada
 
 - **Microsoft DiskSPD** (`diskspd.exe`) — ferramenta oficial da Microsoft para benchmarking de disco
 - **psutil** — para identificação do disco principal
 
-### 5.3 Procedimento
+### 6.3 Procedimento
 
 | Etapa | Descrição | Duração |
 |-------|-----------|---------|
@@ -304,7 +368,7 @@ Medir a velocidade de leitura e escrita sustentada do disco principal, avaliando
 | Número de baterias | 10 |
 | Intervalo entre baterias | 60 segundos |
 
-### 5.4 Métricas Coletadas
+### 6.4 Métricas Coletadas
 
 | Métrica | Unidade | Descrição |
 |---------|---------|-----------|
@@ -326,14 +390,14 @@ Medir a velocidade de leitura e escrita sustentada do disco principal, avaliando
 > ![Exemplo CSV Disco](img/placeholder-csv-disco.png)  
 > *Insira aqui: screenshot de um CSV real gerado pelo teste de disco*
 
-### 5.5 Critério de Aprovação
+### 6.5 Critério de Aprovação
 
 | Condição | Resultado |
 |----------|-----------|
 | Todas as 10 baterias completadas e CSV gerado | **PASS** (exit code 0) |
 | Falha em qualquer bateria ou CSV não gerado | **FAIL** (exit code 1) |
 
-### 5.6 Como Interpretar os Valores `[Gestão]`
+### 6.6 Como Interpretar os Valores `[Gestão]`
 
 Os valores de velocidade dependem do tipo de disco:
 
@@ -345,7 +409,7 @@ Os valores de velocidade dependem do tipo de disco:
 
 Valores **significativamente abaixo** do esperado para o tipo de disco podem indicar: disco com defeito, driver desatualizado, superaquecimento, ou fragmentação excessiva (HDD).
 
-### 5.7 Variante DLP/USB `[Técnico]`
+### 6.7 Variante DLP/USB `[Técnico]`
 
 O script `2-1_teste_disco_dlp.py` mede a velocidade de escrita e leitura num pendrive com o **agente de DLP** ativo, usando cópia nativa de arquivos (sem o DiskSPD). Ele aparece no menu na seção **Disco** e exige um pendrive montado em `E:\` (configurável em `USB_DRIVE`, no topo do script).
 
@@ -368,9 +432,9 @@ Se o DLP bloquear a escrita, apagar o arquivo do pendrive ou negar a leitura, a 
 
 ---
 
-## 6. Módulo 3 — Rede
+## 7. Módulo 3 — Rede
 
-### 6.1 Objetivo
+### 7.1 Objetivo
 
 Aferir a velocidade da conexão de rede da máquina por **dois caminhos**, nas mesmas condições:
 
@@ -379,7 +443,7 @@ Aferir a velocidade da conexão de rede da máquina por **dois caminhos**, nas m
 
 As duas fontes são medidas no mesmo teste, em **rodadas intercaladas**, para que uma mudança de condição da rede ao longo da execução afete as duas por igual. O script é `Testes/3_rede/3_teste_rede.py`. Os cálculos ficam em `Testes/_lib/rede_calc.py`.
 
-### 6.2 Ferramenta Utilizada
+### 7.2 Ferramenta Utilizada
 
 - **Microsoft Edge** via Selenium WebDriver, com o driver obtido automaticamente pelo Selenium Manager. Cada fonte usa o **próprio Edge com perfil temporário** (sem cache, extensões nem sincronização), apagado no fim.
 - **Servidor de speedtest interno** (URL em `config.local.json` → `SpeedtestUrl`, ou `HUB_SPEEDTEST_URL`, não versionada). Só nesta fonte os erros de certificado são ignorados, porque o servidor é acessado por IP via HTTPS.
@@ -389,7 +453,7 @@ As duas fontes são medidas no mesmo teste, em **rodadas intercaladas**, para qu
 
 > **Nota:** o `speed.cloudflare.com` foi avaliado e descartado porque exige verificação antirrobô antes de iniciar a medição, o que impede a execução desassistida.
 
-### 6.3 Procedimento
+### 7.3 Procedimento
 
 | Etapa | Descrição | Duração |
 |-------|-----------|---------|
@@ -408,7 +472,7 @@ Cada rodada segue os passos abaixo:
 
 A 1ª rodada de cada fonte é **aquecimento**: fica registrada, mas não entra nas estatísticas. Nas execuções de 24/11/2026, a 1ª rodada do fast.com tinha upload 1,7 vez maior que as demais.
 
-### 6.4 Métricas Coletadas
+### 7.4 Métricas Coletadas
 
 | Métrica | Fonte | Unidade | Descrição |
 |---------|-------|---------|-----------|
@@ -430,7 +494,7 @@ A 1ª rodada de cada fonte é **aquecimento**: fica registrada, mas não entra n
 
 > **Nota:** no Windows 11, o `netsh wlan` exige a permissão de **Localização** (e às vezes elevação) para informar banda, canal, sinal e BSSID. Sem ela, esses campos ficam N/A, e o tipo (Wi-Fi ou cabo) continua vindo do `Get-NetAdapter`.
 
-### 6.5 Evidências Geradas
+### 7.5 Evidências Geradas
 
 Na pasta `3_rede/` do cenário:
 
@@ -443,7 +507,7 @@ Na pasta `3_rede/` do cenário:
 - `Evidencia_Rede_Interno_<A1|01..10>_<data_hora>.png` e `Evidencia_Rede_Internet_<A1|01..10>_<data_hora>.png`: screenshot de cada rodada.
 - `Evidencia_Rede_Internet_Bloqueio_<data_hora>.png` e `Evidencia_Rede_Interno_Falha_<data_hora>.png`: só quando a página não carregou.
 
-### 6.6 Critério de Aprovação
+### 7.6 Critério de Aprovação
 
 Cada fonte termina com um status:
 
@@ -467,7 +531,7 @@ A checagem antes da fila acusa:
 - **Atenção** quando falta a URL interna (só a internet será medida) ou não há internet (só o interno será medido);
 - **Impede** quando faltam as duas.
 
-### 6.7 Referência de Valores Aceitáveis `[Gestão]`
+### 7.7 Referência de Valores Aceitáveis `[Gestão]`
 
 > **Nota:** a tabela abaixo deve ser preenchida pela equipe conforme os padrões da organização. Use as **medianas** do speedtest interno.
 
@@ -478,7 +542,7 @@ A checagem antes da fila acusa:
 | Ping | ___ ms (máximo) | ___ ms |
 | Jitter | ___ ms (máximo) | ___ ms |
 
-### 6.8 Como Analisar `[Gestão]`
+### 7.8 Como Analisar `[Gestão]`
 
 A rede é a métrica que mais varia entre execuções. Em 24/11/2026, o fast.com mediu 532 Mbps às 19:31 e 80 Mbps às 23:17 na mesma máquina: o horário e os servidores escolhidos pelo site mudaram. Para que a diferença medida seja da máquina ou do agente, e não da internet:
 
@@ -491,7 +555,7 @@ A rede é a métrica que mais varia entre execuções. Em 24/11/2026, o fast.com
 - **Agente zero trust:** compare o `Internet_*` do cenário baseline com o do cenário com agente. O **local do cliente** e o **IP de saída** mostram por onde o tráfego saiu: com o agente ativo, espera-se o nó de saída do provedor do agente. Se continuarem iguais aos do baseline, o tráfego provavelmente não passou pelo agente.
 - O fast.com mede até a borda de conteúdo da Netflix mais próxima, muitas vezes dentro do próprio provedor de internet. O resultado representa a navegação cotidiana, não o trânsito internacional.
 
-### 6.9 Configuração `[Técnico]`
+### 7.9 Configuração `[Técnico]`
 
 Bloco `Rede` do `config.json`. `HUB_REDE_RODADAS` sobrescreve `Rodadas`, para testes rápidos.
 
@@ -509,19 +573,19 @@ Bloco `Rede` do `config.json`. `HUB_REDE_RODADAS` sobrescreve `Rodadas`, para te
 
 ---
 
-## 7. Módulo 4 — Boot e Shutdown
+## 8. Módulo 4 — Boot e Shutdown
 
-### 7.1 Objetivo
+### 8.1 Objetivo
 
 Avaliar o tempo de inicialização e desligamento do Windows através de múltiplos ciclos de reinicialização, identificando degradações e gargalos no processo de boot.
 
-### 7.2 Ferramenta Utilizada
+### 8.2 Ferramenta Utilizada
 
 - **Agendador de Tarefas do Windows** (Task Scheduler) — para automatizar reinicializações
 - **Event Log de Diagnósticos do Windows** (`Microsoft-Windows-Diagnostics-Performance/Operational`) — fonte de métricas de boot/shutdown
 - **PowerShell** (`boot_shutdown_duration.ps1`) — para análise dos eventos
 
-### 7.3 Procedimento
+### 8.3 Procedimento
 
 Este teste opera em **duas etapas** com reinicializações automáticas:
 
@@ -551,7 +615,7 @@ Após os 5 ciclos, o script `boot_shutdown_duration.ps1` consulta o Event Log do
 | Degradação de boot | 101-110 | Drivers, serviços e apps que atrasaram o boot |
 | Atraso no shutdown | 201-203 | Processos que atrasaram o desligamento |
 
-### 7.4 Métricas Coletadas
+### 8.4 Métricas Coletadas
 
 | Métrica | Unidade | Descrição |
 |---------|---------|-----------|
@@ -560,7 +624,7 @@ Após os 5 ciclos, o script `boot_shutdown_duration.ps1` consulta o Event Log do
 | ShutdownDuration | milissegundos | Tempo total de desligamento |
 | Eventos de degradação | texto | Detalhamento de causas de lentidão |
 
-### 7.5 Critérios de Avaliação
+### 8.5 Critérios de Avaliação
 
 O teste utiliza **limiares progressivos**:
 
@@ -569,7 +633,7 @@ O teste utiliza **limiares progressivos**:
 | Tempo de boot | < 30s | 30s – 60s | > 60s |
 | Tempo de shutdown | < 20s | 20s – 60s | > 60s |
 
-### 7.6 Critério de Aprovação
+### 8.6 Critério de Aprovação
 
 | Condição | Resultado |
 |----------|-----------|
@@ -578,7 +642,7 @@ O teste utiliza **limiares progressivos**:
 
 > **Nota:** Eventos de "aviso" (warning) são registrados no relatório mas **não causam FAIL**. Apenas eventos críticos reprovam o teste.
 
-### 7.7 Impacto de Degradação de Boot `[Gestão]`
+### 8.7 Impacto de Degradação de Boot `[Gestão]`
 
 Tempos de boot elevados afetam diretamente a produtividade:
 
@@ -595,15 +659,15 @@ Causas comuns de degradação:
 
 ---
 
-## 8. Módulo 5 — Bateria
+## 9. Módulo 5 — Bateria
 
-### 8.1 Objetivo
+### 9.1 Objetivo
 
 Medir o consumo de energia do notebook na bateria em duas fases padronizadas — **60 minutos ociosa**, com a tela ligada, e **60 minutos sob carga de escritório** — para comparar o cenário **baseline** (sem agente) com o cenário **com agente de segurança** na mesma máquina. Antes de medir, o teste padroniza a máquina sozinho (**pré-voo**), relê cada ajuste e registra o valor antes e depois como evidência.
 
 O script é `Testes/5_bateria/5_teste_bateria.py`. Ele aparece no menu do hub na seção **Bateria**, logo após **Boot Shutdown**, e precisa de um operador para desconectar o carregador. O teste substitui o procedimento manual anterior (`cpu_stress_controller_pro.exe` com 60% de CPU por 120 minutos e a linha de comando do `Comando_Bateria.txt`); os resultados novos **não são comparáveis** com as medições antigas.
 
-### 8.2 Ferramentas Utilizadas
+### 9.2 Ferramentas Utilizadas
 
 - **WMI de bateria** (`root\wmi`): `BatteryStatus` (energia restante em mWh, taxa de descarga, tensão), `BatteryFullChargedCapacity` e `BatteryCycleCount`, lidos por um único processo PowerShell que fica aberto durante o teste — a leitura custa poucos milissegundos por amostra e não pesa na fase ociosa
 - **API do Windows**: `GetSystemPowerStatus` (fonte de alimentação, % de carga e estado da Economia de energia) e `powrprof` (modo de energia)
@@ -612,7 +676,7 @@ O script é `Testes/5_bateria/5_teste_bateria.py`. Ele aparece no menu do hub na
 - **Microsoft Edge** com Google Docs, Google Sheets e um PDF — simulação contínua de carga de escritório no navegador durante a fase de escritório da bateria
 - **psutil** — top 10 processos por CPU
 
-### 8.3 Pré-voo de Padronização
+### 9.3 Pré-voo de Padronização
 
 O pré-voo roda **na tomada**, antes de pedir a desconexão do carregador. Cada item vira uma linha do `bateria_preflight.csv` com `Esperado`, `Antes`, `Acao`, `Depois`, `Situacao` (`ok`, `ajustado`, `não aplicável` ou `falhou`) e `Observacao`.
 
@@ -648,7 +712,7 @@ Regras:
 - Algum item `falhou`: o teste **não mede**, restaura o que já tinha alterado, lista os pendentes numa janela e sai com exit 1.
 - Recurso inexistente na máquina (sem Bluetooth, sem sensor de luz, configuração ausente no plano) é `não aplicável` e não reprova.
 
-### 8.4 Procedimento
+### 9.4 Procedimento
 
 | Etapa | Descrição | Duração |
 |-------|-----------|---------|
@@ -674,7 +738,7 @@ Durante toda a medição:
 - Uma **vigia** a cada 5 s encerra a medição de forma controlada se o carregador for reconectado, se a carga chegar a **7%** (proteção de bateria) ou se o operador pressionar Ctrl+Q.
 - O overlay mostra fase, carga e minutos restantes, atualizado só a cada amostra para não gerar atividade de tela na fase ociosa.
 
-### 8.5 Métricas Coletadas
+### 9.5 Métricas Coletadas
 
 As métricas de cada fase saem de duas amostras-marco tiradas nos limites exatos da fase (`inicio_fase` e `fim_fase`). A **energia em mWh é a medida principal**; o percentual de carga é complementar.
 
@@ -698,7 +762,7 @@ As métricas de cada fase saem de duas amostras-marco tiradas nos limites exatos
 
 `Motivo_Encerramento`: `concluido`, `protecao_bateria`, `carregador_reconectado`, `parada_segura`, `sessao_bloqueada`, `login_exigido`, `padronizacao_na_bateria` ou `erro`. Fase sem dados = `N/A`. Formato: separador `,`, decimal com ponto e 2 casas.
 
-### 8.6 Evidências Geradas
+### 9.6 Evidências Geradas
 
 Na pasta `5_bateria/` do cenário:
 
@@ -715,7 +779,7 @@ Na pasta `5_bateria/` do cenário:
 
 Nada é gravado em `C:\BATERIA`, em `C:\Traces` nem na raiz do projeto.
 
-### 8.7 Critério de Aprovação
+### 9.7 Critério de Aprovação
 
 O PASS/FAIL decide se a **coleta é válida**; não há limiar de autonomia ou consumo.
 
@@ -734,7 +798,7 @@ O PASS/FAIL decide se a **coleta é válida**; não há limiar de autonomia ou c
 
 > **Nota:** desvios de padronização durante a medição e falhas nas evidências complementares (exportação CSV, SRUM, relatório de energia) **não reprovam**: ficam como aviso no log e, no caso dos desvios, em `Desvios_Padronizacao`.
 
-### 8.8 Como Interpretar `[Gestão]`
+### 9.8 Como Interpretar `[Gestão]`
 
 - Compare o `bateria.csv` do cenário **baseline** com o do cenário **com agente**, executados na **mesma máquina**, na **mesma rede** e com a **mesma versão do teste** (`Versao_Teste`).
 - A **fase ociosa** mostra o custo de fundo do agente — é onde 1–2 W de diferença aparecem com mais clareza. A **fase de escritório** representa o uso real.
@@ -744,7 +808,7 @@ O PASS/FAIL decide se a **coleta é válida**; não há limiar de autonomia ou c
 - O `bateria_top_processos.csv` e os traces `.etl` (no WPA) ajudam a atribuir a diferença de consumo a processos específicos.
 - Os resultados **não são comparáveis** com as medições antigas de 60% de CPU por 120 minutos.
 
-### 8.9 Interrupção Segura
+### 9.9 Interrupção Segura
 
 Assim como no Módulo 1, o teste pode ser interrompido com **Ctrl+Q**. Fechar a janela do monitor do teste (pela barra de tarefas ou Alt+F4) e um Ctrl+C recebido pelo teste têm o mesmo efeito. A parada segura salva o trace parcial, grava o que já foi medido (`bateria.csv` com `Coleta_Valida = nao`), restaura as configurações alteradas, fecha o Edge e sai com exit code 1.
 
@@ -752,13 +816,13 @@ Se o processo for encerrado à força (por exemplo, fechando a janela do hub), a
 
 ---
 
-## 9. Módulo 6 — Wi-Fi Fast Transition (802.11r)
+## 10. Módulo 6 — Wi-Fi Fast Transition (802.11r)
 
-### 9.1 Objetivo
+### 10.1 Objetivo
 
 Verificar se a máquina (adaptador Wi-Fi + driver + firmware/BIOS + Windows) faz **roaming com Fast BSS Transition (802.11r)** ao trocar de AP dentro da mesma rede. Sem FT, cada troca de AP passa por uma reautenticação completa (4-way handshake e, em redes 802.1X, o RADIUS), o que gera interrupções perceptíveis em chamadas de voz/vídeo e VPN. O teste também coleta tudo o que interfere nessa compatibilidade, para explicar um FAIL.
 
-### 9.2 Ferramentas Utilizadas
+### 10.2 Ferramentas Utilizadas
 
 - **API nativa de WLAN do Windows (`wlanapi.dll`)**, lida pelo script: BSSID, RSSI e qualidade a cada 250 ms; notificações de associação/roaming; cache de varredura com os *Information Elements* de cada AP.
 - **`netsh wlan show interfaces`**: AKM da associação atual (`akm = 00-0f-ac:NN`), relida a cada 2 s e logo após cada troca de AP.
@@ -768,7 +832,7 @@ Verificar se a máquina (adaptador Wi-Fi + driver + firmware/BIOS + Windows) faz
 
 O teste **não altera nenhuma configuração** do sistema, do adaptador ou da rede, e não força varreduras Wi-Fi.
 
-### 9.3 Procedimento
+### 10.3 Procedimento
 
 1. **Pré-voo:** exige o Wi-Fi conectado — a rede conectada é a rede testada. Registra SSID, BSSID inicial, autenticação, cifra, AKM, banda, canal, RSSI e gateway.
 2. **Coleta de compatibilidade:** adaptador e propriedades avançadas (Roaming Aggressiveness, banda preferida, MIMO Power Save...), driver (versão, data, fornecedor, INF), capacidades sem fio, BIOS, modelo, SO/build, plano e economia de energia do adaptador sem fio, adaptadores virtuais/VPN ativos e perfil WLAN (**sem a senha**).
@@ -776,7 +840,7 @@ O teste **não altera nenhuma configuração** do sistema, do adaptador ou da re
 4. **Caminhada (5 min):** o painel abre no navegador; o operador clica em **Iniciar caminhada** (ou o início é automático após 60 s) e anda pelo escritório passando por áreas de APs diferentes. O painel mostra AP atual, RSSI, gráficos de RSSI e latência, e destaca cada troca com a classificação.
 5. **Pós-processamento:** exportação do log `WLAN-AutoConfig/Operational` do período, relatório WLAN do Windows (`wlanreport`), classificação de cada troca, CSVs e relatório HTML.
 
-### 9.4 Classificação de Cada Troca de AP
+### 10.4 Classificação de Cada Troca de AP
 
 | Classificação | Regra |
 |---------------|-------|
@@ -791,11 +855,11 @@ O tempo de troca vem das notificações WLAN do Windows, quando disponíveis, e 
 
 Sem notificações, só o total pela amostragem (resolução de 250 ms). O início é procurado desde o fim do roaming anterior, porque tentativas demoradas começam segundos antes de o BSSID mudar; trocas acima de 1 s são sinalizadas como **demoradas**. Os carimbos usam relógio de alta resolução (< 1 ms). A interrupção é o maior intervalo sem resposta do gateway em torno da troca.
 
-### 9.5 Métricas Coletadas
+### 10.5 Métricas Coletadas
 
 O `wifi_ft.csv` (formato `Metrica,Valor,Unidade`) traz: SSID, autenticação, cifra, AKM conectada, adaptador, versão/data/fornecedor do driver, firmware, BIOS, build do SO, suporte declarado a FT/802.11k/802.11v, APs vistos/com FT anunciado/utilizados, duração da caminhada, roamings (total, FT, não FT, indeterminados, com desconexão, demorados), tempo de troca total, de reassociação e de conclusão no Windows (média, mediana e máximo), interrupção média/máxima (gateway e internet), perda e latência média/p95 (gateway e internet), RSSI mínimo/médio/máximo e resultado.
 
-### 9.6 Evidências Geradas
+### 10.6 Evidências Geradas
 
 | Arquivo | Conteúdo |
 |---------|----------|
@@ -808,7 +872,7 @@ O `wifi_ft.csv` (formato `Metrica,Valor,Unidade`) traz: SSID, autenticação, ci
 | `wifi_ft_compatibilidade.json` | Toda a coleta de compatibilidade e os achados |
 | `brutos/` | Saídas de `netsh`/PowerShell/`powercfg`, log `WLAN-AutoConfig` (`.evtx` e `.txt`) e `wlan-report.html` |
 
-### 9.7 Critério de Aprovação
+### 10.7 Critério de Aprovação
 
 | Resultado | Condição |
 |-----------|----------|
@@ -817,7 +881,7 @@ O `wifi_ft.csv` (formato `Metrica,Valor,Unidade`) traz: SSID, autenticação, ci
 
 Tempo de troca e perda de pacotes são registrados, mas não reprovam. Ping para a internet bloqueado vira `N/A` e não reprova.
 
-### 9.8 Como Interpretar `[Gestão]`
+### 10.8 Como Interpretar `[Gestão]`
 
 - **FAIL "nenhuma troca de AP":** o operador não se afastou o suficiente do AP inicial, ou só há 1 AP do SSID no percurso. Não indica problema da máquina.
 - **FAIL "nenhum com Fast Transition" com o achado "a rede usa PSK/802.1X/SAE":** o 802.11r não está habilitado no SSID (configuração da controladora/AP), não é problema da máquina.
@@ -826,9 +890,9 @@ Tempo de troca e perda de pacotes são registrados, mas não reprovam. Ping para
 
 ---
 
-## 10. Módulos 7 a 11 — Cargas de Desenvolvimento
+## 11. Módulos 7 a 11 — Cargas de Desenvolvimento
 
-### 10.1 Objetivo
+### 11.1 Objetivo
 
 Medir quanto tempo um desenvolvedor espera nas tarefas reais do dia a dia (compilar, rodar testes, instalar dependências, subir containers, operar o git) e, com isso, o impacto combinado do hardware e da imagem corporativa (EDR, DLP, antivírus) sobre o trabalho de desenvolvimento. As cargas vêm do processo de homologação de notebooks para desenvolvimento e usam **repositórios open source fixados por tag**, para que qualquer máquina meça exatamente o mesmo código.
 
@@ -842,13 +906,13 @@ Os cinco módulos são independentes (um por linguagem ou ferramenta) e podem se
 | 10 — Containers | `10_dev_containers` | A7a `podman build --no-cache` multi-stage, A7b `podman compose up` até `healthy` | Dockerfile do Hugo `v0.169.0`; stack pública SQL Server + RabbitMQ + Redis |
 | 11 — Git e arquivos | `11_dev_git_arquivos` | B1 criar/ler/apagar 20 mil arquivos de 4 KB, B3 `git clone --local` + `git status` | `home-assistant/core` `2026.11.2` (~31 mil arquivos) |
 
-### 10.2 Ferramentas Utilizadas
+### 11.2 Ferramentas Utilizadas
 
 - **Biblioteca comum `Testes/_lib/dev_cargas.py`**: executa as cargas descritas no `cargas.json` de cada módulo, cronometra só o comando medido (`time.perf_counter`), aplica o limite de tempo, monitora tomada e Ctrl+Q e grava as evidências. Não aparece no menu.
 - **Ferramentas de desenvolvimento** instaladas pelos setups `7_install_devtools_dev` (Git, .NET SDK 10, Go, uv, docker-compose) e `10_preparar_podman` (WSL2, Podman CLI e `podman machine` rootful).
 - **`psutil`** para ler a tomada e encerrar a árvore de processos de uma carga (msbuild, go, podman).
 
-### 10.3 Procedimento
+### 11.3 Procedimento
 
 1. **Pré-checagem:** o módulo exige a máquina **na tomada** (na bateria, não mede nada e reprova) e confere cada ferramenta do módulo e a versão mínima. Ferramenta ausente reprova o módulo antes de qualquer medição.
 2. **Repositórios:** clona (ou reaproveita) cada repositório na pasta de trabalho (`%USERPROFILE%\wintestehub-dev-work`, configurável por `DevWorkDir` no `config.local.json`), faz checkout da tag fixa e limpa a árvore (`git reset --hard` + `git clean -fdx`). Fora da medição.
@@ -857,14 +921,14 @@ Os cinco módulos são independentes (um por linguagem ou ferramenta) e podem se
 5. **Monitoramento contínuo:** a cada 0,5 s o módulo confere o limite de tempo e o Ctrl+Q; a cada 2 s, a tomada. Desconectar a tomada ou apertar Ctrl+Q interrompe a carga em curso, roda o `cleanup` e encerra o módulo com FAIL. O Ctrl+Q também para a fila do hub: os módulos seguintes não rodam. Já a tomada desconectada só encerra o módulo atual.
 6. **Registro:** versões das ferramentas, plano de energia, tomada, commit dos repositórios e digests das imagens de container entram no JSON do módulo.
 
-### 10.4 Referência e Limite de Tempo
+### 11.4 Referência e Limite de Tempo
 
 O limite de cada carga é **10 vezes o tempo medido no notebook de referência** (o notebook atual da frota), comparando frio com frio: a 1ª execução (caches do sistema vazios) é limitada a 10x a execução fria da referência, e as seguintes a 10x a mediana. Sem essa separação, cargas com aquecimento grande (ex.: A4c, cuja execução fria é 7x a mediana) reprovariam indevidamente em máquinas só um pouco mais lentas. A referência é gerada uma vez, rodando cada módulo avulso com `--calibrar` no notebook de referência, e fica versionada no `referencia.json` do módulo (mediana, fria e os dois limites por carga, modelo de CPU, RAM, data e versões das ferramentas; sem hostname).
 
 - A carga que passa do limite é **encerrada** (processo e todos os filhos) e fica como `TEMPO_EXCEDIDO`.
 - Módulo sem `referencia.json`, ou carga sem entrada nele (ex.: cargas internas do `workloads.local.json`): roda sem limite, com aviso no log e no JSON.
 
-### 10.5 Métricas Coletadas
+### 11.5 Métricas Coletadas
 
 | Métrica | Descrição |
 |---------|-----------|
@@ -875,7 +939,7 @@ O limite de cada carga é **10 vezes o tempo medido no notebook de referência**
 | Parciais do B1 | Tempos de criar, ler e apagar (linhas `B1-arquivos-pequenos:criar` etc.) |
 | `sensivel_rede` | `sim` nas cargas que dependem de rede durante a medição (A6a, A7a) |
 
-### 10.6 Evidências Geradas
+### 11.6 Evidências Geradas
 
 | Arquivo | Conteúdo |
 |---------|----------|
@@ -884,7 +948,7 @@ O limite de cada carga é **10 vezes o tempo medido no notebook de referência**
 | `logs/<carga>.log` | Saída de cada fase (`preparo`, `setup run N`, `command run N`, `cleanup run N`) e o tempo de cada execução |
 | `logs/_repos.log` | Clone e checkout dos repositórios |
 
-### 10.7 Critério de Aprovação
+### 11.7 Critério de Aprovação
 
 | Resultado | Condição |
 |-----------|----------|
@@ -893,7 +957,7 @@ O limite de cada carga é **10 vezes o tempo medido no notebook de referência**
 
 Uma carga que falha não impede as próximas do mesmo módulo (o resultado parcial fica registrado); interrupções param o módulo.
 
-### 10.8 Ressalvas `[Técnico]`
+### 11.8 Ressalvas `[Técnico]`
 
 - **Rede:** A6a (`pip install` do PyPI) e A7a (`go mod download` dentro do build do container) dependem de rede durante a medição. Compare máquinas na mesma rede.
 - **Tags móveis de imagens** (`mssql/server:2022-latest`, `golang:1.27-alpine3.24`): puxe no mesmo dia nas máquinas comparadas; os digests ficam no JSON.
@@ -902,7 +966,7 @@ Uma carga que falha não impede as próximas do mesmo módulo (o resultado parci
 - **Recursos da VM do Podman:** a VM WSL2 usa o padrão do WSL (50% da RAM, todas as threads). Não use `.wslconfig` diferente entre as máquinas comparadas.
 - **Cargas internas:** podem ser acrescentadas no `workloads.local.json` (fora do git, exemplo em `workloads.local.example.json`); não entram no `referencia.json`.
 
-### 10.9 Como Interpretar `[Gestão]`
+### 11.9 Como Interpretar `[Gestão]`
 
 - O número que importa é a **mediana** de cada carga comparada com a do notebook de referência: uma razão de 1,3 significa que o desenvolvedor espera 30% mais naquela tarefa.
 - **B1 alto com o restante normal** aponta para overhead de EDR/antivírus em arquivos pequenos (padrão de `node_modules`, `obj/`, `.git`), não para o disco.
@@ -911,9 +975,9 @@ Uma carga que falha não impede as próximas do mesmo módulo (o resultado parci
 
 ---
 
-## 11. Rastreabilidade e Evidências
+## 12. Rastreabilidade e Evidências
 
-### 11.1 Estrutura de Armazenamento
+### 12.1 Estrutura de Armazenamento
 
 Toda execução gera evidências organizadas por cenário, em duas pastas: `Execucoes/` (logs, evidências completas e estado) e `Exportar/` (cópia de `Traces/` sem `.etl`, logs e pastas vazias, pronta para o Drive).
 
@@ -930,7 +994,15 @@ Execucoes/
         ├── _relatorio.json
         ├── informacoes_maquina.csv              ← inventário do setup 1
         ├── maquina.csv                          ← inventário do hub + modelo/patrimônio informados
-        ├── <módulo>/frequencia_cpu.csv          ← frequência da CPU durante o teste (gerado pelo hub)
+        ├── <módulo>/frequencia_cpu.csv          ← frequência da CPU durante o teste (gerado pelo hub; exceto 0 e 5)
+        ├── 0_consumo_basal/                     ← evidências do teste de consumo basal
+        │   ├── consumo_basal_*.log
+        │   ├── Trace_Basal_*_Run1.etl … Trace_Basal_*_Run3.etl
+        │   ├── CSV_*_Run1/ … CSV_*_Run3/        ← exportação WPA de cada ciclo
+        │   ├── Resultados_Consolidados/         ← Relatorio_Resumo.csv e .html
+        │   ├── consumo_basal.csv
+        │   ├── ciclos_basal.csv
+        │   └── top_processos_basal.csv
         ├── 1_cpu_memo/                          ← evidências do teste de CPU
         │   ├── automacao_*.log
         │   ├── Trace_*_Run1.etl … Trace_*_Run5.etl
@@ -999,7 +1071,7 @@ A pasta de exportação é regerada ao fim de cada execução (e pela opção `[
 > ![Estrutura de Pastas](img/placeholder-estrutura-traces.png)  
 > *Insira aqui: screenshot do Windows Explorer mostrando a estrutura de pastas de um cenário real*
 
-### 11.2 Ciclo de Vida das Evidências
+### 12.2 Ciclo de Vida das Evidências
 
 1. **Primeira execução:** Evidências são salvas diretamente nas subpastas do cenário
 2. **Re-execução:** Evidências anteriores são movidas para `<pasta do teste>/_anterior/run{N}_{data-hora}/` e novas evidências são geradas
@@ -1009,7 +1081,7 @@ A pasta de exportação é regerada ao fim de cada execução (e pela opção `[
 
 > **Nota:** a pasta de evidências é a da categoria, compartilhada pelos scripts da mesma pasta. Reexecutar um teste também move para `_anterior/` as evidências atuais dos outros testes da mesma pasta (por exemplo, o Módulo 1 e a variante 1-1).
 
-### 11.3 O Arquivo _state.json `[Técnico]`
+### 12.3 O Arquivo _state.json `[Técnico]`
 
 O `_state.json` é a fonte de verdade para o estado do cenário. Exemplo de estrutura:
 
@@ -1037,7 +1109,7 @@ O `_state.json` é a fonte de verdade para o estado do cenário. Exemplo de estr
 }
 ```
 
-### 11.4 Cadeia de Custódia `[Gestão]`
+### 12.4 Cadeia de Custódia `[Gestão]`
 
 Para auditar uma execução e validar a integridade dos resultados:
 
@@ -1052,9 +1124,9 @@ Para auditar uma execução e validar a integridade dos resultados:
 
 ---
 
-## 12. Formatos de Relatório
+## 13. Formatos de Relatório
 
-### 12.1 Relatório HTML
+### 13.1 Relatório HTML
 
 Relatório visual com tabela formatada, badges de status coloridos e resumo estatístico. Ideal para apresentação e compartilhamento. Há dois:
 
@@ -1064,7 +1136,7 @@ Relatório visual com tabela formatada, badges de status coloridos e resumo esta
 > ![Exemplo Relatório HTML](img/placeholder-relatorio-html-exemplo.png)  
 > *Insira aqui: screenshot de um relatório HTML real*
 
-### 12.2 Relatório CSV
+### 13.2 Relatório CSV
 
 Dados tabulares com uma linha por teste. Ideal para importação em Excel ou ferramentas de BI.
 
@@ -1084,7 +1156,7 @@ Dados tabulares com uma linha por teste. Ideal para importação em Excel ou fer
 
 O consolidado `Traces/_relatorio.csv` tem as colunas `Nome`, `Status`, `Duracao_s`, `Run`, `Reexecucao` e `Pasta`, com o último resultado de cada teste. O `_relatorio.json` traz o mesmo status com o nome do cenário, o hostname, o modelo e o patrimônio; a data de cada run está no `_state.json`. O `Traces/maquina.csv` traz o inventário da máquina.
 
-### 12.3 Relatório JSON
+### 13.3 Relatório JSON
 
 Dados estruturados com metadados completos. Ideal para integração com APIs e sistemas de monitoramento.
 
@@ -1103,7 +1175,7 @@ Dados estruturados com metadados completos. Ideal para integração com APIs e s
 }
 ```
 
-### 12.4 Qual Relatório Usar `[Gestão]`
+### 13.4 Qual Relatório Usar `[Gestão]`
 
 | Necessidade | Formato recomendado |
 |-------------|---------------------|
@@ -1116,14 +1188,14 @@ Dados estruturados com metadados completos. Ideal para integração com APIs e s
 
 ---
 
-## 13. Glossário
+## 14. Glossário
 
 | Termo | Definição |
 |-------|-----------|
 | **Aferição** | Uma medição individual dentro de um teste. Ex: cada uma das rodadas de velocidade de rede |
 | **Autonomia projetada** | Tempo que a bateria cheia duraria no ritmo de consumo medido numa fase: capacidade de carga cheia ÷ taxa média de descarga. É uma extrapolação linear, não uma descarga completa |
 | **Bateria (teste de disco)** | Um ciclo completo de operações dentro de um teste. Ex: cada uma das 10 baterias de leitura/escrita do teste de disco |
-| **Bateria (Módulo 5)** | O teste de consumo de energia na bateria do notebook (seção 8) |
+| **Bateria (Módulo 5)** | O teste de consumo de energia na bateria do notebook (seção 9) |
 | **Cenário** | Sessão de testes associada a uma máquina e data, agrupando runs e evidências |
 | **Cooldown** | Período de espera entre ciclos de estresse para a CPU retornar ao estado ocioso |
 | **DiskSPD** | Ferramenta de benchmarking de disco da Microsoft |

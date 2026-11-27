@@ -6,6 +6,8 @@ Mantido pelo Arquiteto. Cada spec aparece em exatamente uma seção; ideias de o
 
 | Spec | Ideias | Onde roda | Desde |
 |---|---|---|---|
+| [003 — Seções de testes no menu da Fase 2](current/003-secoes-de-testes-no-menu/spec.md) | #3 | `current/003-secoes-de-testes-no-menu/` | 2026-11-27 |
+| [004 — Monitoramento ao vivo no terminal (TUI)](current/004-monitoramento-ao-vivo/spec.md) | #4 | `current/004-monitoramento-ao-vivo/` | 2026-11-27 |
 
 ## 🛣️ Próximas, em ordem
 

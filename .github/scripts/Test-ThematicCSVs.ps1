@@ -64,13 +64,14 @@ function Invoke-Scenario {
     return $out
 }
 
-Write-Host "`nCenario 1: Modulo 1, variante 1-1 e variante 2-1 na mesma execucao"
+Write-Host "`nCenario 1: Modulo 0, Modulo 1, variante 1-1 e variante 2-1 na mesma execucao"
 $r = Invoke-Scenario -Name "todos" -TraceFiles @{
+    "0_consumo_basal\consumo_basal.csv"      = "modulo0"
     "1_cpu_memo\cpu_memoria.csv"             = "modulo1"
     "1_cpu_memo\dlp_usb\cpu_memoria_dlp.csv" = "dlp"
     "2_disco\disco_usb.csv"                  = "usb"
 }
-Assert-Condition ($r.Result.Found -eq 3) "3 CSVs encontrados (modulo 1 + as duas variantes)"
+Assert-Condition ($r.Result.Found -eq 4) "4 CSVs encontrados (modulo 0 + modulo 1 + as duas variantes)"
 Assert-Condition ($r.Result.Missing -eq 1) "disco.csv ausente com 2_disco executado conta como ausente"
 Assert-Condition ($r.Log -match "\[AVISO\] CSV tematico 'disco.csv' nao gerado") "aviso de disco.csv no log"
 Assert-Condition $r.Unchanged "nenhum arquivo criado ou copiado"
@@ -91,6 +92,7 @@ $r = Invoke-Scenario -Name "ausente" -TraceFiles @{
 }
 Assert-Condition ($r.Result.Found -eq 0 -and $r.Result.Missing -eq 1) "bateria.csv ausente conta 1"
 Assert-Condition ($r.Log -match "\[AVISO\] CSV tematico 'bateria.csv'") "aviso de bateria.csv no log"
+Assert-Condition ($r.Log -match "\[INFO\] CSV tematico 'consumo_basal.csv' pendente") "modulo 0 nao executado fica como INFO"
 Assert-Condition ($r.Log -match "\[INFO\] CSV tematico 'cpu_memoria.csv' pendente") "modulo nao executado fica como INFO"
 
 Write-Host ""

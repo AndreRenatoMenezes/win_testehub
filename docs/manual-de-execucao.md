@@ -21,7 +21,7 @@
 
 ## 1. Visão Geral
 
-O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (CPU, memória, disco, rede, boot/shutdown, bateria, Wi-Fi e cargas reais de desenvolvimento) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.
+O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (consumo basal, CPU, memória, disco, rede, boot/shutdown, bateria, Wi-Fi e cargas reais de desenvolvimento) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.
 
 ---
 
@@ -50,7 +50,7 @@ Os itens abaixo são instalados automaticamente pela **Fase de Setup** do hub. N
 
 Para o **teste de bateria (Módulo 5)**, além disso:
 
-- **Windows Performance Toolkit** (`wpr.exe` e `wpaexporter.exe`) no PATH — o mesmo pré-requisito do Módulo 1
+- **Windows Performance Toolkit** (`wpr.exe` e `wpaexporter.exe`) no PATH — exigido pelos Módulos 0, 1 e 5
 - **Microsoft Edge com a conta Google já logada** (Google Docs e Sheets; exigido apenas no Módulo 5, pois o Módulo 1 utiliza o LibreOffice localmente)
 - **Feche o Edge antes de iniciar**: o teste encerra o Edge e reabre só com as páginas dele
 
@@ -75,7 +75,7 @@ C:\TesteHub\
 ├── config.json          # Configurações
 ├── config.local.json    # Valores internos, como a URL do speedtest (não versionado)
 ├── Setup\environment\   # Scripts de setup (13 scripts)
-├── Testes\              # Módulos de teste (11 módulos + 2 variantes DLP/USB; _lib\ = biblioteca dos módulos 7 a 11)
+├── Testes\              # Módulos de teste (12 módulos + 2 variantes DLP/USB; _lib\ = biblioteca dos módulos 7 a 11)
 ├── Execucoes\           # Logs, evidências e estado de cada cenário (criada pelo hub)
 └── Exportar\            # Traces de cada cenário prontos para o Drive, sem .etl nem logs (criada pelo hub)
 ```
@@ -90,7 +90,7 @@ C:\TesteHub\
 
 Copie toda a pasta do projeto para `C:\TesteHub` na máquina de teste.
 
-Confira se a cópia inclui os arquivos internos que **não estão no repositório do GitHub**: o `config.local.json` (URL do speedtest interno) e os perfis `Agentes_SI_Profile.wpaProfile` (em `Testes\1_cpu_memo\`) e `Agentes_SI_Bateria_Profile.wpaProfile` (em `Testes\5_bateria\`). Sem os perfis, os módulos 1 e 5 rodam, mas pulam a exportação CSV dos traces.
+Confira se a cópia inclui os arquivos internos que **não estão no repositório do GitHub**: o `config.local.json` (URL do speedtest interno) e os perfis `Agentes_SI_Profile.wpaProfile` (em `Testes\1_cpu_memo\`, também reutilizado pelo Módulo 0 ou em `Testes\0_consumo_basal\`) e `Agentes_SI_Bateria_Profile.wpaProfile` (em `Testes\5_bateria\`). Sem os perfis, os módulos 0, 1 e 5 rodam em execução avulsa, mas pulam a exportação CSV dos traces.
 
 ### 3.2 Primeira Execução
 
@@ -168,6 +168,8 @@ O nome do cenário é combinado com o hostname e a data na pasta de execução, 
 Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupados pelo nome da pasta, sem o prefixo numérico, e os que nunca rodaram no cenário (**pendentes**) já vêm marcados:
 
 ```
+-- Consumo Basal ---------------------------
+[X] 0_teste_consumo_basal          [PY]   pendente
 -- Cpu Memo --------------------------------
 [X] 1_automacao_performance        [PY]   pendente
 [X] 1-1_automacao_performance_dlp  [PY]   pendente
@@ -194,7 +196,7 @@ Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupad
 [X] 11_dev_git_arquivos            [PY]   pendente
 ```
 
-Desmarque com `Espaço` o que não for executar agora. Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (`1-1` e `2-1`) só fazem sentido com um pendrive em `E:\`.
+Desmarque com `Espaço` o que não for executar agora. O Módulo 0 (`0_teste_consumo_basal`, ~11 min) mede a máquina em repouso: não utilize mouse nem teclado após confirmar (qualquer toque fica registrado no relatório como interação humana, exceto `Ctrl+Q`). Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (`1-1` e `2-1`) só fazem sentido com um pendrive em `E:\`.
 
 Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:
 
@@ -226,7 +228,7 @@ Num cenário com execuções anteriores, o menu mostra o último resultado e a d
 Após confirmar, o hub faz a checagem antes da fila (seção 4.9), mostra o resumo dos testes selecionados e inicia a execução sequencial. Durante a execução:
 
 - O console exibe o progresso em tempo real (nome do teste, tempo decorrido)
-- Testes com interface visual (CPU, Disco, Rede, Bateria) exibem um **overlay transparente** na tela com informações de progresso
+- Testes com interface visual (Consumo Basal, CPU, Disco, Rede, Bateria) exibem um **overlay transparente** na tela com informações de progresso
 - O overlay é "click-through" — não interfere no uso da máquina
 
 > ![Execução em Progresso](img/placeholder-execucao-progresso.png)  
@@ -335,7 +337,7 @@ Ao fim, o painel mostra PASS/FAIL e abre o relatório `6_wifi_fast_transition/wi
 
 ### 4.8 Cargas de Desenvolvimento (Módulos 7 a 11) — Passo a Passo do Operador
 
-Os módulos 7 a 11 cronometram tarefas reais de desenvolvimento (build, testes, `pip install`, containers, git). Cada um leva de 3 a 30 min (o 11 é o mais curto; o 8 e o 10, os mais longos), conforme a máquina e o primeiro download dos repositórios e imagens. A metodologia completa está na seção 10 da *Metodologia de Testes*.
+Os módulos 7 a 11 cronometram tarefas reais de desenvolvimento (build, testes, `pip install`, containers, git). Cada um leva de 3 a 30 min (o 11 é o mais curto; o 8 e o 10, os mais longos), conforme a máquina e o primeiro download dos repositórios e imagens. A metodologia completa está na seção 11 da *Metodologia de Testes*.
 
 **1. Prepare a máquina (uma vez)**
 
@@ -393,8 +395,8 @@ Depois que você escolhe os testes, e antes do resumo pré-execução, o hub con
 Cada achado aparece no resumo com um nível e com o que fazer:
 
 - **`[X]` Impede:** o teste vai falhar com certeza.
-    - Falta o `Agentes_SI_Profile.wpaProfile` (módulo 1) ou o `Agentes_SI_Bateria_Profile.wpaProfile` (módulo 5) na pasta do teste. Esses arquivos não são versionados.
-    - Falta o `wpr.exe` ou o `wpaexporter.exe` (módulos 1 e 5).
+    - Falta o `Agentes_SI_Profile.wpaProfile` (módulo 0 — procurado em `Testes\0_consumo_basal\` ou `Testes\1_cpu_memo\` — e módulo 1) ou o `Agentes_SI_Bateria_Profile.wpaProfile` (módulo 5). Esses arquivos não são versionados.
+    - Falta o `wpr.exe` ou o `wpaexporter.exe` (módulos 0, 1 e 5).
     - Falta o LibreOffice (`soffice.exe`) quando `1_automacao_performance.py` está selecionado (módulo 1; não bloqueia a variante `1-1_automacao_performance_dlp.py`). A ação manda rodar o Setup `3_softwares_msStore`.
     - A URL do speedtest interno não está configurada **e** não há internet (módulo 3: nenhuma das duas fontes pode ser medida).
     - Falta uma ferramenta de dev, ou ela está abaixo da versão mínima do `cargas.json` (módulos 7 a 11). A ação manda rodar o Setup 7 ou o Setup 10.
@@ -476,6 +478,7 @@ Execucoes/
         ├── _relatorio.{html,csv,json}       # Relatório consolidado
         ├── informacoes_maquina.csv          # Inventário gerado pelo setup 1
         ├── maquina.csv                      # Modelo, série, CPU, RAM, disco, SO + modelo/patrimônio informados
+        ├── 0_consumo_basal/                 # Evidências do Módulo 0 (consumo_basal.csv, ciclos_basal.csv, top_processos_basal.csv)
         ├── 1_cpu_memo/                      # Evidências do Módulo 1
         │   └── dlp_usb/                     # Evidências da variante 1-1
         ├── 2_disco/                         # Evidências do Módulo 2 e da variante 2-1
@@ -549,7 +552,7 @@ Todo o resto vai: relatórios `_relatorio.*`, `_state.json`, `maquina.csv`, `inf
 - **`Traces/` não é alterada.** Os `.etl` e logs originais continuam em `Execucoes/` para abrir no WPA ou investigar falhas.
 - **A pasta é recriada a cada execução** e reflete o estado atual do cenário. Arquivos colocados à mão nela são perdidos, e um ZIP anterior dela é removido por estar desatualizado.
 - Ao final, o hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora (ex.: `12 .etl, 3600 MB`).
-- Se um módulo tinha só `.etl` e logs, o hub avisa com `[!] <módulo> sem evidencias do teste na exportacao` (o `frequencia_cpu.csv`, gerado pelo próprio hub, não conta como evidência). Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o `.wpaProfile` dos módulos 1 e 5, e o WPA não exporta. As evidências continuam só em `Execucoes/`. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos `.etl`.
+- Se um módulo tinha só `.etl` e logs, o hub avisa com `[!] <módulo> sem evidencias do teste na exportacao` (o `frequencia_cpu.csv`, gerado pelo próprio hub, não conta como evidência). Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o `.wpaProfile` dos módulos 0, 1 e 5, e o WPA não exporta. As evidências continuam só em `Execucoes/`. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos `.etl`.
 - Em seguida, pergunta se deseja **compactar em ZIP**. O ZIP fica ao lado da pasta (`3440 - 050221.zip`), contém a pasta como raiz e é validado pela contagem de arquivos. Nenhuma pasta é apagada.
 - A opção **`[E]`** do menu inicial faz o mesmo para um cenário existente, sem rodar testes.
 
@@ -573,7 +576,7 @@ Os avisos ficam guardados no `_state.json` e se acumulam: os de uma run anterior
 
 **Frequência da CPU por módulo.** Enquanto cada teste roda, o hub grava `<módulo>/frequencia_cpu.csv` com uma amostra a cada 5 s: uso da CPU, desempenho em % (acima de 100 = turbo), MHz efetivo e a maior temperatura das zonas térmicas ACPI, quando o firmware expõe. O relatório mostra o MHz médio, o MHz no começo e no fim e a queda. A queda (aviso a partir de 20%) compara a mediana do 1º e do último minuto **com a CPU sob carga** (uso de pelo menos 50%), porque em ocioso o clock cai sem ser throttling. Testes curtos ou ociosos aparecem sem queda (`-`).
 
-O amostrador não roda nos setups nem no teste 5 (bateria), para não acordar a CPU a cada poucos segundos durante horas. No teste 4, a máquina reinicia e o CSV fica parcial; com menos de 3 amostras, ele é ignorado.
+O amostrador não roda nos setups, no módulo 0 (`0_consumo_basal`) nem no teste 5 (bateria), para não acordar a CPU durante as medições ociosas ou de bateria. No teste 4, a máquina reinicia e o CSV fica parcial; com menos de 3 amostras, ele é ignorado.
 
 ---
 
@@ -664,7 +667,7 @@ Configurações em `config.json`:
         "IntervalSec": 5,
         "ThrottleAlertPct": 20,
         "LoadMinPct": 50,
-        "SkipFolders": ["5_bateria"]
+        "SkipFolders": ["0_consumo_basal", "5_bateria"]
     }
 }
 ```
@@ -735,7 +738,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File hub.ps1
 
 | Atalho | Teste | Ação |
 |--------|-------|------|
-| `Ctrl+Q` | CPU & Memória, Bateria, Cargas dev (7 a 11) | Interromper o teste de forma segura e **parar a fila**: os testes seguintes ficam como *cancelado* e o hub gera o relatório com o que já rodou |
+| `Ctrl+Q` | Consumo Basal, CPU & Memória, Bateria, Cargas dev (7 a 11) | Interromper o teste de forma segura e **parar a fila**: os testes seguintes ficam como *cancelado* e o hub gera o relatório com o que já rodou |
 
 O Ctrl+Q vale para a execução inteira, não só para o teste em andamento. Para pular só um teste com falha, não use o Ctrl+Q: espere a pergunta "Teste falhou. Deseja continuar?" e responda `S`. Teclas apertadas durante o teste são descartadas antes dessa pergunta, então elas não respondem por você.
 

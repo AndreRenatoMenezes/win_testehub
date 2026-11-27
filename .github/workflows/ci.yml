@@ -81,6 +81,9 @@ jobs:
       - name: Teste de regressão (cálculos do teste de rede unificado)
         run: python -I -X utf8 .github/scripts/test_rede_estatistica.py
 
+      - name: Teste de regressão (Módulo 0 — Consumo Basal)
+        run: python -I -X utf8 .github/scripts/test_consumo_basal.py
+
       - name: Teste de regressão (Módulo 1 com LibreOffice)
         run: python -I -X utf8 .github/scripts/test_cpu_memo_libreoffice.py
 

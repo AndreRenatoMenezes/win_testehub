@@ -20,7 +20,7 @@
         "IntervalSec": 5,
         "ThrottleAlertPct": 20,
         "LoadMinPct": 50,
-        "SkipFolders": ["5_bateria"]
+        "SkipFolders": ["0_consumo_basal", "5_bateria"]
     },
     "Rede": {
         "Rodadas": 10,

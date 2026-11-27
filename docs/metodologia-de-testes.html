@@ -377,16 +377,17 @@ li {
 <li><a href="#1-introdução">Introdução</a></li>
 <li><a href="#2-arquitetura-do-framework">Arquitetura do Framework</a></li>
 <li><a href="#3-fase-de-setup--preparação-do-ambiente">Fase de Setup — Preparação do Ambiente</a></li>
-<li><a href="#4-módulo-1--cpu-e-memória">Módulo 1 — CPU e Memória</a></li>
-<li><a href="#5-módulo-2--disco">Módulo 2 — Disco</a></li>
-<li><a href="#6-módulo-3--rede">Módulo 3 — Rede</a></li>
-<li><a href="#7-módulo-4--boot-e-shutdown">Módulo 4 — Boot e Shutdown</a></li>
-<li><a href="#8-módulo-5--bateria">Módulo 5 — Bateria</a></li>
-<li><a href="#9-módulo-6--wi-fi-fast-transition-80211r">Módulo 6 — Wi-Fi Fast Transition (802.11r)</a></li>
-<li><a href="#10-módulos-7-a-11--cargas-de-desenvolvimento">Módulos 7 a 11 — Cargas de Desenvolvimento</a></li>
-<li><a href="#11-rastreabilidade-e-evidências">Rastreabilidade e Evidências</a></li>
-<li><a href="#12-formatos-de-relatório">Formatos de Relatório</a></li>
-<li><a href="#13-glossário">Glossário</a></li>
+<li><a href="#4-módulo-0--consumo-basal">Módulo 0 — Consumo Basal</a></li>
+<li><a href="#5-módulo-1--cpu-e-memória">Módulo 1 — CPU e Memória</a></li>
+<li><a href="#6-módulo-2--disco">Módulo 2 — Disco</a></li>
+<li><a href="#7-módulo-3--rede">Módulo 3 — Rede</a></li>
+<li><a href="#8-módulo-4--boot-e-shutdown">Módulo 4 — Boot e Shutdown</a></li>
+<li><a href="#9-módulo-5--bateria">Módulo 5 — Bateria</a></li>
+<li><a href="#10-módulo-6--wi-fi-fast-transition-80211r">Módulo 6 — Wi-Fi Fast Transition (802.11r)</a></li>
+<li><a href="#11-módulos-7-a-11--cargas-de-desenvolvimento">Módulos 7 a 11 — Cargas de Desenvolvimento</a></li>
+<li><a href="#12-rastreabilidade-e-evidências">Rastreabilidade e Evidências</a></li>
+<li><a href="#13-formatos-de-relatório">Formatos de Relatório</a></li>
+<li><a href="#14-glossário">Glossário</a></li>
 </ol>
 </div>
 
@@ -396,6 +397,7 @@ li {
 <p>O <strong>WinTestHub</strong> (Hardware Test Hub) é um framework de validação de hardware projetado para avaliar o desempenho e a estabilidade dos principais componentes de uma máquina Windows: processador, memória, disco, rede, ciclo de boot/shutdown, consumo de bateria e roaming Wi-Fi com Fast Transition (802.11r). Os testes simulam cenários de uso intensivo e coletam métricas objetivas para determinar se o equipamento atende aos padrões operacionais esperados.</p>
 <h3 id="12-escopo">1.2 Escopo</h3>
 <p><strong>O que é testado:</strong>
+- Consumo basal de CPU e RAM da máquina em repouso (sistema total, Top 15 processos e agentes de segurança)
 - Desempenho de CPU e memória sob estresse sustentado
 - Velocidade de leitura e escrita do disco principal
 - Velocidade de conexão de rede (download, upload, latência, jitter) no speedtest interno e na internet (fast.com)
@@ -414,7 +416,7 @@ li {
 <li>Identifique o <strong>cenário</strong> em <code>Execucoes/</code> (pasta com nome, hostname e data)</li>
 <li>Abra o <code>Traces/_relatorio.html</code> do cenário para ver o resumo de resultados</li>
 <li>Compare os procedimentos descritos neste documento com as evidências coletadas</li>
-<li>Verifique a cadeia de custódia usando o <code>_state.json</code> (seção 11)</li>
+<li>Verifique a cadeia de custódia usando o <code>_state.json</code> (seção 12)</li>
 </ol>
 </div>
 
@@ -440,7 +442,7 @@ li {
 │                       │                             │
 │                       ▼                             │
 │  ┌─── Fase 2: Testes ───────────────────────────┐   │
-│  │ 11 módulos de teste + 2 variantes            │   │
+│  │ 12 módulos de teste + 2 variantes            │   │
 │  │ Seleção via menu checkbox interativo         │   │
 │  │ Checagem antes da fila (pré-requisitos e     │   │
 │  │ sobras de teste); sobras limpas entre testes │   │
@@ -457,9 +459,9 @@ li {
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> diagrama visual do fluxo de execução do framework<br><em>Salvar como: img/placeholder-diagrama-arquitetura.png</em></div>
 <h4 id="controles-que-protegem-a-medição">Controles que protegem a medição</h4>
 <ul>
-<li><strong>Checagem antes da fila.</strong> Antes de iniciar, o hub confere o que os testes selecionados precisam: o perfil <code>.wpaProfile</code> dos módulos 1 e 5, o Windows Performance Toolkit, o LibreOffice (<code>soffice.exe</code>) para o <code>1_automacao_performance.py</code>, a URL do speedtest, as ferramentas de dev e a <code>podman machine</code>, a tomada, a internet e o espaço em disco. O que impede um teste precisa de uma decisão explícita do operador (tirar o teste da fila ou continuar); a decisão fica registrada.</li>
-<li><strong>Sobras de teste.</strong> Processos que um teste abriu e não fechou (sessão do WPR, LibreOffice da automação com perfil <code>wintesthub_lo_profile</code>, Edge da automação, <code>diskspd</code>, Python de teste, build servers do .NET, stack do Podman) consomem recursos e contaminariam o teste seguinte. A checagem aponta essas sobras, e entre um teste e outro o hub encerra as do teste que acabou. Entre testes, só são encerrados os processos que o próprio teste abriu (o hub compara com os processos que já existiam antes do teste); antes da fila, os build servers do .NET aparecem só como aviso, porque podem ser do Visual Studio do usuário. A sessão do WPR, a stack do Podman e a <code>podman machine</code> seguem a pasta do teste que as usa.</li>
-<li><strong>Frequência da CPU.</strong> Durante cada teste (exceto setups e o teste 5, de bateria), o hub registra a cada 5 s o uso da CPU, o desempenho relativo ao clock base, o MHz efetivo e a maior temperatura das zonas térmicas ACPI, em <code>&lt;módulo&gt;/frequencia_cpu.csv</code>. Uma queda do clock sob carga de 20% ou mais entre o 1º e o último minuto vira aviso de <strong>throttling</strong>: uma máquina que esquenta mede pior, e isso não deve ser atribuído ao agente. A leitura usa CIM (não <code>Get-Counter</code>, cujos nomes mudam no Windows pt-BR); o custo é uma consulta a cada 5 s, bem abaixo de 1% de CPU, e fica ativo também durante o módulo 1. As zonas ACPI servem para comparar máquinas sob a mesma carga, não como temperatura absoluta do processador.</li>
+<li><strong>Checagem antes da fila.</strong> Antes de iniciar, o hub confere o que os testes selecionados precisam: o perfil <code>.wpaProfile</code> dos módulos 0, 1 e 5 (o módulo 0 reutiliza o de <code>1_cpu_memo</code> quando não há cópia própria), o Windows Performance Toolkit, o LibreOffice (<code>soffice.exe</code>) para o <code>1_automacao_performance.py</code>, a URL do speedtest, as ferramentas de dev e a <code>podman machine</code>, a tomada, a internet e o espaço em disco. O que impede um teste precisa de uma decisão explícita do operador (tirar o teste da fila ou continuar); a decisão fica registrada.</li>
+<li><strong>Sobras de teste.</strong> Processos que um teste abriu e não fechou (sessão do WPR, <code>wpaexporter</code>, LibreOffice da automação com perfil <code>wintesthub_lo_profile</code>, Edge da automação, <code>diskspd</code>, Python de teste, build servers do .NET, stack do Podman) consomem recursos e contaminariam o teste seguinte. A checagem aponta essas sobras, e entre um teste e outro o hub encerra as do teste que acabou. Entre testes, só são encerrados os processos que o próprio teste abriu (o hub compara com os processos que já existiam antes do teste); antes da fila, os build servers do .NET aparecem só como aviso, porque podem ser do Visual Studio do usuário. A sessão do WPR, a stack do Podman e a <code>podman machine</code> seguem a pasta do teste que as usa.</li>
+<li><strong>Frequência da CPU.</strong> Durante cada teste (exceto setups, o módulo 0 de consumo basal e o teste 5 de bateria), o hub registra a cada 5 s o uso da CPU, o desempenho relativo ao clock base, o MHz efetivo e a maior temperatura das zonas térmicas ACPI, em <code>&lt;módulo&gt;/frequencia_cpu.csv</code>. Uma queda do clock sob carga de 20% ou mais entre o 1º e o último minuto vira aviso de <strong>throttling</strong>: uma máquina que esquenta mede pior, e isso não deve ser atribuído ao agente. A leitura usa CIM (não <code>Get-Counter</code>, cujos nomes mudam no Windows pt-BR); o custo é uma consulta a cada 5 s, bem abaixo de 1% de CPU, e fica ativo também durante o módulo 1. As zonas ACPI servem para comparar máquinas sob a mesma carga, não como temperatura absoluta do processador. No módulo 0, o amostrador é desligado via <code>CpuSampler.SkipFolders</code> para evitar ruído de consultas WMI paralelas durante o repouso.</li>
 <li><strong>Avisos da rodada.</strong> Tudo o que pode qualificar um resultado (checagem, sobras, módulo sem evidência, CSV faltando, carga de dev com falha ou sensível à rede, throttling) fica no <code>_state.json</code> e aparece no <code>_relatorio.html</code>/<code>.json</code>, junto das evidências exportadas.</li>
 </ul>
 <h3 id="22-sistema-de-cenários">2.2 Sistema de Cenários</h3>
@@ -613,17 +615,132 @@ li {
 </div>
 
 <div class="section">
-<h2 id="4-módulo-1--cpu-e-memória">4. Módulo 1 — CPU e Memória</h2>
+<h2 id="4-módulo-0--consumo-basal">4. Módulo 0 — Consumo Basal</h2>
 <h3 id="41-objetivo">4.1 Objetivo</h3>
+<p>Medir o consumo basal de CPU e RAM da máquina 100% em repouso (sem carga de trabalho aberta), separando o consumo total do Windows, os 15 processos mais pesados e a fatia exata dos agentes de segurança (EDR, DLP, AV, Zero Trust). O módulo permite comparar a imagem limpa contra a imagem com agentes instalados com evidência rastreável.</p>
+<p>O script é <code>Testes/0_consumo_basal/0_teste_consumo_basal.py</code> e aparece no topo da Fase 2 do hub (seção <strong>Consumo Basal</strong>, antes do Módulo 1).</p>
+<h3 id="42-ferramentas-utilizadas">4.2 Ferramentas Utilizadas</h3>
+<ul>
+<li><strong><code>psutil</code></strong> — amostragem contínua a cada <code>1,0 s</code> de CPU total do sistema (<code>%</code>), frequência atual (<code>MHz</code>), RAM usada (<code>MB</code> e <code>%</code>), RAM disponível (<code>MB</code>) e uso de CPU/RAM RSS por processo (agrupado pelo nome do executável, excluindo <code>System Idle Process</code>/PID 0 e o próprio processo Python do Teste 0)</li>
+<li><strong>Windows Performance Recorder (<code>wpr.exe</code>) e Windows Performance Analyzer (<code>wpaexporter.exe</code>)</strong> — captura <code>Power.light</code> + <code>VirtualAllocation.light</code> e exportação CSV usando <code>Agentes_SI_Profile.wpaProfile</code> (procurado em <code>Testes/0_consumo_basal/</code> ou reutilizado automaticamente de <code>Testes/1_cpu_memo/</code>)</li>
+<li><strong><code>pynput</code></strong> — monitoramento passivo de teclado e mouse (marca <code>Interacao_Detectada = sim</code> no ciclo se o operador tocar na máquina, exceto <code>Ctrl+Q</code>)</li>
+<li><strong><code>tkinter</code></strong> — overlay <em>click-through</em> com o aviso <code>"Não utilize mouse ou teclado — medindo consumo basal"</code></li>
+</ul>
+<h3 id="43-procedimento">4.3 Procedimento</h3>
+<p>Antes de iniciar, o hub desliga o <code>CpuSampler</code> externo em PowerShell (<code>0_consumo_basal</code> está em <code>CpuSampler.SkipFolders</code> no <code>config.json</code>), evitando ruído de consultas WMI paralelas durante a coleta ociosa.</p>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Descrição</th>
+<th>Duração</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Verificação de pré-requisitos (<code>wpr.exe</code>, <code>wpaexporter.exe</code>, módulos Python e resolução do <code>.wpaProfile</code>)</td>
+<td>segundos</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Estabilização inicial</strong> — aguarda a dissipação do pico de inicialização do Python/Tkinter com a máquina parada</td>
+<td>60 segundos</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>3 ciclos ociosos</strong> — em cada ciclo: inicia captura WPR (<code>Power.light</code> + <code>VirtualAllocation.light</code>), coleta amostras <code>psutil</code> a cada <code>1,0 s</code> e monitora interações humanas</td>
+<td>3 × 180 segundos (3 min cada)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Salva <code>Trace_Basal_&lt;data&gt;_Run&lt;N&gt;.etl</code> e exporta via <code>wpaexporter.exe</code> (quando o <code>.wpaProfile</code> está disponível)</td>
+<td>~15–30 s por ciclo</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Cooldown</strong> entre ciclos (após os ciclos 1 e 2)</td>
+<td>30 segundos</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Consolidação das amostras <code>psutil</code> e dos CSVs do WPA em <code>consumo_basal.csv</code>, <code>ciclos_basal.csv</code>, <code>top_processos_basal.csv</code> e <code>Resultados_Consolidados/</code></td>
+<td>~5 s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tempo total estimado:</strong> ~11 minutos.</p>
+<h3 id="44-métricas-coletadas">4.4 Métricas Coletadas</h3>
+<table>
+<thead>
+<tr>
+<th>Arquivo</th>
+<th>Conteúdo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>consumo_basal.csv</code></td>
+<td>CSV temático (<code>Metrica,Valor,Unidade</code>): <code>Versao_Teste</code> (<code>1.0</code>), <code>Ciclos_Executados</code> (<code>3</code>), <code>Duracao_Por_Ciclo</code> (<code>180</code>), <code>Estabilizacao_Inicial</code> (<code>60</code>), <code>Amostras_Totais</code> (<code>~540</code>), <code>Interacao_Humana_Detectada</code> (<code>nao</code>/<code>sim</code>), <code>CPU_Sistema_Media</code>, <code>_Mediana</code>, <code>_P95</code>, <code>_Pico</code>, <code>_Min</code> (<code>%</code>), <code>RAM_Total_GB</code>, <code>RAM_Usada_Media_MB</code>, <code>_Mediana_MB</code>, <code>_Pico_MB</code>, <code>RAM_Usada_Media_Pct</code>, <code>RAM_Disponivel_Media_GB</code>, <code>Self_Overhead_CPU_Media</code>, <code>Self_Overhead_RAM_Media_MB</code>, <code>Top1_CPU_Processo</code>/<code>_Media</code>, <code>Top1_RAM_Processo</code>/<code>_Media_MB</code> e métricas WPA (<code>WPA_&lt;Arquivo&gt;_&lt;Metrica&gt;_Soma_Media</code>, <code>_Media</code>, <code>_Max</code>)</td>
+</tr>
+<tr>
+<td><code>ciclos_basal.csv</code></td>
+<td>Uma linha por ciclo: <code>Ciclo,Timestamp_Inicio,Duracao_s,Amostras,Interacao_Detectada,CPU_Media_Pct,CPU_Mediana_Pct,CPU_P95_Pct,CPU_Pico_Pct,RAM_Usada_Media_MB,RAM_Usada_Pico_MB,RAM_Usada_Media_Pct</code></td>
+</tr>
+<tr>
+<td><code>top_processos_basal.csv</code></td>
+<td>Top 15 processos por CPU média (<code>Ranking_Por=CPU</code>) e Top 15 por RAM RSS média (<code>Ranking_Por=RAM</code>), somando instâncias do mesmo executável e excluindo Idle e o próprio Teste 0</td>
+</tr>
+<tr>
+<td><code>Resultados_Consolidados/</code></td>
+<td>CSVs consolidados por perfil (<code>Media_*.csv</code>), <code>Relatorio_Resumo.csv</code> e <code>Relatorio_Resumo.html</code> (incluindo <code>Soma_Media</code>, o peso agregado de todos os agentes filtrados pelo <code>.wpaProfile</code>)</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><strong>Imagem limpa</strong>quando nenhum processo do filtro do <code>.wpaProfile</code> está ativo (caso esperado na imagem sem agentes de segurança), os CSVs exportados pelo WPA vêm vazios (0 linhas de dados); o teste não falha e registra <code>0.00</code> em <code>WPA_*_Soma_Media</code>, <code>_Media</code> e <code>_Max</code>.</div>
+<h3 id="45-critério-de-aprovação">4.5 Critério de Aprovação</h3>
+<table>
+<thead>
+<tr>
+<th>Condição</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Os 3 ciclos completam sem erro e gravam <code>consumo_basal.csv</code>, <code>ciclos_basal.csv</code> e <code>top_processos_basal.csv</code></td>
+<td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
+</tr>
+<tr>
+<td>Falha no WPR/<code>wpaexporter</code>, falta de pré-requisitos, ciclos incompletos ou <code>Ctrl+Q</code></td>
+<td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="46-como-interpretar-gestão">4.6 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
+<ul>
+<li>Compare <code>consumo_basal.csv</code> do cenário <strong>ImagemLimpa</strong> com o do cenário <strong>ComAgentes</strong> na mesma máquina.</li>
+<li><strong><code>CPU_Sistema_Mediana</code> e <code>CPU_Sistema_P95</code></strong> mostram o impacto basal real no sistema, sem distorção de picos pontuais.</li>
+<li><strong><code>WPA_*_Soma_Media</code></strong> mostra o peso agregado de todos os agentes de segurança monitorados pelo <code>.wpaProfile</code>.</li>
+<li><strong><code>Self_Overhead_*</code></strong> registra o custo residual do próprio script de medição (já excluído de <code>top_processos_basal.csv</code>).</li>
+<li>Execuções com <code>Interacao_Humana_Detectada = sim</code> tiveram movimento de mouse ou tecla durante um ciclo; confira <code>ciclos_basal.csv</code> para saber em qual ciclo ocorreu antes de comparar cenários.</li>
+</ul>
+<h3 id="47-interrupção-segura-e-detecção-de-interação">4.7 Interrupção Segura e Detecção de Interação</h3>
+<p>Movimentos de mouse ou teclas comuns durante um ciclo ativo são registrados como aviso no log e marcam <code>Interacao_Detectada = sim</code> no ciclo, sem interromper nem reprovar a execução. Pressionar <strong><code>Ctrl+Q</code></strong> cancela imediatamente a captura WPR (<code>wpr.exe -cancel</code>), fecha o overlay, sinaliza a parada da fila ao hub e encerra com exit code 1.</p>
+</div>
+
+<div class="section">
+<h2 id="5-módulo-1--cpu-e-memória">5. Módulo 1 — CPU e Memória</h2>
+<h3 id="51-objetivo">5.1 Objetivo</h3>
 <p>Avaliar o desempenho e a estabilidade do processador e da memória sob carga de escritório local e 100% offline no <strong>LibreOffice</strong> (Writer e Calc), medindo o tempo de abertura dos aplicativos, o tempo de relógio e a CPU consumida no recálculo de uma planilha pesada (a <strong>planilha R2</strong>: 5.000 linhas e 100.000 fórmulas, a mesma carga do teste do macOS) e o consumo contínuo de CPU e RAM do sistema e do LibreOffice sob captura WPR/WPA.</p>
-<h3 id="42-ferramenta-utilizada">4.2 Ferramenta Utilizada</h3>
+<h3 id="52-ferramenta-utilizada">5.2 Ferramenta Utilizada</h3>
 <ul>
 <li><strong>LibreOffice Writer e Calc</strong> (<code>soffice.exe</code> / <code>soffice.bin</code>) — executados com subperfis temporários isolados (<code>-env:UserInstallation=file:///.../wintesthub_lo_profile_&lt;papel&gt;</code> onde <code>&lt;papel&gt;</code> é <code>batch</code>, <code>writer</code> ou <code>calc</code>) e flags <code>--norestore --nologo --nodefault --nolockcheck</code>, garantindo <em>cold start</em> real, processos independentes e execução 100% offline sem necessidade de login</li>
 <li><strong>Gerador determinístico das planilhas de carga</strong> (<code>zipfile</code> + XML da stdlib Python) — cria localmente <code>workload_doc.odt</code> (título e 20 parágrafos iniciais) e <code>workload_calc_r2.xlsx</code>, a <strong>planilha R2</strong> do teste do macOS (<code>gen_cpu_r2_workload.py</code>): aba <code>Data</code> com 5.000 linhas (<code>seq</code>, <code>value</code>, <code>category</code>, <code>date</code>), aba <code>Calc</code> com 5.000 × 20 fórmulas — agregações condicionais sobre a coluna inteira (<code>SUMIFS</code>, <code>COUNTIFS</code>, <code>AVERAGEIFS</code>, <code>MAXIFS</code>), buscas (<code>INDEX</code>/<code>MATCH</code>, <code>VLOOKUP</code>, <code>XLOOKUP</code>, <code>INDIRECT</code>), estatística em janela móvel (<code>STDEV</code>, <code>VAR</code>, <code>PERCENTILE</code>, <code>RANK</code>), financeiras (<code>NPV</code>, <code>PMT</code>, <code>FV</code>, <code>IPMT</code>) e texto/lógica —, aba <code>Trigger</code> (onde a edição GUI digita) e aba <code>Sentinel</code> (soma os cantos da aba <code>Calc</code> e prova que o recálculo aconteceu). As fórmulas são gravadas sem valor em cache, então o LibreOffice calcula as 100.000; o texto é idêntico ao do macOS, só <code>MAXIFS</code> e <code>XLOOKUP</code> levam o prefixo <code>_xlfn.</code> do Excel (sem ele o LibreOffice mostra <code>#NOME?</code>)</li>
 <li><strong>Windows Performance Recorder (<code>wpr.exe</code>) e Windows Performance Analyzer (<code>wpaexporter.exe</code>)</strong> — captura <code>Power.light</code> + <code>VirtualAllocation.light</code> e exportação CSV com o perfil <code>Agentes_SI_Profile.wpaProfile</code></li>
 <li><strong><code>psutil</code> + <code>pyautogui</code> / <code>pyperclip</code></strong> — thread amostradora contínua (intervalo de 1,0 s) coletando CPU (%) e RAM (MB e %) do sistema e da árvore de processos <code>soffice.exe</code>/<code>soffice.bin</code> do teste, combinada com automação GUI real no Writer e no Calc</li>
 </ul>
-<h3 id="43-procedimento">4.3 Procedimento</h3>
+<h3 id="53-procedimento">5.3 Procedimento</h3>
 <p>Antes do Ciclo 1, o script valida a presença do <code>soffice.exe</code> (via <code>HUB_LIBREOFFICE_PATH</code>, <code>PATH</code> ou caminhos padrão em <code>C:\Program Files\LibreOffice\program\soffice.exe</code> e <code>C:\Program Files (x86)\LibreOffice\program\soffice.exe</code>) e gera os arquivos <code>workload_doc.odt</code> e <code>workload_calc_r2.xlsx</code> em pasta temporária. Os subperfis <code>batch</code> e <code>calc</code> nascem configurados para sempre recalcular <code>.xlsx</code> ao abrir e para gravar <code>.xlsx</code> sem o diálogo de formato.</p>
 <table>
 <thead>
@@ -688,7 +805,7 @@ li {
 │ 5min │down  │ │ 5min │down  │ │ 5min │down  │ │ 5min │down  │ │ 5min │down  │
 └──────┴──────┘ └──────┴──────┘ └──────┴──────┘ └──────┴──────┘ └──────┴──────┘
 </code></pre>
-<h3 id="44-métricas-coletadas">4.4 Métricas Coletadas</h3>
+<h3 id="54-métricas-coletadas">5.4 Métricas Coletadas</h3>
 <table>
 <thead>
 <tr>
@@ -716,7 +833,7 @@ li {
 </tbody>
 </table>
 <div class="callout callout-info"><strong>Versões do teste</strong><code>Versao_Teste = 2.1</code> usa a planilha R2 (100.000 fórmulas; cerca de 18 s de CPU no cálculo numa máquina de 12 threads). A <code>2.0</code> usava uma planilha de 25.000 fórmulas simples (cerca de 2 s de CPU). Os tempos e o consumo das duas versões <b>não se comparam</b>: compare <code>ImagemLimpa</code> e <code>ComAgentes</code> sempre com a mesma versão.</div>
-<h3 id="45-critério-de-aprovação">4.5 Critério de Aprovação</h3>
+<h3 id="55-critério-de-aprovação">5.5 Critério de Aprovação</h3>
 <table>
 <thead>
 <tr>
@@ -735,7 +852,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="46-o-que-um-fail-significa-gestão">4.6 O que um FAIL Significa <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="56-o-que-um-fail-significa-gestão">5.6 O que um FAIL Significa <span class="tag tag-gestao">Gestão</span></h3>
 <p>Uma falha neste teste indica que o processador ou a memória da máquina não conseguiram sustentar carga contínua por 5 ciclos de estresse. Possíveis causas:</p>
 <ul>
 <li><strong>Superaquecimento</strong> — o processador ativou proteção térmica (thermal throttling)</li>
@@ -744,9 +861,9 @@ li {
 <li><strong>Recurso insuficiente</strong> — memória RAM insuficiente para a carga aplicada</li>
 </ul>
 <p><strong>Ação recomendada:</strong> Investigar logs detalhados em <code>Execucoes/&lt;cenário&gt;/Logs/run_*.log</code> e verificar se o hardware apresenta defeitos.</p>
-<h3 id="47-interrupção-segura">4.7 Interrupção Segura</h3>
+<h3 id="57-interrupção-segura">5.7 Interrupção Segura</h3>
 <p>O operador pode interromper o teste a qualquer momento pressionando <code>Ctrl+Q</code>. O teste é encerrado de forma controlada: a captura WPR em andamento é cancelada, o log registra a interrupção e o resultado é <strong>FAIL</strong> (exit code 1).</p>
-<h3 id="48-variante-dlpusb-técnico">4.8 Variante DLP/USB <span class="tag tag-tecnico">Técnico</span></h3>
+<h3 id="58-variante-dlpusb-técnico">5.8 Variante DLP/USB <span class="tag tag-tecnico">Técnico</span></h3>
 <p>O script <code>1-1_automacao_performance_dlp.py</code> mede o custo de CPU e memória do <strong>agente de DLP</strong> ao inspecionar cópias para um pendrive. Ele aparece no menu na mesma seção do Módulo 1 (<strong>Cpu Memo</strong>) e exige um pendrive montado em <code>E:\</code> (configurável em <code>USB_DRIVE</code>, no topo do script).</p>
 <table>
 <thead>
@@ -812,15 +929,15 @@ li {
 </div>
 
 <div class="section">
-<h2 id="5-módulo-2--disco">5. Módulo 2 — Disco</h2>
-<h3 id="51-objetivo">5.1 Objetivo</h3>
+<h2 id="6-módulo-2--disco">6. Módulo 2 — Disco</h2>
+<h3 id="61-objetivo">6.1 Objetivo</h3>
 <p>Medir a velocidade de leitura e escrita sustentada do disco principal, avaliando o desempenho de I/O sob operações sequenciais com blocos grandes.</p>
-<h3 id="52-ferramenta-utilizada">5.2 Ferramenta Utilizada</h3>
+<h3 id="62-ferramenta-utilizada">6.2 Ferramenta Utilizada</h3>
 <ul>
 <li><strong>Microsoft DiskSPD</strong> (<code>diskspd.exe</code>) — ferramenta oficial da Microsoft para benchmarking de disco</li>
 <li><strong>psutil</strong> — para identificação do disco principal</li>
 </ul>
-<h3 id="53-procedimento">5.3 Procedimento</h3>
+<h3 id="63-procedimento">6.3 Procedimento</h3>
 <table>
 <thead>
 <tr>
@@ -902,7 +1019,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="54-métricas-coletadas">5.4 Métricas Coletadas</h3>
+<h3 id="64-métricas-coletadas">6.4 Métricas Coletadas</h3>
 <table>
 <thead>
 <tr>
@@ -972,7 +1089,7 @@ li {
 </tbody>
 </table>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot de um CSV real gerado pelo teste de disco<br><em>Salvar como: img/placeholder-csv-disco.png</em></div>
-<h3 id="55-critério-de-aprovação">5.5 Critério de Aprovação</h3>
+<h3 id="65-critério-de-aprovação">6.5 Critério de Aprovação</h3>
 <table>
 <thead>
 <tr>
@@ -991,7 +1108,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="56-como-interpretar-os-valores-gestão">5.6 Como Interpretar os Valores <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="66-como-interpretar-os-valores-gestão">6.6 Como Interpretar os Valores <span class="tag tag-gestao">Gestão</span></h3>
 <p>Os valores de velocidade dependem do tipo de disco:</p>
 <table>
 <thead>
@@ -1020,7 +1137,7 @@ li {
 </tbody>
 </table>
 <p>Valores <strong>significativamente abaixo</strong> do esperado para o tipo de disco podem indicar: disco com defeito, driver desatualizado, superaquecimento, ou fragmentação excessiva (HDD).</p>
-<h3 id="57-variante-dlpusb-técnico">5.7 Variante DLP/USB <span class="tag tag-tecnico">Técnico</span></h3>
+<h3 id="67-variante-dlpusb-técnico">6.7 Variante DLP/USB <span class="tag tag-tecnico">Técnico</span></h3>
 <p>O script <code>2-1_teste_disco_dlp.py</code> mede a velocidade de escrita e leitura num pendrive com o <strong>agente de DLP</strong> ativo, usando cópia nativa de arquivos (sem o DiskSPD). Ele aparece no menu na seção <strong>Disco</strong> e exige um pendrive montado em <code>E:\</code> (configurável em <code>USB_DRIVE</code>, no topo do script).</p>
 <table>
 <thead>
@@ -1075,15 +1192,15 @@ li {
 </div>
 
 <div class="section">
-<h2 id="6-módulo-3--rede">6. Módulo 3 — Rede</h2>
-<h3 id="61-objetivo">6.1 Objetivo</h3>
+<h2 id="7-módulo-3--rede">7. Módulo 3 — Rede</h2>
+<h3 id="71-objetivo">7.1 Objetivo</h3>
 <p>Aferir a velocidade da conexão de rede da máquina por <strong>dois caminhos</strong>, nas mesmas condições:</p>
 <ul>
 <li><strong>Interno:</strong> o speedtest interno (OpenSpeedTest) do laboratório. Mede a rede corporativa até um servidor controlado e é a referência mais estável para comparar máquinas.</li>
 <li><strong>Internet:</strong> o fast.com (Netflix), pelo mesmo caminho do tráfego real do usuário. Em máquinas com agente <strong>zero trust</strong>, o tráfego para destinos internos pode não passar pelo agente (bypass ou túnel distinto), enquanto o tráfego para a internet passa pelo proxy/túnel e pela inspeção SSL. Esta fonte captura o impacto do agente na navegação.</li>
 </ul>
 <p>As duas fontes são medidas no mesmo teste, em <strong>rodadas intercaladas</strong>, para que uma mudança de condição da rede ao longo da execução afete as duas por igual. O script é <code>Testes/3_rede/3_teste_rede.py</code>. Os cálculos ficam em <code>Testes/_lib/rede_calc.py</code>.</p>
-<h3 id="62-ferramenta-utilizada">6.2 Ferramenta Utilizada</h3>
+<h3 id="72-ferramenta-utilizada">7.2 Ferramenta Utilizada</h3>
 <ul>
 <li><strong>Microsoft Edge</strong> via Selenium WebDriver, com o driver obtido automaticamente pelo Selenium Manager. Cada fonte usa o <strong>próprio Edge com perfil temporário</strong> (sem cache, extensões nem sincronização), apagado no fim.</li>
 <li><strong>Servidor de speedtest interno</strong> (URL em <code>config.local.json</code> → <code>SpeedtestUrl</code>, ou <code>HUB_SPEEDTEST_URL</code>, não versionada). Só nesta fonte os erros de certificado são ignorados, porque o servidor é acessado por IP via HTTPS.</li>
@@ -1092,7 +1209,7 @@ li {
 <li><strong><code>psutil</code></strong>, <code>Get-NetAdapter</code> e <code>netsh wlan</code> para o tráfego de fundo e a conexão de cada rodada.</li>
 </ul>
 <div class="callout callout-info"><strong>Nota</strong>o <code>speed.cloudflare.com</code> foi avaliado e descartado porque exige verificação antirrobô antes de iniciar a medição, o que impede a execução desassistida.</div>
-<h3 id="63-procedimento">6.3 Procedimento</h3>
+<h3 id="73-procedimento">7.3 Procedimento</h3>
 <table>
 <thead>
 <tr>
@@ -1133,7 +1250,7 @@ li {
 <li>Lê as métricas na página, salva o screenshot e deixa o Edge daquela fonte em página em branco, para ele não gerar tráfego durante a rodada da outra.</li>
 </ol>
 <p>A 1ª rodada de cada fonte é <strong>aquecimento</strong>: fica registrada, mas não entra nas estatísticas. Nas execuções de 24/11/2026, a 1ª rodada do fast.com tinha upload 1,7 vez maior que as demais.</p>
-<h3 id="64-métricas-coletadas">6.4 Métricas Coletadas</h3>
+<h3 id="74-métricas-coletadas">7.4 Métricas Coletadas</h3>
 <table>
 <thead>
 <tr>
@@ -1207,7 +1324,7 @@ li {
 <li><strong><code>Estavel</code></strong> = <code>sim</code> quando o CV do download e o do upload ficam no máximo em 10%.</li>
 </ul>
 <div class="callout callout-info"><strong>Nota</strong>no Windows 11, o <code>netsh wlan</code> exige a permissão de <b>Localização</b> (e às vezes elevação) para informar banda, canal, sinal e BSSID. Sem ela, esses campos ficam N/A, e o tipo (Wi-Fi ou cabo) continua vindo do <code>Get-NetAdapter</code>.</div>
-<h3 id="65-evidências-geradas">6.5 Evidências Geradas</h3>
+<h3 id="75-evidências-geradas">7.5 Evidências Geradas</h3>
 <p>Na pasta <code>3_rede/</code> do cenário:</p>
 <ul>
 <li><code>teste_rede_&lt;data_hora&gt;.log</code>: log completo da execução.</li>
@@ -1219,7 +1336,7 @@ li {
 <li><code>Evidencia_Rede_Interno_&lt;A1|01..10&gt;_&lt;data_hora&gt;.png</code> e <code>Evidencia_Rede_Internet_&lt;A1|01..10&gt;_&lt;data_hora&gt;.png</code>: screenshot de cada rodada.</li>
 <li><code>Evidencia_Rede_Internet_Bloqueio_&lt;data_hora&gt;.png</code> e <code>Evidencia_Rede_Interno_Falha_&lt;data_hora&gt;.png</code>: só quando a página não carregou.</li>
 </ul>
-<h3 id="66-critério-de-aprovação">6.6 Critério de Aprovação</h3>
+<h3 id="76-critério-de-aprovação">7.6 Critério de Aprovação</h3>
 <p>Cada fonte termina com um status:</p>
 <table>
 <thead>
@@ -1269,7 +1386,7 @@ li {
 <p>A checagem antes da fila acusa:
 - <strong>Atenção</strong> quando falta a URL interna (só a internet será medida) ou não há internet (só o interno será medido);
 - <strong>Impede</strong> quando faltam as duas.</p>
-<h3 id="67-referência-de-valores-aceitáveis-gestão">6.7 Referência de Valores Aceitáveis <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="77-referência-de-valores-aceitáveis-gestão">7.7 Referência de Valores Aceitáveis <span class="tag tag-gestao">Gestão</span></h3>
 <div class="callout callout-info"><strong>Nota</strong>a tabela abaixo deve ser preenchida pela equipe conforme os padrões da organização. Use as <b>medianas</b> do speedtest interno.</div>
 <table>
 <thead>
@@ -1302,7 +1419,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="68-como-analisar-gestão">6.8 Como Analisar <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="78-como-analisar-gestão">7.8 Como Analisar <span class="tag tag-gestao">Gestão</span></h3>
 <p>A rede é a métrica que mais varia entre execuções. Em 24/11/2026, o fast.com mediu 532 Mbps às 19:31 e 80 Mbps às 23:17 na mesma máquina: o horário e os servidores escolhidos pelo site mudaram. Para que a diferença medida seja da máquina ou do agente, e não da internet:</p>
 <ul>
 <li><strong>Use a mediana.</strong> A média de poucas rodadas é arrastada por uma rodada fora da curva.</li>
@@ -1314,7 +1431,7 @@ li {
 <li><strong>Agente zero trust:</strong> compare o <code>Internet_*</code> do cenário baseline com o do cenário com agente. O <strong>local do cliente</strong> e o <strong>IP de saída</strong> mostram por onde o tráfego saiu: com o agente ativo, espera-se o nó de saída do provedor do agente. Se continuarem iguais aos do baseline, o tráfego provavelmente não passou pelo agente.</li>
 <li>O fast.com mede até a borda de conteúdo da Netflix mais próxima, muitas vezes dentro do próprio provedor de internet. O resultado representa a navegação cotidiana, não o trânsito internacional.</li>
 </ul>
-<h3 id="69-configuração-técnico">6.9 Configuração <span class="tag tag-tecnico">Técnico</span></h3>
+<h3 id="79-configuração-técnico">7.9 Configuração <span class="tag tag-tecnico">Técnico</span></h3>
 <p>Bloco <code>Rede</code> do <code>config.json</code>. <code>HUB_REDE_RODADAS</code> sobrescreve <code>Rodadas</code>, para testes rápidos.</p>
 <table>
 <thead>
@@ -1375,16 +1492,16 @@ li {
 </div>
 
 <div class="section">
-<h2 id="7-módulo-4--boot-e-shutdown">7. Módulo 4 — Boot e Shutdown</h2>
-<h3 id="71-objetivo">7.1 Objetivo</h3>
+<h2 id="8-módulo-4--boot-e-shutdown">8. Módulo 4 — Boot e Shutdown</h2>
+<h3 id="81-objetivo">8.1 Objetivo</h3>
 <p>Avaliar o tempo de inicialização e desligamento do Windows através de múltiplos ciclos de reinicialização, identificando degradações e gargalos no processo de boot.</p>
-<h3 id="72-ferramenta-utilizada">7.2 Ferramenta Utilizada</h3>
+<h3 id="82-ferramenta-utilizada">8.2 Ferramenta Utilizada</h3>
 <ul>
 <li><strong>Agendador de Tarefas do Windows</strong> (Task Scheduler) — para automatizar reinicializações</li>
 <li><strong>Event Log de Diagnósticos do Windows</strong> (<code>Microsoft-Windows-Diagnostics-Performance/Operational</code>) — fonte de métricas de boot/shutdown</li>
 <li><strong>PowerShell</strong> (<code>boot_shutdown_duration.ps1</code>) — para análise dos eventos</li>
 </ul>
-<h3 id="73-procedimento">7.3 Procedimento</h3>
+<h3 id="83-procedimento">8.3 Procedimento</h3>
 <p>Este teste opera em <strong>duas etapas</strong> com reinicializações automáticas:</p>
 <h4 id="etapa-1--ciclos-de-reinicialização-automático">Etapa 1 — Ciclos de Reinicialização (automático)</h4>
 <table>
@@ -1456,7 +1573,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="74-métricas-coletadas">7.4 Métricas Coletadas</h3>
+<h3 id="84-métricas-coletadas">8.4 Métricas Coletadas</h3>
 <table>
 <thead>
 <tr>
@@ -1488,7 +1605,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="75-critérios-de-avaliação">7.5 Critérios de Avaliação</h3>
+<h3 id="85-critérios-de-avaliação">8.5 Critérios de Avaliação</h3>
 <p>O teste utiliza <strong>limiares progressivos</strong>:</p>
 <table>
 <thead>
@@ -1514,7 +1631,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="76-critério-de-aprovação">7.6 Critério de Aprovação</h3>
+<h3 id="86-critério-de-aprovação">8.6 Critério de Aprovação</h3>
 <table>
 <thead>
 <tr>
@@ -1534,7 +1651,7 @@ li {
 </tbody>
 </table>
 <div class="callout callout-info"><strong>Nota</strong>Eventos de "aviso" (warning) são registrados no relatório mas <b>não causam FAIL</b>. Apenas eventos críticos reprovam o teste.</div>
-<h3 id="77-impacto-de-degradação-de-boot-gestão">7.7 Impacto de Degradação de Boot <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="87-impacto-de-degradação-de-boot-gestão">8.7 Impacto de Degradação de Boot <span class="tag tag-gestao">Gestão</span></h3>
 <p>Tempos de boot elevados afetam diretamente a produtividade:</p>
 <table>
 <thead>
@@ -1562,11 +1679,11 @@ li {
 </div>
 
 <div class="section">
-<h2 id="8-módulo-5--bateria">8. Módulo 5 — Bateria</h2>
-<h3 id="81-objetivo">8.1 Objetivo</h3>
+<h2 id="9-módulo-5--bateria">9. Módulo 5 — Bateria</h2>
+<h3 id="91-objetivo">9.1 Objetivo</h3>
 <p>Medir o consumo de energia do notebook na bateria em duas fases padronizadas — <strong>60 minutos ociosa</strong>, com a tela ligada, e <strong>60 minutos sob carga de escritório</strong> — para comparar o cenário <strong>baseline</strong> (sem agente) com o cenário <strong>com agente de segurança</strong> na mesma máquina. Antes de medir, o teste padroniza a máquina sozinho (<strong>pré-voo</strong>), relê cada ajuste e registra o valor antes e depois como evidência.</p>
 <p>O script é <code>Testes/5_bateria/5_teste_bateria.py</code>. Ele aparece no menu do hub na seção <strong>Bateria</strong>, logo após <strong>Boot Shutdown</strong>, e precisa de um operador para desconectar o carregador. O teste substitui o procedimento manual anterior (<code>cpu_stress_controller_pro.exe</code> com 60% de CPU por 120 minutos e a linha de comando do <code>Comando_Bateria.txt</code>); os resultados novos <strong>não são comparáveis</strong> com as medições antigas.</p>
-<h3 id="82-ferramentas-utilizadas">8.2 Ferramentas Utilizadas</h3>
+<h3 id="92-ferramentas-utilizadas">9.2 Ferramentas Utilizadas</h3>
 <ul>
 <li><strong>WMI de bateria</strong> (<code>root\wmi</code>): <code>BatteryStatus</code> (energia restante em mWh, taxa de descarga, tensão), <code>BatteryFullChargedCapacity</code> e <code>BatteryCycleCount</code>, lidos por um único processo PowerShell que fica aberto durante o teste — a leitura custa poucos milissegundos por amostra e não pesa na fase ociosa</li>
 <li><strong>API do Windows</strong>: <code>GetSystemPowerStatus</code> (fonte de alimentação, % de carga e estado da Economia de energia) e <code>powrprof</code> (modo de energia)</li>
@@ -1575,7 +1692,7 @@ li {
 <li><strong>Microsoft Edge</strong> com Google Docs, Google Sheets e um PDF — simulação contínua de carga de escritório no navegador durante a fase de escritório da bateria</li>
 <li><strong>psutil</strong> — top 10 processos por CPU</li>
 </ul>
-<h3 id="83-pré-voo-de-padronização">8.3 Pré-voo de Padronização</h3>
+<h3 id="93-pré-voo-de-padronização">9.3 Pré-voo de Padronização</h3>
 <p>O pré-voo roda <strong>na tomada</strong>, antes de pedir a desconexão do carregador. Cada item vira uma linha do <code>bateria_preflight.csv</code> com <code>Esperado</code>, <code>Antes</code>, <code>Acao</code>, <code>Depois</code>, <code>Situacao</code> (<code>ok</code>, <code>ajustado</code>, <code>não aplicável</code> ou <code>falhou</code>) e <code>Observacao</code>.</p>
 <table>
 <thead>
@@ -1728,7 +1845,7 @@ li {
 <li>Algum item <code>falhou</code>: o teste <strong>não mede</strong>, restaura o que já tinha alterado, lista os pendentes numa janela e sai com exit 1.</li>
 <li>Recurso inexistente na máquina (sem Bluetooth, sem sensor de luz, configuração ausente no plano) é <code>não aplicável</code> e não reprova.</li>
 </ul>
-<h3 id="84-procedimento">8.4 Procedimento</h3>
+<h3 id="94-procedimento">9.4 Procedimento</h3>
 <table>
 <thead>
 <tr>
@@ -1808,7 +1925,7 @@ li {
 <li>Uma <strong>vigia</strong> a cada 5 s encerra a medição de forma controlada se o carregador for reconectado, se a carga chegar a <strong>7%</strong> (proteção de bateria) ou se o operador pressionar Ctrl+Q.</li>
 <li>O overlay mostra fase, carga e minutos restantes, atualizado só a cada amostra para não gerar atividade de tela na fase ociosa.</li>
 </ul>
-<h3 id="85-métricas-coletadas">8.5 Métricas Coletadas</h3>
+<h3 id="95-métricas-coletadas">9.5 Métricas Coletadas</h3>
 <p>As métricas de cada fase saem de duas amostras-marco tiradas nos limites exatos da fase (<code>inicio_fase</code> e <code>fim_fase</code>). A <strong>energia em mWh é a medida principal</strong>; o percentual de carga é complementar.</p>
 <table>
 <thead>
@@ -1897,7 +2014,7 @@ li {
 </tbody>
 </table>
 <p><code>Motivo_Encerramento</code>: <code>concluido</code>, <code>protecao_bateria</code>, <code>carregador_reconectado</code>, <code>parada_segura</code>, <code>sessao_bloqueada</code>, <code>login_exigido</code>, <code>padronizacao_na_bateria</code> ou <code>erro</code>. Fase sem dados = <code>N/A</code>. Formato: separador <code>,</code>, decimal com ponto e 2 casas.</p>
-<h3 id="86-evidências-geradas">8.6 Evidências Geradas</h3>
+<h3 id="96-evidências-geradas">9.6 Evidências Geradas</h3>
 <p>Na pasta <code>5_bateria/</code> do cenário:</p>
 <ul>
 <li><code>teste_bateria_&lt;data_hora&gt;.log</code> — log completo da execução</li>
@@ -1912,7 +2029,7 @@ li {
 <li><code>bateria.csv</code> — CSV temático (<code>Metrica,Valor,Unidade</code>). É gravado sempre que a medição começou, inclusive em encerramento antecipado</li>
 </ul>
 <p>Nada é gravado em <code>C:\BATERIA</code>, em <code>C:\Traces</code> nem na raiz do projeto.</p>
-<h3 id="87-critério-de-aprovação">8.7 Critério de Aprovação</h3>
+<h3 id="97-critério-de-aprovação">9.7 Critério de Aprovação</h3>
 <p>O PASS/FAIL decide se a <strong>coleta é válida</strong>; não há limiar de autonomia ou consumo.</p>
 <table>
 <thead>
@@ -1965,7 +2082,7 @@ li {
 </tbody>
 </table>
 <div class="callout callout-info"><strong>Nota</strong>desvios de padronização durante a medição e falhas nas evidências complementares (exportação CSV, SRUM, relatório de energia) <b>não reprovam</b>: ficam como aviso no log e, no caso dos desvios, em <code>Desvios_Padronizacao</code>.</div>
-<h3 id="88-como-interpretar-gestão">8.8 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="98-como-interpretar-gestão">9.8 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
 <ul>
 <li>Compare o <code>bateria.csv</code> do cenário <strong>baseline</strong> com o do cenário <strong>com agente</strong>, executados na <strong>mesma máquina</strong>, na <strong>mesma rede</strong> e com a <strong>mesma versão do teste</strong> (<code>Versao_Teste</code>).</li>
 <li>A <strong>fase ociosa</strong> mostra o custo de fundo do agente — é onde 1–2 W de diferença aparecem com mais clareza. A <strong>fase de escritório</strong> representa o uso real.</li>
@@ -1975,16 +2092,16 @@ li {
 <li>O <code>bateria_top_processos.csv</code> e os traces <code>.etl</code> (no WPA) ajudam a atribuir a diferença de consumo a processos específicos.</li>
 <li>Os resultados <strong>não são comparáveis</strong> com as medições antigas de 60% de CPU por 120 minutos.</li>
 </ul>
-<h3 id="89-interrupção-segura">8.9 Interrupção Segura</h3>
+<h3 id="99-interrupção-segura">9.9 Interrupção Segura</h3>
 <p>Assim como no Módulo 1, o teste pode ser interrompido com <strong>Ctrl+Q</strong>. Fechar a janela do monitor do teste (pela barra de tarefas ou Alt+F4) e um Ctrl+C recebido pelo teste têm o mesmo efeito. A parada segura salva o trace parcial, grava o que já foi medido (<code>bateria.csv</code> com <code>Coleta_Valida = nao</code>), restaura as configurações alteradas, fecha o Edge e sai com exit code 1.</p>
 <p>Se o processo for encerrado à força (por exemplo, fechando a janela do hub), a restauração automática não roda: use a coluna <code>Antes</code> do <code>bateria_preflight.csv</code> para voltar brilho, Bluetooth e configurações de energia aos valores anteriores.</p>
 </div>
 
 <div class="section">
-<h2 id="9-módulo-6--wi-fi-fast-transition-80211r">9. Módulo 6 — Wi-Fi Fast Transition (802.11r)</h2>
-<h3 id="91-objetivo">9.1 Objetivo</h3>
+<h2 id="10-módulo-6--wi-fi-fast-transition-80211r">10. Módulo 6 — Wi-Fi Fast Transition (802.11r)</h2>
+<h3 id="101-objetivo">10.1 Objetivo</h3>
 <p>Verificar se a máquina (adaptador Wi-Fi + driver + firmware/BIOS + Windows) faz <strong>roaming com Fast BSS Transition (802.11r)</strong> ao trocar de AP dentro da mesma rede. Sem FT, cada troca de AP passa por uma reautenticação completa (4-way handshake e, em redes 802.1X, o RADIUS), o que gera interrupções perceptíveis em chamadas de voz/vídeo e VPN. O teste também coleta tudo o que interfere nessa compatibilidade, para explicar um FAIL.</p>
-<h3 id="92-ferramentas-utilizadas">9.2 Ferramentas Utilizadas</h3>
+<h3 id="102-ferramentas-utilizadas">10.2 Ferramentas Utilizadas</h3>
 <ul>
 <li><strong>API nativa de WLAN do Windows (<code>wlanapi.dll</code>)</strong>, lida pelo script: BSSID, RSSI e qualidade a cada 250 ms; notificações de associação/roaming; cache de varredura com os <em>Information Elements</em> de cada AP.</li>
 <li><strong><code>netsh wlan show interfaces</code></strong>: AKM da associação atual (<code>akm = 00-0f-ac:NN</code>), relida a cada 2 s e logo após cada troca de AP.</li>
@@ -1993,7 +2110,7 @@ li {
 <li><strong>Painel ao vivo</strong> no navegador (servidor local em <code>127.0.0.1</code>), sem dependência de internet.</li>
 </ul>
 <p>O teste <strong>não altera nenhuma configuração</strong> do sistema, do adaptador ou da rede, e não força varreduras Wi-Fi.</p>
-<h3 id="93-procedimento">9.3 Procedimento</h3>
+<h3 id="103-procedimento">10.3 Procedimento</h3>
 <ol>
 <li><strong>Pré-voo:</strong> exige o Wi-Fi conectado — a rede conectada é a rede testada. Registra SSID, BSSID inicial, autenticação, cifra, AKM, banda, canal, RSSI e gateway.</li>
 <li><strong>Coleta de compatibilidade:</strong> adaptador e propriedades avançadas (Roaming Aggressiveness, banda preferida, MIMO Power Save...), driver (versão, data, fornecedor, INF), capacidades sem fio, BIOS, modelo, SO/build, plano e economia de energia do adaptador sem fio, adaptadores virtuais/VPN ativos e perfil WLAN (<strong>sem a senha</strong>).</li>
@@ -2001,7 +2118,7 @@ li {
 <li><strong>Caminhada (5 min):</strong> o painel abre no navegador; o operador clica em <strong>Iniciar caminhada</strong> (ou o início é automático após 60 s) e anda pelo escritório passando por áreas de APs diferentes. O painel mostra AP atual, RSSI, gráficos de RSSI e latência, e destaca cada troca com a classificação.</li>
 <li><strong>Pós-processamento:</strong> exportação do log <code>WLAN-AutoConfig/Operational</code> do período, relatório WLAN do Windows (<code>wlanreport</code>), classificação de cada troca, CSVs e relatório HTML.</li>
 </ol>
-<h3 id="94-classificação-de-cada-troca-de-ap">9.4 Classificação de Cada Troca de AP</h3>
+<h3 id="104-classificação-de-cada-troca-de-ap">10.4 Classificação de Cada Troca de AP</h3>
 <table>
 <thead>
 <tr>
@@ -2030,9 +2147,9 @@ li {
 <li><strong>Conclusão no Windows:</strong> autenticação → roaming concluído (instalação de chaves, liberação da porta e aviso aos programas). A WLC não enxerga essa fase.</li>
 </ul>
 <p>Sem notificações, só o total pela amostragem (resolução de 250 ms). O início é procurado desde o fim do roaming anterior, porque tentativas demoradas começam segundos antes de o BSSID mudar; trocas acima de 1 s são sinalizadas como <strong>demoradas</strong>. Os carimbos usam relógio de alta resolução (&lt; 1 ms). A interrupção é o maior intervalo sem resposta do gateway em torno da troca.</p>
-<h3 id="95-métricas-coletadas">9.5 Métricas Coletadas</h3>
+<h3 id="105-métricas-coletadas">10.5 Métricas Coletadas</h3>
 <p>O <code>wifi_ft.csv</code> (formato <code>Metrica,Valor,Unidade</code>) traz: SSID, autenticação, cifra, AKM conectada, adaptador, versão/data/fornecedor do driver, firmware, BIOS, build do SO, suporte declarado a FT/802.11k/802.11v, APs vistos/com FT anunciado/utilizados, duração da caminhada, roamings (total, FT, não FT, indeterminados, com desconexão, demorados), tempo de troca total, de reassociação e de conclusão no Windows (média, mediana e máximo), interrupção média/máxima (gateway e internet), perda e latência média/p95 (gateway e internet), RSSI mínimo/médio/máximo e resultado.</p>
-<h3 id="96-evidências-geradas">9.6 Evidências Geradas</h3>
+<h3 id="106-evidências-geradas">10.6 Evidências Geradas</h3>
 <table>
 <thead>
 <tr>
@@ -2075,7 +2192,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="97-critério-de-aprovação">9.7 Critério de Aprovação</h3>
+<h3 id="107-critério-de-aprovação">10.7 Critério de Aprovação</h3>
 <table>
 <thead>
 <tr>
@@ -2095,7 +2212,7 @@ li {
 </tbody>
 </table>
 <p>Tempo de troca e perda de pacotes são registrados, mas não reprovam. Ping para a internet bloqueado vira <code>N/A</code> e não reprova.</p>
-<h3 id="98-como-interpretar-gestão">9.8 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="108-como-interpretar-gestão">10.8 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
 <ul>
 <li><strong>FAIL "nenhuma troca de AP":</strong> o operador não se afastou o suficiente do AP inicial, ou só há 1 AP do SSID no percurso. Não indica problema da máquina.</li>
 <li><strong>FAIL "nenhum com Fast Transition" com o achado "a rede usa PSK/802.1X/SAE":</strong> o 802.11r não está habilitado no SSID (configuração da controladora/AP), não é problema da máquina.</li>
@@ -2105,8 +2222,8 @@ li {
 </div>
 
 <div class="section">
-<h2 id="10-módulos-7-a-11--cargas-de-desenvolvimento">10. Módulos 7 a 11 — Cargas de Desenvolvimento</h2>
-<h3 id="101-objetivo">10.1 Objetivo</h3>
+<h2 id="11-módulos-7-a-11--cargas-de-desenvolvimento">11. Módulos 7 a 11 — Cargas de Desenvolvimento</h2>
+<h3 id="111-objetivo">11.1 Objetivo</h3>
 <p>Medir quanto tempo um desenvolvedor espera nas tarefas reais do dia a dia (compilar, rodar testes, instalar dependências, subir containers, operar o git) e, com isso, o impacto combinado do hardware e da imagem corporativa (EDR, DLP, antivírus) sobre o trabalho de desenvolvimento. As cargas vêm do processo de homologação de notebooks para desenvolvimento e usam <strong>repositórios open source fixados por tag</strong>, para que qualquer máquina meça exatamente o mesmo código.</p>
 <p>Os cinco módulos são independentes (um por linguagem ou ferramenta) e podem ser escolhidos separadamente no menu:</p>
 <table>
@@ -2151,13 +2268,13 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="102-ferramentas-utilizadas">10.2 Ferramentas Utilizadas</h3>
+<h3 id="112-ferramentas-utilizadas">11.2 Ferramentas Utilizadas</h3>
 <ul>
 <li><strong>Biblioteca comum <code>Testes/_lib/dev_cargas.py</code></strong>: executa as cargas descritas no <code>cargas.json</code> de cada módulo, cronometra só o comando medido (<code>time.perf_counter</code>), aplica o limite de tempo, monitora tomada e Ctrl+Q e grava as evidências. Não aparece no menu.</li>
 <li><strong>Ferramentas de desenvolvimento</strong> instaladas pelos setups <code>7_install_devtools_dev</code> (Git, .NET SDK 10, Go, uv, docker-compose) e <code>10_preparar_podman</code> (WSL2, Podman CLI e <code>podman machine</code> rootful).</li>
 <li><strong><code>psutil</code></strong> para ler a tomada e encerrar a árvore de processos de uma carga (msbuild, go, podman).</li>
 </ul>
-<h3 id="103-procedimento">10.3 Procedimento</h3>
+<h3 id="113-procedimento">11.3 Procedimento</h3>
 <ol>
 <li><strong>Pré-checagem:</strong> o módulo exige a máquina <strong>na tomada</strong> (na bateria, não mede nada e reprova) e confere cada ferramenta do módulo e a versão mínima. Ferramenta ausente reprova o módulo antes de qualquer medição.</li>
 <li><strong>Repositórios:</strong> clona (ou reaproveita) cada repositório na pasta de trabalho (<code>%USERPROFILE%\wintestehub-dev-work</code>, configurável por <code>DevWorkDir</code> no <code>config.local.json</code>), faz checkout da tag fixa e limpa a árvore (<code>git reset --hard</code> + <code>git clean -fdx</code>). Fora da medição.</li>
@@ -2166,13 +2283,13 @@ li {
 <li><strong>Monitoramento contínuo:</strong> a cada 0,5 s o módulo confere o limite de tempo e o Ctrl+Q; a cada 2 s, a tomada. Desconectar a tomada ou apertar Ctrl+Q interrompe a carga em curso, roda o <code>cleanup</code> e encerra o módulo com FAIL. O Ctrl+Q também para a fila do hub: os módulos seguintes não rodam. Já a tomada desconectada só encerra o módulo atual.</li>
 <li><strong>Registro:</strong> versões das ferramentas, plano de energia, tomada, commit dos repositórios e digests das imagens de container entram no JSON do módulo.</li>
 </ol>
-<h3 id="104-referência-e-limite-de-tempo">10.4 Referência e Limite de Tempo</h3>
+<h3 id="114-referência-e-limite-de-tempo">11.4 Referência e Limite de Tempo</h3>
 <p>O limite de cada carga é <strong>10 vezes o tempo medido no notebook de referência</strong> (o notebook atual da frota), comparando frio com frio: a 1ª execução (caches do sistema vazios) é limitada a 10x a execução fria da referência, e as seguintes a 10x a mediana. Sem essa separação, cargas com aquecimento grande (ex.: A4c, cuja execução fria é 7x a mediana) reprovariam indevidamente em máquinas só um pouco mais lentas. A referência é gerada uma vez, rodando cada módulo avulso com <code>--calibrar</code> no notebook de referência, e fica versionada no <code>referencia.json</code> do módulo (mediana, fria e os dois limites por carga, modelo de CPU, RAM, data e versões das ferramentas; sem hostname).</p>
 <ul>
 <li>A carga que passa do limite é <strong>encerrada</strong> (processo e todos os filhos) e fica como <code>TEMPO_EXCEDIDO</code>.</li>
 <li>Módulo sem <code>referencia.json</code>, ou carga sem entrada nele (ex.: cargas internas do <code>workloads.local.json</code>): roda sem limite, com aviso no log e no JSON.</li>
 </ul>
-<h3 id="105-métricas-coletadas">10.5 Métricas Coletadas</h3>
+<h3 id="115-métricas-coletadas">11.5 Métricas Coletadas</h3>
 <table>
 <thead>
 <tr>
@@ -2207,7 +2324,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="106-evidências-geradas">10.6 Evidências Geradas</h3>
+<h3 id="116-evidências-geradas">11.6 Evidências Geradas</h3>
 <table>
 <thead>
 <tr>
@@ -2234,7 +2351,7 @@ li {
 </tr>
 </tbody>
 </table>
-<h3 id="107-critério-de-aprovação">10.7 Critério de Aprovação</h3>
+<h3 id="117-critério-de-aprovação">11.7 Critério de Aprovação</h3>
 <table>
 <thead>
 <tr>
@@ -2254,7 +2371,7 @@ li {
 </tbody>
 </table>
 <p>Uma carga que falha não impede as próximas do mesmo módulo (o resultado parcial fica registrado); interrupções param o módulo.</p>
-<h3 id="108-ressalvas-técnico">10.8 Ressalvas <span class="tag tag-tecnico">Técnico</span></h3>
+<h3 id="118-ressalvas-técnico">11.8 Ressalvas <span class="tag tag-tecnico">Técnico</span></h3>
 <ul>
 <li><strong>Rede:</strong> A6a (<code>pip install</code> do PyPI) e A7a (<code>go mod download</code> dentro do build do container) dependem de rede durante a medição. Compare máquinas na mesma rede.</li>
 <li><strong>Tags móveis de imagens</strong> (<code>mssql/server:2022-latest</code>, <code>golang:1.27-alpine3.24</code>): puxe no mesmo dia nas máquinas comparadas; os digests ficam no JSON.</li>
@@ -2263,7 +2380,7 @@ li {
 <li><strong>Recursos da VM do Podman:</strong> a VM WSL2 usa o padrão do WSL (50% da RAM, todas as threads). Não use <code>.wslconfig</code> diferente entre as máquinas comparadas.</li>
 <li><strong>Cargas internas:</strong> podem ser acrescentadas no <code>workloads.local.json</code> (fora do git, exemplo em <code>workloads.local.example.json</code>); não entram no <code>referencia.json</code>.</li>
 </ul>
-<h3 id="109-como-interpretar-gestão">10.9 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="119-como-interpretar-gestão">11.9 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
 <ul>
 <li>O número que importa é a <strong>mediana</strong> de cada carga comparada com a do notebook de referência: uma razão de 1,3 significa que o desenvolvedor espera 30% mais naquela tarefa.</li>
 <li><strong>B1 alto com o restante normal</strong> aponta para overhead de EDR/antivírus em arquivos pequenos (padrão de <code>node_modules</code>, <code>obj/</code>, <code>.git</code>), não para o disco.</li>
@@ -2273,8 +2390,8 @@ li {
 </div>
 
 <div class="section">
-<h2 id="11-rastreabilidade-e-evidências">11. Rastreabilidade e Evidências</h2>
-<h3 id="111-estrutura-de-armazenamento">11.1 Estrutura de Armazenamento</h3>
+<h2 id="12-rastreabilidade-e-evidências">12. Rastreabilidade e Evidências</h2>
+<h3 id="121-estrutura-de-armazenamento">12.1 Estrutura de Armazenamento</h3>
 <p>Toda execução gera evidências organizadas por cenário, em duas pastas: <code>Execucoes/</code> (logs, evidências completas e estado) e <code>Exportar/</code> (cópia de <code>Traces/</code> sem <code>.etl</code>, logs e pastas vazias, pronta para o Drive).</p>
 <pre><code>Execucoes/
 └── ImagemLimpa_DESKTOP-ABC_2026-04-15/     ← cenário
@@ -2288,7 +2405,15 @@ li {
         ├── _relatorio.json
         ├── informacoes_maquina.csv              ← inventário do setup 1
         ├── maquina.csv                          ← inventário do hub + modelo/patrimônio informados
-        ├── &lt;módulo&gt;/frequencia_cpu.csv          ← frequência da CPU durante o teste (gerado pelo hub)
+        ├── &lt;módulo&gt;/frequencia_cpu.csv          ← frequência da CPU durante o teste (gerado pelo hub; exceto 0 e 5)
+        ├── 0_consumo_basal/                     ← evidências do teste de consumo basal
+        │   ├── consumo_basal_*.log
+        │   ├── Trace_Basal_*_Run1.etl … Trace_Basal_*_Run3.etl
+        │   ├── CSV_*_Run1/ … CSV_*_Run3/        ← exportação WPA de cada ciclo
+        │   ├── Resultados_Consolidados/         ← Relatorio_Resumo.csv e .html
+        │   ├── consumo_basal.csv
+        │   ├── ciclos_basal.csv
+        │   └── top_processos_basal.csv
         ├── 1_cpu_memo/                          ← evidências do teste de CPU
         │   ├── automacao_*.log
         │   ├── Trace_*_Run1.etl … Trace_*_Run5.etl
@@ -2353,7 +2478,7 @@ Exportar/
 </code></pre>
 <p>A pasta de exportação é regerada ao fim de cada execução (e pela opção <code>[E]</code> do menu). <code>Traces/</code> não é alterada: os <code>.etl</code> continuam disponíveis em <code>Execucoes/</code> para análise no WPA. Os dados de análise de cada módulo ficam em CSV, JSON ou HTML, então nada que sustente um resultado se perde na exportação.</p>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot do Windows Explorer mostrando a estrutura de pastas de um cenário real<br><em>Salvar como: img/placeholder-estrutura-traces.png</em></div>
-<h3 id="112-ciclo-de-vida-das-evidências">11.2 Ciclo de Vida das Evidências</h3>
+<h3 id="122-ciclo-de-vida-das-evidências">12.2 Ciclo de Vida das Evidências</h3>
 <ol>
 <li><strong>Primeira execução:</strong> Evidências são salvas diretamente nas subpastas do cenário</li>
 <li><strong>Re-execução:</strong> Evidências anteriores são movidas para <code>&lt;pasta do teste&gt;/_anterior/run{N}_{data-hora}/</code> e novas evidências são geradas</li>
@@ -2361,7 +2486,7 @@ Exportar/
 </ol>
 <p><strong>Nenhuma evidência é apagada.</strong> O histórico completo de todas as tentativas é preservado.</p>
 <div class="callout callout-info"><strong>Nota</strong>a pasta de evidências é a da categoria, compartilhada pelos scripts da mesma pasta. Reexecutar um teste também move para <code>_anterior/</code> as evidências atuais dos outros testes da mesma pasta (por exemplo, o Módulo 1 e a variante 1-1).</div>
-<h3 id="113-o-arquivo-_statejson-técnico">11.3 O Arquivo _state.json <span class="tag tag-tecnico">Técnico</span></h3>
+<h3 id="123-o-arquivo-_statejson-técnico">12.3 O Arquivo _state.json <span class="tag tag-tecnico">Técnico</span></h3>
 <p>O <code>_state.json</code> é a fonte de verdade para o estado do cenário. Exemplo de estrutura:</p>
 <pre><code class="language-json">{
   &quot;scenario&quot;: &quot;ImagemLimpa&quot;,
@@ -2385,7 +2510,7 @@ Exportar/
   ]
 }
 </code></pre>
-<h3 id="114-cadeia-de-custódia-gestão">11.4 Cadeia de Custódia <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="124-cadeia-de-custódia-gestão">12.4 Cadeia de Custódia <span class="tag tag-gestao">Gestão</span></h3>
 <p>Para auditar uma execução e validar a integridade dos resultados:</p>
 <table>
 <thead>
@@ -2431,15 +2556,15 @@ Exportar/
 </div>
 
 <div class="section">
-<h2 id="12-formatos-de-relatório">12. Formatos de Relatório</h2>
-<h3 id="121-relatório-html">12.1 Relatório HTML</h3>
+<h2 id="13-formatos-de-relatório">13. Formatos de Relatório</h2>
+<h3 id="131-relatório-html">13.1 Relatório HTML</h3>
 <p>Relatório visual com tabela formatada, badges de status coloridos e resumo estatístico. Ideal para apresentação e compartilhamento. Há dois:</p>
 <ul>
 <li><strong><code>Traces/_relatorio.html</code> (consolidado do cenário):</strong> nome do cenário, máquina, datas de criação e da última execução, total de runs e estatísticas (PASS, FAIL, ERROR). Tabela com o último resultado de cada teste: nome, status, duração, run e pasta de evidências.</li>
 <li><strong><code>Logs/run_*.html</code> (uma execução):</strong> máquina, usuário, início e tempo total. Tabela com cada script da run: fase, nome, tipo, status, duração e número de evidências. Para os que não passaram, mostra as últimas linhas de erro.</li>
 </ul>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot de um relatório HTML real<br><em>Salvar como: img/placeholder-relatorio-html-exemplo.png</em></div>
-<h3 id="122-relatório-csv">12.2 Relatório CSV</h3>
+<h3 id="132-relatório-csv">13.2 Relatório CSV</h3>
 <p>Dados tabulares com uma linha por teste. Ideal para importação em Excel ou ferramentas de BI.</p>
 <p><strong>Colunas do <code>Logs/run_*.csv</code>:</strong></p>
 <table>
@@ -2489,7 +2614,7 @@ Exportar/
 </tbody>
 </table>
 <p>O consolidado <code>Traces/_relatorio.csv</code> tem as colunas <code>Nome</code>, <code>Status</code>, <code>Duracao_s</code>, <code>Run</code>, <code>Reexecucao</code> e <code>Pasta</code>, com o último resultado de cada teste. O <code>_relatorio.json</code> traz o mesmo status com o nome do cenário, o hostname, o modelo e o patrimônio; a data de cada run está no <code>_state.json</code>. O <code>Traces/maquina.csv</code> traz o inventário da máquina.</p>
-<h3 id="123-relatório-json">12.3 Relatório JSON</h3>
+<h3 id="133-relatório-json">13.3 Relatório JSON</h3>
 <p>Dados estruturados com metadados completos. Ideal para integração com APIs e sistemas de monitoramento.</p>
 <p><strong>Campos principais:</strong></p>
 <pre><code class="language-json">{
@@ -2503,7 +2628,7 @@ Exportar/
   &quot;Scripts&quot;: [ ... ]
 }
 </code></pre>
-<h3 id="124-qual-relatório-usar-gestão">12.4 Qual Relatório Usar <span class="tag tag-gestao">Gestão</span></h3>
+<h3 id="134-qual-relatório-usar-gestão">13.4 Qual Relatório Usar <span class="tag tag-gestao">Gestão</span></h3>
 <table>
 <thead>
 <tr>
@@ -2541,7 +2666,7 @@ Exportar/
 </div>
 
 <div class="section">
-<h2 id="13-glossário">13. Glossário</h2>
+<h2 id="14-glossário">14. Glossário</h2>
 <table>
 <thead>
 <tr>
@@ -2564,7 +2689,7 @@ Exportar/
 </tr>
 <tr>
 <td><strong>Bateria (Módulo 5)</strong></td>
-<td>O teste de consumo de energia na bateria do notebook (seção 8)</td>
+<td>O teste de consumo de energia na bateria do notebook (seção 9)</td>
 </tr>
 <tr>
 <td><strong>Cenário</strong></td>

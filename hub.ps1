@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath $configFile)) {
             IntervalSec      = 5
             ThrottleAlertPct = 20
             LoadMinPct       = 50
-            SkipFolders      = @("5_bateria")
+            SkipFolders      = @("0_consumo_basal", "5_bateria")
         }
     }
     $defaultConfig | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configFile -Encoding UTF8
@@ -58,7 +58,7 @@ function Merge-ConfigSection {
     return $merged
 }
 $PreflightSettings  = Merge-ConfigSection $config "Preflight"  @{ MinFreeGB = 20; CpuAlertPct = 10; InternetHost = "www.msftconnecttest.com" }
-$CpuSamplerSettings = Merge-ConfigSection $config "CpuSampler" @{ Enabled = $true; IntervalSec = 5; ThrottleAlertPct = 20; LoadMinPct = 50; SkipFolders = @("5_bateria") }
+$CpuSamplerSettings = Merge-ConfigSection $config "CpuSampler" @{ Enabled = $true; IntervalSec = 5; ThrottleAlertPct = 20; LoadMinPct = 50; SkipFolders = @("0_consumo_basal", "5_bateria") }
 # "Enabled": "false" (com aspas) tambem desliga
 try { $CpuSamplerSettings.Enabled = [System.Convert]::ToBoolean([string]$CpuSamplerSettings.Enabled) } catch { $CpuSamplerSettings.Enabled = $true }
 
@@ -1194,6 +1194,7 @@ function Test-ThematicCSVs {
     Write-Host "`n  Verificando CSVs tematicos..." -ForegroundColor DarkCyan
 
     $expectedCSVs = @{
+        "0_consumo_basal"  = "consumo_basal.csv"
         "1_cpu_memo"       = "cpu_memoria.csv"
         "2_disco"          = "disco.csv"
         "3_rede"           = "rede.csv"
@@ -1889,16 +1890,37 @@ function Get-PreflightFindings {
     }
     $allNames = @($Tests | ForEach-Object { "$($_.Name).$($_.Type)" })
 
-    # Modulos com captura WPR + exportacao WPA (1 e 5): profile do WPA (nao
-    # versionado; sem ele o modulo grava so .etl, horas depois) e o WPT no PATH
-    $wpaModules = [ordered]@{ "1_cpu_memo" = "Agentes_SI_Profile.wpaProfile"; "5_bateria" = "Agentes_SI_Bateria_Profile.wpaProfile" }
+    # Modulos com captura WPR + exportacao WPA (0, 1 e 5): profile do WPA (nao
+    # versionado; sem ele o modulo grava so .etl, horas depois) e o WPT no PATH.
+    # O modulo 0 reutiliza o Agentes_SI_Profile.wpaProfile de 1_cpu_memo quando
+    # nao ha copia propria em 0_consumo_basal.
+    $wpaModules = [ordered]@{
+        "0_consumo_basal" = @("Agentes_SI_Profile.wpaProfile", "1_cpu_memo")
+        "1_cpu_memo"      = @("Agentes_SI_Profile.wpaProfile", $null)
+        "5_bateria"       = @("Agentes_SI_Bateria_Profile.wpaProfile", $null)
+    }
     foreach ($folder in $wpaModules.Keys) {
         if (-not $byFolder.Contains($folder)) { continue }
         $names = $byFolder[$folder]
+        $profileName, $fallbackFolder = $wpaModules[$folder]
         $dir = Join-Path $TestsRoot $folder
-        $prof = Join-Path $dir $wpaModules[$folder]
-        if (-not (Test-Path -LiteralPath $prof) -and -not (Test-Path -LiteralPath "$prof.xml")) {
-            $findings.Add((New-PreflightFinding "Impede" $names "$($wpaModules[$folder]) ausente (sem ele o modulo grava so .etl e nenhum CSV do WPA)" "Copie o $($wpaModules[$folder]) para $dir"))
+        $searchDirs = @($dir)
+        if ($fallbackFolder) { $searchDirs += (Join-Path $TestsRoot $fallbackFolder) }
+        $foundProfile = $false
+        foreach ($sd in $searchDirs) {
+            $prof = Join-Path $sd $profileName
+            if ((Test-Path -LiteralPath $prof) -or (Test-Path -LiteralPath "$prof.xml")) {
+                $foundProfile = $true
+                break
+            }
+        }
+        if (-not $foundProfile) {
+            $acao = if ($fallbackFolder) {
+                "Copie o $profileName para $dir ou $(Join-Path $TestsRoot $fallbackFolder)"
+            } else {
+                "Copie o $profileName para $dir"
+            }
+            $findings.Add((New-PreflightFinding "Impede" $names "$profileName ausente (sem ele o modulo grava so .etl e nenhum CSV do WPA)" $acao))
         }
         foreach ($exe in "wpr", "wpaexporter") {
             if (-not (Test-CommandAvailable -Cmd $exe)) {
@@ -2058,7 +2080,7 @@ function Get-TestLeftovers {
     }
 
     if (Test-WprRecording (Get-WprStatus)) {
-        & $add "wpr" "sessao do WPR gravando" "wpr -status" @() @("1_cpu_memo")
+        & $add "wpr" "sessao do WPR gravando" "wpr -status" @() @("0_consumo_basal", "1_cpu_memo")
     }
 
     # IgnorePids: processos que ja existiam antes do teste (entre testes, so o
@@ -2071,7 +2093,7 @@ function Get-TestLeftovers {
         @($procs | Where-Object { $_.Name -match $Pattern })
     }
 
-    foreach ($exe in @(@{ N = "wpaexporter"; T = @("1_cpu_memo") }, @{ N = "diskspd"; T = @("2_disco") })) {
+    foreach ($exe in @(@{ N = "wpaexporter"; T = @("0_consumo_basal", "1_cpu_memo") }, @{ N = "diskspd"; T = @("2_disco") })) {
         $p = @(& $byName ("^" + $exe.N + "\.exe$"))
         if ($p.Count -gt 0) { & $add $exe.N "$($exe.N).exe" "$($p.Count) processo(s)" @($p | ForEach-Object { $_.ProcessId }) $exe.T }
     }

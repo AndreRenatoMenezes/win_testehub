@@ -200,9 +200,10 @@ try {
     Assert-Condition ((Get-Content -LiteralPath (Join-Path $t3 "_relatorio.html") -Raw) -match 'Nenhum aviso' -and @($j3.Avisos).Count -eq 0) "cenario sem avisos: 'Nenhum aviso' e lista vazia"
 
     Section "Test-CpuSamplingEnabled"
-    $on  = [PSCustomObject]@{ Enabled = $true; SkipFolders = @("5_bateria") }
+    $on  = [PSCustomObject]@{ Enabled = $true; SkipFolders = @("0_consumo_basal", "5_bateria") }
     $offS = [PSCustomObject]@{ Enabled = $false; SkipFolders = @() }
     Assert-Condition (Test-CpuSamplingEnabled -Test ([PSCustomObject]@{ Kind = "test"; ParentFolder = "1_cpu_memo" }) -Settings $on) "teste comum -> amostra"
+    Assert-Condition (-not (Test-CpuSamplingEnabled -Test ([PSCustomObject]@{ Kind = "test"; ParentFolder = "0_consumo_basal" }) -Settings $on)) "teste 0 (SkipFolders) -> nao amostra"
     Assert-Condition (-not (Test-CpuSamplingEnabled -Test ([PSCustomObject]@{ Kind = "test"; ParentFolder = "5_bateria" }) -Settings $on)) "teste 5 (SkipFolders) -> nao amostra"
     Assert-Condition (-not (Test-CpuSamplingEnabled -Test ([PSCustomObject]@{ Kind = "setup"; ParentFolder = "environment" }) -Settings $on)) "setup -> nao amostra"
     Assert-Condition (-not (Test-CpuSamplingEnabled -Test ([PSCustomObject]@{ Kind = "test"; ParentFolder = "1_cpu_memo" }) -Settings $offS)) "Enabled false -> nao amostra (nenhum CSV)"

@@ -46,6 +46,7 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 
 | # | Módulo | Script | O que mede | Duração | PASS quando |
 |:-:|--------|--------|------------|:-------:|-------------|
+| 0 | Consumo Basal | `0_teste_consumo_basal.py` | Consumo de CPU e RAM da máquina em repouso (sistema total, Top 15 processos via `psutil` e soma/média dos agentes de segurança via WPR/WPA): 60 s de estabilização + 3 ciclos de 3 min | ~11 min | os 3 ciclos terminam e geram os 3 CSVs |
 | 1 | CPU e Memória | `1_automacao_performance.py` | Carga de escritório local no LibreOffice (Writer e Calc: abertura, cálculo da planilha R2 — 100 mil fórmulas, a mesma carga do teste do macOS — e edição GUI) com amostragem `psutil`, captura WPR e exportação WPA: 5 ciclos de 5 min com cooldown inteligente | ~50 min | os 5 ciclos terminam sem erro |
 | 1.1 | CPU e Memória — DLP/USB | `1-1_automacao_performance_dlp.py` | Variante do Módulo 1: cópias para pendrive durante a captura, para medir o custo do agente de DLP | 5 ciclos de 60 s | os ciclos terminam sem erro |
 | 2 | Disco | `2_teste_disco.py` | Leitura e escrita sequenciais com DiskSpd (bloco de 1 MB, arquivo de 8 GB), 10 baterias | ~25 min | as 10 baterias terminam e o CSV é gerado |
@@ -106,7 +107,7 @@ Antes de cada script, o hub injeta `HUB_EVIDENCE_DIR` (onde gravar as evidência
 | Rede | Internet para o setup; acesso ao speedtest interno para o Módulo 3 |
 | Disco | ≥ 10 GB livres (o Módulo 2 cria um arquivo de teste de 8 GB) |
 | Software | Python 3.12, as dependências e o LibreOffice são instalados pelo próprio setup. O Microsoft Edge já vem no Windows |
-| Módulos 1 e 5 | Windows Performance Toolkit (`wpr.exe` e `wpaexporter.exe`) no `PATH`, parte do Windows ADK |
+| Módulos 0, 1 e 5 | Windows Performance Toolkit (`wpr.exe` e `wpaexporter.exe`) no `PATH`, parte do Windows ADK |
 | Módulo 1 | LibreOffice (`soffice.exe`, instalado pelo setup `3_softwares_msStore.ps1`); executa 100% offline, sem conta Google |
 | Módulo 3 | `config.local.json` com a URL do speedtest interno (veja [Configuração](#configuração)) |
 | Módulos 1.1 e 2.1 | Pendrive montado como `E:\` (configurável no topo de cada script) |
@@ -185,7 +186,7 @@ No resumo pré-execução, depois da checagem: `R` tira da fila os testes que v�
 | `CpuSampler.IntervalSec` | `5` | Intervalo entre amostras (mínimo 1) |
 | `CpuSampler.ThrottleAlertPct` | `20` | Queda do clock sob carga que vira aviso de throttling |
 | `CpuSampler.LoadMinPct` | `50` | Uso de CPU a partir do qual a amostra conta como "sob carga" |
-| `CpuSampler.SkipFolders` | `["5_bateria"]` | Testes em que o amostrador não roda |
+| `CpuSampler.SkipFolders` | `["0_consumo_basal", "5_bateria"]` | Testes em que o amostrador não roda |
 
 ### `config.local.json` (não versionado)
 
@@ -203,7 +204,7 @@ Por segurança ou por licença, alguns arquivos ficam fora do Git e são distrib
 | Arquivo | Onde colocar | Motivo | Sem ele |
 |---------|--------------|--------|---------|
 | `config.local.json` | raiz | Contém a URL interna do speedtest | O Módulo 3 falha com uma mensagem de configuração |
-| `Agentes_SI_Profile.wpaProfile` | `Testes/1_cpu_memo/` | Lista os processos dos agentes monitorados | O trace WPR é capturado, mas a exportação CSV é pulada |
+| `Agentes_SI_Profile.wpaProfile` | `Testes/1_cpu_memo/` (também reutilizado pelo Módulo 0, ou em `Testes/0_consumo_basal/`) | Lista os processos dos agentes monitorados | O trace WPR é capturado, mas a exportação CSV é pulada |
 | `Agentes_SI_Bateria_Profile.wpaProfile` | `Testes/5_bateria/` | Mesmo motivo, no Módulo 5 | Idem |
 | `workloads.local.json` *(opcional)* | raiz | Cargas dos módulos 7 a 11 com repositórios internos (modelo em `workloads.local.example.json`) | Só as cargas públicas rodam |
 
@@ -252,6 +253,7 @@ Ao criar um cenário, o hub pergunta o **nome do cenário**, o **modelo** e o **
 ├── config.local.example.json  # modelo da configuração local (não versionada)
 ├── Setup/environment/         # scripts da Fase 1
 ├── Testes/                    # um módulo por pasta (N_categoria/)
+│   ├── 0_consumo_basal/
 │   ├── 1_cpu_memo/
 │   ├── 2_disco/               # inclui diskspd.exe (MIT)
 │   ├── 3_rede/                # speedtest interno + fast.com

@@ -66,13 +66,14 @@ function Get-HighCpuProcesses { param($ThresholdPct) @() }
 $guid = [guid]::NewGuid().ToString('N')
 $hub  = Join-Path ([System.IO.Path]::GetTempPath()) "hubtest preflight $guid [x]"
 $testsRoot = Join-Path $hub "Testes"
-foreach ($d in "1_cpu_memo", "3_rede", "5_bateria", "8_dev_go", "10_dev_containers", "2_disco") {
+foreach ($d in "0_consumo_basal", "1_cpu_memo", "3_rede", "5_bateria", "8_dev_go", "10_dev_containers", "2_disco") {
     New-Item -ItemType Directory -Path (Join-Path $testsRoot $d) -Force | Out-Null
 }
 Set-Content -LiteralPath (Join-Path $testsRoot "8_dev_go\cargas.json") -Encoding UTF8 -Value '{"ferramentas":[{"cmd":"go","versao":["go","version"],"minima":"1.21"}],"repos":[{"nome":"hugo"}]}'
 Set-Content -LiteralPath (Join-Path $testsRoot "10_dev_containers\cargas.json") -Encoding UTF8 -Value '{"ferramentas":[{"cmd":"podman","versao":["podman","--version"],"minima":"5.0"}],"repos":[]}'
 
 function New-T { param($Folder, $Name, $Type = "py") [PSCustomObject]@{ Name = $Name; Type = $Type; ParentFolder = $Folder } }
+$tBasal = New-T "0_consumo_basal" "0_teste_consumo_basal"
 $tCpu  = New-T "1_cpu_memo" "1_automacao_performance"
 $tCpuDlp = New-T "1_cpu_memo" "1-1_automacao_performance_dlp"
 $tRede = New-T "3_rede" "3_teste_rede"
@@ -92,6 +93,10 @@ try {
     Write-Host "`n  Checagem por teste selecionado" -ForegroundColor Cyan
 
     $script:tools = $okTools.Clone()
+    $f0 = Get-F @($tBasal)
+    $p0 = Find-Item $f0 'wpaProfile'
+    Assert-Condition ($p0.Count -eq 1 -and $p0[0].Nivel -eq "Impede" -and $p0[0].Testes -contains "0_teste_consumo_basal.py") "modulo 0 sem .wpaProfile em 0_consumo_basal nem 1_cpu_memo -> Impede"
+
     $f = Get-F @($tCpu)
     $p = Find-Item $f 'wpaProfile'
     Assert-Condition ($p.Count -eq 1 -and $p[0].Nivel -eq "Impede") "modulo 1 sem .wpaProfile -> Impede"
@@ -100,10 +105,14 @@ try {
     Set-Content -LiteralPath (Join-Path $testsRoot "1_cpu_memo\Agentes_SI_Profile.wpaProfile.xml") -Value "<x/>"
     $f = Get-F @($tCpu)
     Assert-Condition ((Find-Item $f 'wpaProfile').Count -eq 0) "profile .wpaProfile.xml presente -> sem achado"
+    Assert-Condition ((Find-Item (Get-F @($tBasal)) 'wpaProfile').Count -eq 0) "modulo 0 reutiliza .wpaProfile de 1_cpu_memo -> sem achado"
 
     $script:tools.Remove("wpaexporter")
     $f = Get-F @($tCpu)
     Assert-Condition ((Find-Item $f 'wpaexporter').Count -eq 1) "wpaexporter ausente -> Impede"
+    Assert-Condition ((Find-Item (Get-F @($tBasal)) 'wpaexporter').Count -eq 1) "modulo 0 sem wpaexporter -> Impede"
+    $script:tools.Remove("wpr")
+    Assert-Condition ((Find-Item (Get-F @($tBasal)) 'wpr\.exe').Count -eq 1) "modulo 0 sem wpr -> Impede"
     $script:tools = $okTools.Clone()
 
     $script:tools.Remove("soffice")
@@ -232,7 +241,8 @@ try {
         [PSCustomObject]@{ Name = "soffice.bin"; ProcessId = 52; ParentProcessId = 51; CommandLine = '"soffice.bin" -env:UserInstallation=file:///C:/Temp/wintesthub_lo_profile_writer --writer' },
         [PSCustomObject]@{ Name = "notepad.exe"; ProcessId = 53; ParentProcessId = 51; CommandLine = '"notepad.exe" C:\Users\user\notas.txt' },
         [PSCustomObject]@{ Name = "soffice.bin"; ProcessId = 54; ParentProcessId = 51; CommandLine = '"soffice.bin" -env:UserInstallation=file:///C:/Temp/wintesthub_lo_profile_calc --calc' },
-        [PSCustomObject]@{ Name = "soffice.bin"; ProcessId = 55; ParentProcessId = 51; CommandLine = '"soffice.bin" --writer user.odt' }
+        [PSCustomObject]@{ Name = "soffice.bin"; ProcessId = 55; ParentProcessId = 51; CommandLine = '"soffice.bin" --writer user.odt' },
+        [PSCustomObject]@{ Name = "wpaexporter.exe"; ProcessId = 60; ParentProcessId = 1; CommandLine = 'wpaexporter.exe -i trace.etl' }
     )
     $script:podman = [PSCustomObject]@{ Available = $true; Containers = @("wintestehub-database"); MachineRunning = $true }
 
@@ -298,6 +308,8 @@ try {
 
     $only1 = @(Get-TestLeftovers -TestsRoot $testsRoot -Folders @("1_cpu_memo") | ForEach-Object { $_.Id })
     Assert-Condition (($only1 -contains "wpr") -and ($only1 -contains "libreoffice") -and ($only1 -contains "python") -and ($only1 -notcontains "edge") -and ($only1 -notcontains "diskspd") -and ($only1 -notcontains "compose")) "filtro por teste: depois do modulo 1 so as sobras dele (wpr, libreoffice, python; sem edge)"
+    $only0 = @(Get-TestLeftovers -TestsRoot $testsRoot -Folders @("0_consumo_basal") | ForEach-Object { $_.Id })
+    Assert-Condition (($only0 -contains "wpr") -and ($only0 -contains "wpaexporter") -and ($only0 -contains "python") -and ($only0 -notcontains "libreoffice") -and ($only0 -notcontains "edge") -and ($only0 -notcontains "diskspd")) "filtro por teste: depois do modulo 0 so wpr, wpaexporter e python (sem libreoffice/edge/diskspd)"
 
     # Clear-TestLeftovers encerra (Stop-TestLeftovers substituido) e registra
     $script:stopped = @()

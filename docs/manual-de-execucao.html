@@ -387,7 +387,7 @@ li {
 
 <div class="section">
 <h2 id="1-visão-geral">1. Visão Geral</h2>
-<p>O <strong>WinTestHub</strong> (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (CPU, memória, disco, rede, boot/shutdown, bateria, Wi-Fi e cargas reais de desenvolvimento) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.</p>
+<p>O <strong>WinTestHub</strong> (Hardware Test Hub) é um framework Windows para validação de hardware que automatiza a preparação do ambiente, execução de testes de diagnóstico (consumo basal, CPU, memória, disco, rede, boot/shutdown, bateria, Wi-Fi e cargas reais de desenvolvimento) e geração de relatórios. Através de um menu interativo no console, o operador seleciona quais testes executar e acompanha o progresso em tempo real. Os resultados são persistidos em múltiplos formatos (HTML, CSV, JSON) com rastreabilidade completa por cenário.</p>
 </div>
 
 <div class="section">
@@ -441,7 +441,7 @@ li {
 </ul>
 <p>Para o <strong>teste de bateria (Módulo 5)</strong>, além disso:</p>
 <ul>
-<li><strong>Windows Performance Toolkit</strong> (<code>wpr.exe</code> e <code>wpaexporter.exe</code>) no PATH — o mesmo pré-requisito do Módulo 1</li>
+<li><strong>Windows Performance Toolkit</strong> (<code>wpr.exe</code> e <code>wpaexporter.exe</code>) no PATH — exigido pelos Módulos 0, 1 e 5</li>
 <li><strong>Microsoft Edge com a conta Google já logada</strong> (Google Docs e Sheets; exigido apenas no Módulo 5, pois o Módulo 1 utiliza o LibreOffice localmente)</li>
 <li><strong>Feche o Edge antes de iniciar</strong>: o teste encerra o Edge e reabre só com as páginas dele</li>
 </ul>
@@ -462,7 +462,7 @@ li {
 ├── config.json          # Configurações
 ├── config.local.json    # Valores internos, como a URL do speedtest (não versionado)
 ├── Setup\environment\   # Scripts de setup (13 scripts)
-├── Testes\              # Módulos de teste (11 módulos + 2 variantes DLP/USB; _lib\ = biblioteca dos módulos 7 a 11)
+├── Testes\              # Módulos de teste (12 módulos + 2 variantes DLP/USB; _lib\ = biblioteca dos módulos 7 a 11)
 ├── Execucoes\           # Logs, evidências e estado de cada cenário (criada pelo hub)
 └── Exportar\            # Traces de cada cenário prontos para o Drive, sem .etl nem logs (criada pelo hub)
 </code></pre>
@@ -473,7 +473,7 @@ li {
 <h2 id="3-instalação-e-primeiro-uso">3. Instalação e Primeiro Uso</h2>
 <h3 id="31-copiar-o-repositório">3.1 Copiar o Repositório</h3>
 <p>Copie toda a pasta do projeto para <code>C:\TesteHub</code> na máquina de teste.</p>
-<p>Confira se a cópia inclui os arquivos internos que <strong>não estão no repositório do GitHub</strong>: o <code>config.local.json</code> (URL do speedtest interno) e os perfis <code>Agentes_SI_Profile.wpaProfile</code> (em <code>Testes\1_cpu_memo\</code>) e <code>Agentes_SI_Bateria_Profile.wpaProfile</code> (em <code>Testes\5_bateria\</code>). Sem os perfis, os módulos 1 e 5 rodam, mas pulam a exportação CSV dos traces.</p>
+<p>Confira se a cópia inclui os arquivos internos que <strong>não estão no repositório do GitHub</strong>: o <code>config.local.json</code> (URL do speedtest interno) e os perfis <code>Agentes_SI_Profile.wpaProfile</code> (em <code>Testes\1_cpu_memo\</code>, também reutilizado pelo Módulo 0 ou em <code>Testes\0_consumo_basal\</code>) e <code>Agentes_SI_Bateria_Profile.wpaProfile</code> (em <code>Testes\5_bateria\</code>). Sem os perfis, os módulos 0, 1 e 5 rodam em execução avulsa, mas pulam a exportação CSV dos traces.</p>
 <h3 id="32-primeira-execução">3.2 Primeira Execução</h3>
 <ol>
 <li>Clique duas vezes em <code>hub.bat</code></li>
@@ -583,7 +583,9 @@ li {
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot da tela de seleção/criação de cenário<br><em>Salvar como: img/placeholder-selecao-cenario.png</em></div>
 <h3 id="42-navegar-o-menu-de-testes">4.2 Navegar o Menu de Testes</h3>
 <p>Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupados pelo nome da pasta, sem o prefixo numérico, e os que nunca rodaram no cenário (<strong>pendentes</strong>) já vêm marcados:</p>
-<pre><code>-- Cpu Memo --------------------------------
+<pre><code>-- Consumo Basal ---------------------------
+[X] 0_teste_consumo_basal          [PY]   pendente
+-- Cpu Memo --------------------------------
 [X] 1_automacao_performance        [PY]   pendente
 [X] 1-1_automacao_performance_dlp  [PY]   pendente
 -- Disco -----------------------------------
@@ -608,7 +610,7 @@ li {
 -- Dev Git Arquivos ------------------------
 [X] 11_dev_git_arquivos            [PY]   pendente
 </code></pre>
-<p>Desmarque com <code>Espaço</code> o que não for executar agora. Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (<code>1-1</code> e <code>2-1</code>) só fazem sentido com um pendrive em <code>E:\</code>.</p>
+<p>Desmarque com <code>Espaço</code> o que não for executar agora. O Módulo 0 (<code>0_teste_consumo_basal</code>, ~11 min) mede a máquina em repouso: não utilize mouse nem teclado após confirmar (qualquer toque fica registrado no relatório como interação humana, exceto <code>Ctrl+Q</code>). Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (<code>1-1</code> e <code>2-1</code>) só fazem sentido com um pendrive em <code>E:\</code>.</p>
 <p>Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:</p>
 <pre><code>[ ] 1_automacao_performance        [PY]   PASS  (1842.5s)
 [ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
@@ -656,7 +658,7 @@ li {
 <p>Após confirmar, o hub faz a checagem antes da fila (seção 4.9), mostra o resumo dos testes selecionados e inicia a execução sequencial. Durante a execução:</p>
 <ul>
 <li>O console exibe o progresso em tempo real (nome do teste, tempo decorrido)</li>
-<li>Testes com interface visual (CPU, Disco, Rede, Bateria) exibem um <strong>overlay transparente</strong> na tela com informações de progresso</li>
+<li>Testes com interface visual (Consumo Basal, CPU, Disco, Rede, Bateria) exibem um <strong>overlay transparente</strong> na tela com informações de progresso</li>
 <li>O overlay é "click-through" — não interfere no uso da máquina</li>
 </ul>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot da execução com overlay de progresso visível<br><em>Salvar como: img/placeholder-execucao-progresso.png</em></div>
@@ -793,7 +795,7 @@ li {
 <p><strong>5. Veja o resultado</strong></p>
 <p>Ao fim, o painel mostra PASS/FAIL e abre o relatório <code>6_wifi_fast_transition/wifi_ft_relatorio.html</code>, com gráficos e informações técnicas. O <code>wifi_ft.csv</code> fica na mesma pasta e segue na exportação.</p>
 <h3 id="48-cargas-de-desenvolvimento-módulos-7-a-11--passo-a-passo-do-operador">4.8 Cargas de Desenvolvimento (Módulos 7 a 11) — Passo a Passo do Operador</h3>
-<p>Os módulos 7 a 11 cronometram tarefas reais de desenvolvimento (build, testes, <code>pip install</code>, containers, git). Cada um leva de 3 a 30 min (o 11 é o mais curto; o 8 e o 10, os mais longos), conforme a máquina e o primeiro download dos repositórios e imagens. A metodologia completa está na seção 10 da <em>Metodologia de Testes</em>.</p>
+<p>Os módulos 7 a 11 cronometram tarefas reais de desenvolvimento (build, testes, <code>pip install</code>, containers, git). Cada um leva de 3 a 30 min (o 11 é o mais curto; o 8 e o 10, os mais longos), conforme a máquina e o primeiro download dos repositórios e imagens. A metodologia completa está na seção 11 da <em>Metodologia de Testes</em>.</p>
 <p><strong>1. Prepare a máquina (uma vez)</strong></p>
 <p>Na Fase de Setup, rode:</p>
 <table>
@@ -847,8 +849,8 @@ li {
 <p>Cada achado aparece no resumo com um nível e com o que fazer:</p>
 <ul>
 <li><strong><code>[X]</code> Impede:</strong> o teste vai falhar com certeza.<ul>
-<li>Falta o <code>Agentes_SI_Profile.wpaProfile</code> (módulo 1) ou o <code>Agentes_SI_Bateria_Profile.wpaProfile</code> (módulo 5) na pasta do teste. Esses arquivos não são versionados.</li>
-<li>Falta o <code>wpr.exe</code> ou o <code>wpaexporter.exe</code> (módulos 1 e 5).</li>
+<li>Falta o <code>Agentes_SI_Profile.wpaProfile</code> (módulo 0 — procurado em <code>Testes\0_consumo_basal\</code> ou <code>Testes\1_cpu_memo\</code> — e módulo 1) ou o <code>Agentes_SI_Bateria_Profile.wpaProfile</code> (módulo 5). Esses arquivos não são versionados.</li>
+<li>Falta o <code>wpr.exe</code> ou o <code>wpaexporter.exe</code> (módulos 0, 1 e 5).</li>
 <li>Falta o LibreOffice (<code>soffice.exe</code>) quando <code>1_automacao_performance.py</code> está selecionado (módulo 1; não bloqueia a variante <code>1-1_automacao_performance_dlp.py</code>). A ação manda rodar o Setup <code>3_softwares_msStore</code>.</li>
 <li>A URL do speedtest interno não está configurada <strong>e</strong> não há internet (módulo 3: nenhuma das duas fontes pode ser medida).</li>
 <li>Falta uma ferramenta de dev, ou ela está abaixo da versão mínima do <code>cargas.json</code> (módulos 7 a 11). A ação manda rodar o Setup 7 ou o Setup 10.</li>
@@ -976,6 +978,7 @@ li {
         ├── _relatorio.{html,csv,json}       # Relatório consolidado
         ├── informacoes_maquina.csv          # Inventário gerado pelo setup 1
         ├── maquina.csv                      # Modelo, série, CPU, RAM, disco, SO + modelo/patrimônio informados
+        ├── 0_consumo_basal/                 # Evidências do Módulo 0 (consumo_basal.csv, ciclos_basal.csv, top_processos_basal.csv)
         ├── 1_cpu_memo/                      # Evidências do Módulo 1
         │   └── dlp_usb/                     # Evidências da variante 1-1
         ├── 2_disco/                         # Evidências do Módulo 2 e da variante 2-1
@@ -1122,7 +1125,7 @@ Exportar/
 <li><strong><code>Traces/</code> não é alterada.</strong> Os <code>.etl</code> e logs originais continuam em <code>Execucoes/</code> para abrir no WPA ou investigar falhas.</li>
 <li><strong>A pasta é recriada a cada execução</strong> e reflete o estado atual do cenário. Arquivos colocados à mão nela são perdidos, e um ZIP anterior dela é removido por estar desatualizado.</li>
 <li>Ao final, o hub mostra quantos arquivos e MB foram exportados e quanto ficou de fora (ex.: <code>12 .etl, 3600 MB</code>).</li>
-<li>Se um módulo tinha só <code>.etl</code> e logs, o hub avisa com <code>[!] &lt;módulo&gt; sem evidencias do teste na exportacao</code> (o <code>frequencia_cpu.csv</code>, gerado pelo próprio hub, não conta como evidência). Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o <code>.wpaProfile</code> dos módulos 1 e 5, e o WPA não exporta. As evidências continuam só em <code>Execucoes/</code>. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos <code>.etl</code>.</li>
+<li>Se um módulo tinha só <code>.etl</code> e logs, o hub avisa com <code>[!] &lt;módulo&gt; sem evidencias do teste na exportacao</code> (o <code>frequencia_cpu.csv</code>, gerado pelo próprio hub, não conta como evidência). Isso costuma indicar que o teste não gerou os CSVs: por exemplo, falta o <code>.wpaProfile</code> dos módulos 0, 1 e 5, e o WPA não exporta. As evidências continuam só em <code>Execucoes/</code>. Corrija a causa e reexecute o teste, ou gere os CSVs a partir dos <code>.etl</code>.</li>
 <li>Em seguida, pergunta se deseja <strong>compactar em ZIP</strong>. O ZIP fica ao lado da pasta (<code>3440 - 050221.zip</code>), contém a pasta como raiz e é validado pela contagem de arquivos. Nenhuma pasta é apagada.</li>
 <li>A opção <strong><code>[E]</code></strong> do menu inicial faz o mesmo para um cenário existente, sem rodar testes.</li>
 </ul>
@@ -1169,7 +1172,7 @@ Exportar/
 </table>
 <p>Os avisos ficam guardados no <code>_state.json</code> e se acumulam: os de uma run anterior continuam no relatório, identificados pelo número da run. Quem abre a pasta no Drive vê as ressalvas da rodada sem abrir os CSVs.</p>
 <p><strong>Frequência da CPU por módulo.</strong> Enquanto cada teste roda, o hub grava <code>&lt;módulo&gt;/frequencia_cpu.csv</code> com uma amostra a cada 5 s: uso da CPU, desempenho em % (acima de 100 = turbo), MHz efetivo e a maior temperatura das zonas térmicas ACPI, quando o firmware expõe. O relatório mostra o MHz médio, o MHz no começo e no fim e a queda. A queda (aviso a partir de 20%) compara a mediana do 1º e do último minuto <strong>com a CPU sob carga</strong> (uso de pelo menos 50%), porque em ocioso o clock cai sem ser throttling. Testes curtos ou ociosos aparecem sem queda (<code>-</code>).</p>
-<p>O amostrador não roda nos setups nem no teste 5 (bateria), para não acordar a CPU a cada poucos segundos durante horas. No teste 4, a máquina reinicia e o CSV fica parcial; com menos de 3 amostras, ele é ignorado.</p>
+<p>O amostrador não roda nos setups, no módulo 0 (<code>0_consumo_basal</code>) nem no teste 5 (bateria), para não acordar a CPU durante as medições ociosas ou de bateria. No teste 4, a máquina reinicia e o CSV fica parcial; com menos de 3 amostras, ele é ignorado.</p>
 </div>
 
 <div class="section">
@@ -1425,7 +1428,7 @@ Exportar/
         &quot;IntervalSec&quot;: 5,
         &quot;ThrottleAlertPct&quot;: 20,
         &quot;LoadMinPct&quot;: 50,
-        &quot;SkipFolders&quot;: [&quot;5_bateria&quot;]
+        &quot;SkipFolders&quot;: [&quot;0_consumo_basal&quot;, &quot;5_bateria&quot;]
     }
 }
 </code></pre>
@@ -1605,7 +1608,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File hub.ps1
 <tbody>
 <tr>
 <td><code>Ctrl+Q</code></td>
-<td>CPU &amp; Memória, Bateria, Cargas dev (7 a 11)</td>
+<td>Consumo Basal, CPU &amp; Memória, Bateria, Cargas dev (7 a 11)</td>
 <td>Interromper o teste de forma segura e <strong>parar a fila</strong>: os testes seguintes ficam como <em>cancelado</em> e o hub gera o relatório com o que já rodou</td>
 </tr>
 </tbody>
