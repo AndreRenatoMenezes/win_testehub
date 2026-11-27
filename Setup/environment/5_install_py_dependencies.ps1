@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # Instalação Isolada de Dependências Python (Virtual Environment)
 # =============================================================================
 
@@ -9,7 +9,7 @@ $VenvPath = Join-Path $RootPath $VenvName
 
 Write-Host "  >> Verificando ambiente virtual Python em: $VenvPath" -ForegroundColor Cyan
 
-if (-not (Test-Path $VenvPath)) {
+if (-not (Test-Path -LiteralPath $VenvPath)) {
     Write-Host "  >> Criando novo ambiente virtual (.venv)..." -ForegroundColor Yellow
     
     # Tenta usar python3 ou python
@@ -25,17 +25,30 @@ if (-not (Test-Path $VenvPath)) {
 }
 
 $VenvPython = Join-Path $VenvPath "Scripts\python.exe"
-$VenvPip    = Join-Path $VenvPath "Scripts\pip.exe"
+if (-not (Test-Path -LiteralPath $VenvPython)) {
+    Write-Host "  [ERRO] Python do ambiente virtual não encontrado em: $VenvPython" -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "  >> Atualizando o PIP no ambiente virtual..." -ForegroundColor DarkGray
 & $VenvPython -m pip install --upgrade pip | Out-Null
 
 # Liste aqui os pacotes Python que os seus testes necessitam
-$Pacotes = @("psutil", "speedtest-cli", "requests", "selenium", "pandas", "pyautogui", "pyperclip", "psutil", "pynput")
+$Pacotes = @("psutil", "speedtest-cli", "requests", "selenium", "pandas", "pyautogui", "pyperclip", "pynput", "rich")
 
 Write-Host "  >> Instalando pacotes ($($Pacotes -join ', '))..." -ForegroundColor Yellow
+$falhas = @()
 foreach ($pacote in $Pacotes) {
-    & $VenvPip install $pacote | Out-Null
+    & $VenvPython -m pip install $pacote | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [ERRO] Falha ao instalar '$pacote' (exit $LASTEXITCODE)." -ForegroundColor Red
+        $falhas += $pacote
+    }
+}
+
+if ($falhas.Count -gt 0) {
+    Write-Host "  [ERRO] Não foi possível instalar: $($falhas -join ', ')." -ForegroundColor Red
+    exit 1
 }
 
 Write-Host "  [OK] Dependências Python isoladas configuradas com sucesso." -ForegroundColor Green

@@ -582,40 +582,38 @@ li {
 <p>O nome do cenário é combinado com o hostname e a data na pasta de execução, resultando em algo como: <code>ImagemLimpa_DESKTOP-ABC_2026-04-15</code></p>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot da tela de seleção/criação de cenário<br><em>Salvar como: img/placeholder-selecao-cenario.png</em></div>
 <h3 id="42-navegar-o-menu-de-testes">4.2 Navegar o Menu de Testes</h3>
-<p>Após selecionar o cenário, o menu de testes é exibido. Os testes são agrupados pelo nome da pasta, sem o prefixo numérico, e os que nunca rodaram no cenário (<strong>pendentes</strong>) já vêm marcados:</p>
-<pre><code>-- Consumo Basal ---------------------------
-[X] 0_teste_consumo_basal          [PY]   pendente
--- Cpu Memo --------------------------------
-[X] 1_automacao_performance        [PY]   pendente
-[X] 1-1_automacao_performance_dlp  [PY]   pendente
--- Disco -----------------------------------
-[X] 2_teste_disco                  [PY]   pendente
-[X] 2-1_teste_disco_dlp            [PY]   pendente
--- Rede ------------------------------------
-[X] 3_teste_rede                   [PY]   pendente
--- Boot Shutdown ---------------------------
-[X] 4_boot_shutdown_auto           [PY]   pendente
--- Bateria ---------------------------------
-[X] 5_teste_bateria                [PY]   pendente
--- Wifi Fast Transition --------------------
-[X] 6_teste_fast_transition        [PY]   pendente
--- Dev Dotnet ------------------------------
-[X] 7_dev_dotnet                   [PY]   pendente
--- Dev Go ----------------------------------
-[X] 8_dev_go                       [PY]   pendente
--- Dev Python ------------------------------
-[X] 9_dev_python                   [PY]   pendente
--- Dev Containers --------------------------
-[X] 10_dev_containers              [PY]   pendente
--- Dev Git Arquivos ------------------------
-[X] 11_dev_git_arquivos            [PY]   pendente
+<p>Após selecionar o cenário, o menu de testes é exibido. Os testes ficam em três seções, definidas em <code>TestSections</code> no <code>config.json</code> (seção 7.3):</p>
+<ul>
+<li><strong>Escritório</strong> (atalho <code>1</code>): módulos 0 a 5. É a bateria padrão: os que nunca rodaram no cenário (<strong>pendentes</strong>) já vêm marcados.</li>
+<li><strong>Dev</strong> (atalho <code>2</code>): módulos 7 a 11. Desmarcada.</li>
+<li><strong>Opcional</strong> (atalho <code>3</code>): <code>1-1</code> e <code>2-1</code> (DLP/USB), <code>6</code> (caminhada Wi-Fi) e qualquer script novo em <code>Testes/</code> que não esteja listado nas outras seções. Desmarcada.</li>
+</ul>
+<pre><code>&gt;&gt; [X] == [1] Escritorio (6/6) ================================
+   [X] 0_teste_consumo_basal  [PY]                  pendente
+   [X] 1_automacao_performance  [PY]                pendente
+   [X] 2_teste_disco  [PY]                          pendente
+   [X] 3_teste_rede  [PY]                           pendente
+   [X] 4_boot_shutdown_auto  [PY]                   pendente
+   [X] 5_teste_bateria  [PY]                        pendente
+   [ ] == [2] Dev (0/5) ========================================
+   [ ] 7_dev_dotnet  [PY]                           pendente
+   [ ] 8_dev_go  [PY]                               pendente
+   [ ] 9_dev_python  [PY]                           pendente
+   [ ] 10_dev_containers  [PY]                      pendente
+   [ ] 11_dev_git_arquivos  [PY]                    pendente
+   [ ] == [3] Opcional (0/3) ===================================
+   [ ] 1-1_automacao_performance_dlp  [PY]          pendente
+   [ ] 2-1_teste_disco_dlp  [PY]                    pendente
+   [ ] 6_teste_fast_transition  [PY]                pendente
 </code></pre>
+<p>O cabeçalho de cada seção mostra <code>[X]</code> (toda marcada), <code>[-]</code> (parte) ou <code>[ ]</code> (nenhum) e a contagem <code>marcados/total</code>. Para ligar ou desligar uma seção inteira, pressione o número dela (<code>1</code>, <code>2</code> ou <code>3</code>, na fileira de cima ou no teclado numérico) ou <code>Espaço</code> sobre o cabeçalho: se a seção estiver toda marcada, desmarca; senão, marca toda. A fila roda na ordem das seções (Escritório → Dev → Opcional) e, dentro de cada uma, na ordem numérica.</p>
 <p>Desmarque com <code>Espaço</code> o que não for executar agora. O Módulo 0 (<code>0_teste_consumo_basal</code>, ~11 min) mede a máquina em repouso: não utilize mouse nem teclado após confirmar (qualquer toque fica registrado no relatório como interação humana, exceto <code>Ctrl+Q</code>). Os módulos 5 e 6 exigem o operador presente e convém executá-los sozinhos (seções 4.6 e 4.7), os módulos 7 a 11 exigem a máquina na tomada e os setups de ferramentas (seção 4.8), e as variantes DLP/USB (<code>1-1</code> e <code>2-1</code>) só fazem sentido com um pendrive em <code>E:\</code>.</p>
-<p>Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes vêm marcados:</p>
-<pre><code>[ ] 1_automacao_performance        [PY]   PASS  (1842.5s)
-[ ] 2_teste_disco                  [PY]   FAIL  (12.3s)
-[X] 3_teste_rede                   [PY]   pendente
-[X] 4_boot_shutdown_auto           [PY]   pendente
+<p>Num cenário com execuções anteriores, o menu mostra o último resultado e a duração de cada teste. Só os pendentes de <strong>Escritório</strong> vêm marcados; Dev e Opcional continuam desmarcados. Se todo o Escritório já rodou, o menu abre sem nada marcado:</p>
+<pre><code>&gt;&gt; [-] == [1] Escritorio (4/6) ================================
+   [ ] 1_automacao_performance  [PY]                PASS  (1842.5s)
+   [ ] 2_teste_disco  [PY]                          FAIL  (12.3s)
+   [X] 3_teste_rede  [PY]                           pendente
+   [X] 4_boot_shutdown_auto  [PY]                   pendente
 </code></pre>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot do menu checkbox com testes e status<br><em>Salvar como: img/placeholder-menu-testes.png</em></div>
 <h3 id="43-controles-do-menu">4.3 Controles do Menu</h3>
@@ -633,7 +631,11 @@ li {
 </tr>
 <tr>
 <td><code>Espaço</code></td>
-<td>Marcar/desmarcar o item atual</td>
+<td>Marcar/desmarcar o item atual; sobre o cabeçalho, a seção inteira</td>
+</tr>
+<tr>
+<td><code>1</code> <code>2</code> <code>3</code></td>
+<td>Marcar/desmarcar a seção inteira (Escritório, Dev, Opcional)</td>
 </tr>
 <tr>
 <td><code>A</code></td>
@@ -641,7 +643,7 @@ li {
 </tr>
 <tr>
 <td><code>P</code></td>
-<td>Selecionar apenas os <strong>pendentes</strong> (nunca executados no cenário)</td>
+<td>Selecionar apenas os <strong>pendentes</strong> (nunca executados no cenário). Na Fase 2, só os pendentes de <strong>Escritório</strong></td>
 </tr>
 <tr>
 <td><code>Enter</code></td>
@@ -653,13 +655,51 @@ li {
 </tr>
 </tbody>
 </table>
-<p><strong>Dica:</strong> <code>P</code> não marca os testes que falharam. Para reexecutar um FAIL, marque-o com <code>Espaço</code>.</p>
+<p><strong>Dica:</strong> <code>P</code> não marca os testes que falharam nem os de Dev e Opcional. Para reexecutar um FAIL, marque-o com <code>Espaço</code>; para rodar a bateria de Dev, pressione <code>2</code>.</p>
+<p>Na Fase 1 (preparação) não há seções: os scripts ficam agrupados por pasta, todos os pendentes vêm marcados e <code>P</code> marca todos os pendentes.</p>
 <h3 id="44-acompanhar-a-execução">4.4 Acompanhar a Execução</h3>
 <p>Após confirmar, o hub faz a checagem antes da fila (seção 4.9), mostra o resumo dos testes selecionados e inicia a execução sequencial. Durante a execução:</p>
 <ul>
-<li>O console exibe o progresso em tempo real (nome do teste, tempo decorrido)</li>
-<li>Testes com interface visual (Consumo Basal, CPU, Disco, Rede, Bateria) exibem um <strong>overlay transparente</strong> na tela com informações de progresso</li>
-<li>O overlay é "click-through" — não interfere no uso da máquina</li>
+<li>O console exibe o <strong>monitor ao vivo</strong> (seção 4.4.1), com a fila, a etapa interna do teste, a telemetria da máquina, as últimas linhas de log e os alertas</li>
+<li>Testes que abrem aplicativos sobre o terminal (CPU/Memória com LibreOffice, Rede com Edge e a fase de escritório da Bateria) exibem também um <strong>overlay transparente</strong> ("click-through") na tela. Os demais testes (Consumo Basal, Disco, variantes DLP/USB e cargas Dev 7–11) usam apenas a TUI do terminal quando o monitor ao vivo está ativo — mantendo o overlay ao rodar fora do hub ou no painel clássico</li>
+</ul>
+<h4 id="441-monitor-ao-vivo-no-terminal">4.4.1 Monitor ao vivo no terminal</h4>
+<p>A cada teste, o hub limpa o console e desenha um painel que se atualiza sozinho (1 vez por segundo), em cinco blocos:</p>
+<table>
+<thead>
+<tr>
+<th>Bloco</th>
+<th>O que mostra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Cabeçalho</strong></td>
+<td>Cenário, máquina (<code>modelo - patrimônio</code>), <code>Run #N</code>, tempo total da rodada e a barra da fila (<code>[2/6]</code>)</td>
+</tr>
+<tr>
+<td><strong>Fila de Testes</strong></td>
+<td>Cada teste com o status (<code>OK</code> PASS, <code>&gt;&gt;</code> executando, <code>..</code> aguardando, <code>XX</code> FAIL, <code>!!</code> ERROR, <code>--</code> cancelado) e o cronômetro do teste atual</td>
+</tr>
+<tr>
+<td><strong>Etapa Atual</strong></td>
+<td>Etapa e subetapa do teste (ex.: <code>Ciclo 2/5</code> — <code>Calc R2</code>) com barra interna. Sem etapa informada pelo teste, mostra a última linha de saída</td>
+</tr>
+<tr>
+<td><strong>Telemetria</strong></td>
+<td>CPU %, clock (MHz) e temperatura máxima (lidos do <code>frequencia_cpu.csv</code> do hub), RAM usada/total e energia (Tomada/Bateria). Sem o CSV ou sem zona térmica, aparece <code>MHz: -</code> / <code>Temp: -</code></td>
+</tr>
+<tr>
+<td><strong>Saída ao Vivo e Avisos</strong></td>
+<td>As últimas 8 linhas do teste e os alertas da rodada: avisos da checagem, alertas do próprio teste, linhas <code>[WARNING]</code>/<code>[ERRO]</code> e queda de clock sob carga (throttling)</td>
+</tr>
+</tbody>
+</table>
+<p>O painel <strong>só mostra</strong>: não lê o teclado nem tira o foco das automações (LibreOffice, Edge), e o <code>Ctrl+Q</code> continua funcionando como antes. Quando um teste falha, o painel fecha o último quadro e só então aparece a pergunta <code>Teste falhou. Deseja continuar? (S para continuar)</code>. Terminal com menos de 100 colunas empilha os blocos.</p>
+<ul>
+<li><strong>Modo baixo impacto (Testes 0 e 5):</strong> no Consumo Basal e na Bateria o painel não lê telemetria nem redesenha por tempo; atualiza só quando o teste escreve uma linha nova ("Telemetria pausada (modo baixo impacto)"). O processo do monitor (<code>HUB_MONITOR_PID</code>) fica fora do ranking <code>top_processos_basal.csv</code>.</li>
+<li><strong>Painel clássico:</strong> com <code>LiveMonitor.Enabled: false</code> no <code>config.json</code>, ou se o <code>.venv</code> não tiver o pacote <code>rich</code> (Setup 5 não executado), o hub usa o painel estático anterior e registra o motivo no <code>run_*.log</code>. A execução não muda.</li>
+<li><strong>Auditoria:</strong> as linhas de etapa (<code>[HUB:PROGRESS]</code>) e alerta (<code>[HUB:ALERT]</code>) ficam gravadas no <code>Logs/run_*.log</code>, com a hora em que cada ciclo começou.</li>
 </ul>
 <div class="img-placeholder"><span class="icon">&#128247;</span><strong>Insira aqui:</strong> screenshot da execução com overlay de progresso visível<br><em>Salvar como: img/placeholder-execucao-progresso.png</em></div>
 <h3 id="45-interpretar-resultados-na-tela">4.5 Interpretar Resultados na Tela</h3>
@@ -957,7 +997,7 @@ li {
 <li>Manter histórico completo de todas as tentativas</li>
 </ul>
 <h3 id="52-continuar-um-cenário-existente">5.2 Continuar um Cenário Existente</h3>
-<p>Ao iniciar o hub, selecione o número do cenário que deseja continuar. O menu de testes mostrará o status da última execução de cada teste; os pendentes já vêm marcados, e os que falharam podem ser marcados com <code>Espaço</code>.</p>
+<p>Ao iniciar o hub, selecione o número do cenário que deseja continuar. O menu de testes mostrará o status da última execução de cada teste; os pendentes de Escritório já vêm marcados, e os que falharam (ou os de Dev e Opcional) podem ser marcados com <code>Espaço</code> ou com o atalho da seção.</p>
 <h3 id="53-re-execução-de-testes">5.3 Re-execução de Testes</h3>
 <p>Ao re-executar um teste que já foi rodado anteriormente:</p>
 <ol>
@@ -1233,6 +1273,11 @@ Exportar/
 <td>Libere pelo menos 10 GB no disco principal</td>
 </tr>
 <tr>
+<td>Aviso "Monitor ao vivo indisponivel (Python do .venv sem o pacote rich)"</td>
+<td><code>.venv</code> criado antes do monitor ao vivo</td>
+<td>Re-execute o Setup 5 (dependências Python). Até lá, o hub usa o painel clássico</td>
+</tr>
+<tr>
 <td>Overlay visual não aparece</td>
 <td>Problema com <code>tkinter</code></td>
 <td>Verifique se o Python foi instalado com suporte a tkinter (padrão na instalação oficial)</td>
@@ -1403,6 +1448,10 @@ Exportar/
 <td><code>HUB_TRACE_ROOT</code></td>
 <td>Pasta <code>Traces</code> do cenário atual</td>
 </tr>
+<tr>
+<td><code>HUB_MONITOR_PID</code></td>
+<td>PID do monitor ao vivo (<code>live_monitor.py</code>), quando ativo. O Teste 0 o exclui do ranking de processos</td>
+</tr>
 </tbody>
 </table>
 <p>Configurações em <code>config.json</code>:</p>
@@ -1429,10 +1478,35 @@ Exportar/
         &quot;ThrottleAlertPct&quot;: 20,
         &quot;LoadMinPct&quot;: 50,
         &quot;SkipFolders&quot;: [&quot;0_consumo_basal&quot;, &quot;5_bateria&quot;]
-    }
+    },
+    &quot;LiveMonitor&quot;: {
+        &quot;Enabled&quot;: true,
+        &quot;RefreshHz&quot;: 1,
+        &quot;LogTailLines&quot;: 8,
+        &quot;TelemetryIntervalSec&quot;: 2,
+        &quot;LowImpactFolders&quot;: [&quot;0_consumo_basal&quot;, &quot;5_bateria&quot;]
+    },
+    &quot;TestSections&quot;: [
+        {
+            &quot;Id&quot;: &quot;escritorio&quot;, &quot;Label&quot;: &quot;Escritório&quot;, &quot;Key&quot;: &quot;1&quot;,
+            &quot;DefaultSelected&quot;: true, &quot;Fallback&quot;: false,
+            &quot;Scripts&quot;: [&quot;0_teste_consumo_basal&quot;, &quot;1_automacao_performance&quot;, &quot;2_teste_disco&quot;,
+                        &quot;3_teste_rede&quot;, &quot;4_boot_shutdown_auto&quot;, &quot;5_teste_bateria&quot;]
+        },
+        {
+            &quot;Id&quot;: &quot;dev&quot;, &quot;Label&quot;: &quot;Dev&quot;, &quot;Key&quot;: &quot;2&quot;,
+            &quot;DefaultSelected&quot;: false, &quot;Fallback&quot;: false,
+            &quot;Scripts&quot;: [&quot;7_dev_dotnet&quot;, &quot;8_dev_go&quot;, &quot;9_dev_python&quot;, &quot;10_dev_containers&quot;, &quot;11_dev_git_arquivos&quot;]
+        },
+        {
+            &quot;Id&quot;: &quot;opcional&quot;, &quot;Label&quot;: &quot;Opcional&quot;, &quot;Key&quot;: &quot;3&quot;,
+            &quot;DefaultSelected&quot;: false, &quot;Fallback&quot;: true,
+            &quot;Scripts&quot;: [&quot;1-1_automacao_performance_dlp&quot;, &quot;2-1_teste_disco_dlp&quot;, &quot;6_teste_fast_transition&quot;]
+        }
+    ]
 }
 </code></pre>
-<p>As seções <code>Preflight</code> e <code>CpuSampler</code> são opcionais: um <code>config.json</code> antigo, sem elas, usa os valores acima.</p>
+<p>As seções <code>Preflight</code>, <code>CpuSampler</code>, <code>LiveMonitor</code> e <code>TestSections</code> são opcionais: um <code>config.json</code> antigo, sem elas, usa os valores acima.</p>
 <table>
 <thead>
 <tr>
@@ -1472,6 +1546,30 @@ Exportar/
 <tr>
 <td><code>CpuSampler.SkipFolders</code></td>
 <td>Pastas de teste em que o amostrador não roda</td>
+</tr>
+<tr>
+<td><code>LiveMonitor.Enabled</code></td>
+<td>Liga/desliga o monitor ao vivo (TUI <code>rich</code>) da Fase 2. <code>false</code> usa o painel clássico</td>
+</tr>
+<tr>
+<td><code>LiveMonitor.RefreshHz</code></td>
+<td>Redesenhos por segundo do painel</td>
+</tr>
+<tr>
+<td><code>LiveMonitor.LogTailLines</code></td>
+<td>Linhas de saída mostradas no bloco "Saída ao Vivo"</td>
+</tr>
+<tr>
+<td><code>LiveMonitor.TelemetryIntervalSec</code></td>
+<td>Intervalo, em segundos, da leitura de CPU %, RAM, energia e da última linha do <code>frequencia_cpu.csv</code></td>
+</tr>
+<tr>
+<td><code>LiveMonitor.LowImpactFolders</code></td>
+<td>Pastas de teste em modo baixo impacto (sem timer nem telemetria)</td>
+</tr>
+<tr>
+<td><code>TestSections</code></td>
+<td>Seções do menu da Fase 2, na ordem em que aparecem e rodam. <code>Scripts</code> usa o nome do arquivo sem extensão (por isso <code>1</code> e <code>1-1</code>, da mesma pasta, ficam em seções diferentes); um script listado em duas seções fica na primeira. <code>DefaultSelected: true</code> marca os pendentes da seção ao abrir o menu e com <code>P</code>. A seção com <code>Fallback: true</code> recebe os scripts não listados (sem nenhuma, vai para a última). Seção sem script encontrado não aparece</td>
 </tr>
 </tbody>
 </table>
@@ -1516,7 +1614,11 @@ Exportar/
 </tr>
 <tr>
 <td><code>Espaço</code></td>
-<td>Marcar/desmarcar item</td>
+<td>Marcar/desmarcar item (no cabeçalho: a seção)</td>
+</tr>
+<tr>
+<td><code>1</code> <code>2</code> <code>3</code></td>
+<td>Marcar/desmarcar a seção Escritório, Dev ou Opcional</td>
 </tr>
 <tr>
 <td><code>A</code></td>
@@ -1524,7 +1626,7 @@ Exportar/
 </tr>
 <tr>
 <td><code>P</code></td>
-<td>Selecionar apenas pendentes</td>
+<td>Selecionar apenas pendentes (na Fase 2, só de Escritório)</td>
 </tr>
 <tr>
 <td><code>Enter</code></td>

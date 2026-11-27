@@ -22,7 +22,7 @@ O `hub.ps1` procura **recursivamente** por arquivos `*.ps1` e `*.py` em duas pas
 
 - Os scripts aparecem no menu ordenados pelo nome do arquivo, em **ordem numérica natural** (`9_` antes de `10_`), e agrupados pela pasta-mãe.
 - O rótulo do grupo vem do nome da pasta, sem o prefixo numérico: `5_bateria` → **Bateria**.
-- **Todo** `.ps1`/`.py` dessas pastas vira item do menu. Bibliotecas comuns ficam em `Testes/_lib/` (`dev_cargas.py`, `rede_calc.py`), que a função `Get-Scripts` do `hub.ps1` ignora inteira. Outro script auxiliar (chamado por outro, e não pelo operador) precisa entrar na lista de exclusão da `Get-Scripts`, como já acontece com `boot_shutdown_duration.ps1`.
+- **Todo** `.ps1`/`.py` dessas pastas vira item do menu. Bibliotecas comuns ficam em `Testes/_lib/` (`dev_cargas.py`, `rede_calc.py`, `hub_progress.py`, `live_monitor.py`), que a função `Get-Scripts` do `hub.ps1` ignora inteira. Outro script auxiliar (chamado por outro, e não pelo operador) precisa entrar na lista de exclusão da `Get-Scripts`, como já acontece com `boot_shutdown_duration.ps1`.
 
 ## Contrato de um script
 
@@ -47,6 +47,7 @@ O hub injeta estas variáveis de ambiente antes de cada script:
 | `HUB_EVIDENCE_DIR` | Pasta de evidências do teste atual (`Execucoes/<cenário>/Traces/<pasta-do-teste>`) |
 | `HUB_TRACE_DIR` | Igual a `HUB_EVIDENCE_DIR` |
 | `HUB_TRACE_ROOT` | Pasta `Traces` do cenário |
+| `HUB_MONITOR_PID` | PID do monitor ao vivo (`Testes/_lib/live_monitor.py`), quando ativo. Teste que ranqueia processos deve excluí-lo, como faz o Teste 0 |
 
 Nunca grave arquivos na raiz do projeto. Para permitir execução avulsa (fora do hub), use a pasta do próprio script como fallback:
 
@@ -77,7 +78,33 @@ O teste `.github/scripts/Test-ThematicCSVs.ps1`, executado no CI, cobre esse com
 
 Scripts `.ps1` rodam com `-NonInteractive`, e a saída de todos é capturada para o log. Quando o teste precisar do operador, use uma janela própria (Tkinter, por exemplo), como fazem os módulos 5 e 6.
 
-### 6. Módulos de cargas de dev (7 a 11)
+### 6. Progresso para o monitor ao vivo (`[HUB:PROGRESS]`)
+
+Na Fase 2, o hub executa cada teste pelo `Testes/_lib/live_monitor.py`, que lê o stdout do teste e desenha a etapa atual, uma barra interna e os alertas. Para alimentar esse painel, emita eventos com `Testes/_lib/hub_progress.py` (só stdlib) nas **transições** de etapa — início de ciclo, rodada, exportação, consolidação —, nunca a cada segundo:
+
+```python
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:
+    from hub_progress import emit_alert, emit_progress
+except ImportError:  # fora da arvore do hub: vira no-op
+    def emit_progress(*_a, **_k): pass
+    def emit_alert(*_a, **_k): pass
+
+emit_progress(f"Ciclo {i}/{TOTAL}", i, TOTAL, "Calc R2 (planilha 100k fórmulas)")
+emit_alert("Speedtest interno indisponível; seguindo com fast.com")   # nivel: info | warn | error
+```
+
+| Função | Linha gerada no stdout |
+|--------|------------------------|
+| `emit_progress(etapa, atual=None, total=None, detalhe="")` | `[HUB:PROGRESS] {"etapa":"Ciclo 2/5","atual":2,"total":5,"detalhe":"..."}` |
+| `emit_alert(texto, nivel="warn")` | `[HUB:ALERT] {"nivel":"warn","texto":"..."}` |
+
+- `etapa` é obrigatória; `total` aceita só inteiro maior que 0. Linha com JSON inválido é ignorada pelo painel e continua no log.
+- As linhas ficam gravadas no `Logs/run_*.log`, para a auditoria saber quando cada etapa começou.
+- Em testes sensíveis a consumo (pastas em `LiveMonitor.LowImpactFolders`, hoje 0 e 5), emita poucos eventos (no máximo 1 por minuto): cada linha acorda o monitor para redesenhar.
+- Teste sem `emit_progress` continua funcionando: o painel mostra a última linha de saída como etapa.
+
+### 7. Módulos de cargas de dev (7 a 11)
 
 Os módulos de cargas de desenvolvimento não têm lógica própria: o script só chama `executar_modulo(__file__)` da biblioteca `Testes/_lib/dev_cargas.py`, e o que é medido fica no `cargas.json` da pasta do módulo:
 
@@ -86,7 +113,7 @@ Os módulos de cargas de desenvolvimento não têm lógica própria: o script s�
 
 O `referencia.json` do módulo (gerado com `--calibrar` no notebook de referência e versionado) define o limite de 10x por carga. Para uma carga nova, regenere a referência. Repositórios internos nunca entram no `cargas.json`: vão para o `workloads.local.json`, que não é versionado.
 
-### 7. Pré-requisitos e sobras do módulo
+### 8. Pré-requisitos e sobras do módulo
 
 Se o módulo depende de algo que pode faltar na máquina (arquivo não versionado, ferramenta, configuração), acrescente uma regra em `Get-PreflightFindings` (`hub.ps1`). A regra recebe só os testes selecionados, agrupados pela pasta, e devolve achados `New-PreflightFinding 'Impede'|'Atencao' <testes> <item> <ação>`. Use `Impede` só quando o teste vai falhar com certeza, e escreva a ação como instrução ao operador ("Copie X para Y", "Rode o Setup N"). Sondas do sistema (tomada, internet, disco, versão de ferramenta) ficam em funções próprias, para a CI poder substituí-las (`.github/scripts/Test-Preflight.ps1`).
 
@@ -98,6 +125,7 @@ Se o módulo abre processos que podem sobreviver ao teste (navegador, servidor, 
 - [ ] Exit code `0` somente em PASS
 - [ ] Evidências em `HUB_EVIDENCE_DIR`
 - [ ] Parada segura (`Ctrl+Q`) em testes longos
+- [ ] Etapas principais emitidas com `emit_progress()` (`Testes/_lib/hub_progress.py`)
 - [ ] CSV temático registrado em `Test-ThematicCSVs` (se houver)
 - [ ] Pré-requisitos na checagem (`Get-PreflightFindings`) e sobras em `Get-TestLeftovers` (se houver)
 - [ ] Dependências Python novas adicionadas a `Setup/environment/5_install_py_dependencies.ps1`

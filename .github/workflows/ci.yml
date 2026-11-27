@@ -70,7 +70,7 @@ jobs:
           python-version: "3.12"
 
       - name: Instala ferramentas
-        run: pip install ruff==0.17.4 markdown==3.11.3
+        run: pip install ruff==0.17.4 markdown==3.11.3 rich psutil
 
       - name: Ruff (erros de sintaxe e nomes indefinidos)
         run: ruff check --select E9,F63,F7,F82 --target-version py312 --output-format github Testes/ docs/
@@ -86,6 +86,9 @@ jobs:
 
       - name: Teste de regressão (Módulo 1 com LibreOffice)
         run: python -I -X utf8 .github/scripts/test_cpu_memo_libreoffice.py
+
+      - name: Teste de regressão (monitor ao vivo — hub_progress e live_monitor)
+        run: python -I -X utf8 .github/scripts/test_live_monitor.py
 
       - name: HTML da documentação em sincronia com o Markdown
         run: python docs/gerar_html.py --check
@@ -127,6 +130,19 @@ jobs:
         shell: pwsh
         run: |
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-GetScriptsOrder.ps1
+          exit $LASTEXITCODE
+
+      - name: Teste de regressão do hub (seções do menu da Fase 2)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-TestSections.ps1
+          exit $LASTEXITCODE
+
+      - name: Teste de regressão do hub (monitor ao vivo e fallback clássico)
+        shell: pwsh
+        run: |
+          python -m pip install --quiet rich
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .github\scripts\Test-LiveMonitorFallback.ps1
           exit $LASTEXITCODE
 
       - name: Teste de regressão do hub (parada da fila por Ctrl+Q)

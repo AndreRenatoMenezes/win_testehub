@@ -6,7 +6,8 @@ Valida:
 2. Resolucao de Agentes_SI_Profile.wpaProfile (0_consumo_basal -> 1_cpu_memo) e
    renomeacao automatica de .wpaProfile.xml.
 3. Agregacao de processos no BasalSampler (exclusao de Idle/PID 0 e do proprio
-   processo, soma por executavel, Self_Overhead e Top 15 CPU / Top 15 RAM).
+   processo, soma por executavel, Self_Overhead e Top 15 CPU / Top 15 RAM) e
+   exclusao do monitor ao vivo do hub (HUB_MONITOR_PID).
 4. Consolidacao de consumo_basal.csv, ciclos_basal.csv e top_processos_basal.csv
    com WPA preenchido (pandas e fallback stdlib), caso ImagemLimpa (CSV WPA vazio
    com 0 linhas -> 0.00 sem falhar) e caso sem .wpaProfile.
@@ -129,6 +130,34 @@ confere(len(top_cpu_rows) == 15 and len(top_ram_rows) == 15, "Top 15 CPU e Top 1
 confere(top_cpu_rows[0]["Processo"] == "svchost.exe" and perto(top_cpu_rows[0]["Instancias_Medias"], 2.0), "Top 1 CPU = svchost.exe (Instancias_Medias = 2.00)")
 confere(top_ram_rows[0]["Processo"] == "agente_si.exe" and perto(top_ram_rows[0]["RAM_RSS_Media_MB"], 200.0), "Top 1 RAM = agente_si.exe (200.0 MB)")
 confere(all(r["Processo"] not in ("python.exe", "System Idle Process") for r in top_rows), "ranking nao contem Self nem Idle")
+
+# --- 3b. Monitor ao vivo do hub (HUB_MONITOR_PID) fora do ranking -------------
+orig_mon = os.environ.get("HUB_MONITOR_PID")
+try:
+    os.environ["HUB_MONITOR_PID"] = "7777"
+    sm = mod.BasalSampler(interval=1.0, self_pid=9999)
+    confere(sm.exclude_pids == frozenset([7777]), "BasalSampler le HUB_MONITOR_PID do ambiente")
+    sm.record_tick(
+        sys_cpu=5.0, sys_ram_mb=4000.0, sys_ram_pct=50.0, sys_ram_avail_mb=4096.0, ram_total_gb=8.0,
+        proc_readings=[(7777, "python.exe", 3.0, 80.0), (9999, "python.exe", 1.0, 40.0), (55, "agente_si.exe", 2.0, 100.0)],
+    )
+    sm_sum = sm.summarize()
+    rows_m = mod.build_top_processes_rows(sm_sum["process_stats"], sm_sum["Amostras"], limit=15)
+    confere("python.exe" not in sm_sum["process_stats"] and all(r["Processo"] != "python.exe" for r in rows_m),
+            "HUB_MONITOR_PID excluido do top_processos_basal")
+    confere(perto(sm_sum["Self_Overhead_CPU_Media"], 1.0), "monitor nao entra no Self_Overhead do Teste 0")
+    confere("agente_si.exe" in sm_sum["process_stats"], "demais processos continuam no ranking")
+    for invalido in ("", "abc", "-5", "0"):
+        os.environ["HUB_MONITOR_PID"] = invalido
+        confere(mod.BasalSampler(interval=1.0, self_pid=9999).exclude_pids == frozenset(),
+                f"HUB_MONITOR_PID invalido ({invalido!r}) ignorado")
+    os.environ.pop("HUB_MONITOR_PID", None)
+    confere(mod._hub_monitor_pids() == frozenset(), "sem HUB_MONITOR_PID (fora do hub): nada excluido")
+finally:
+    if orig_mon is None:
+        os.environ.pop("HUB_MONITOR_PID", None)
+    else:
+        os.environ["HUB_MONITOR_PID"] = orig_mon
 
 # --- 4. Consolidacao de CSVs --------------------------------------------------
 def _make_cycle(idx, cpu_vals, ram_vals, interacao="nao"):

@@ -33,13 +33,14 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 
 ### Destaques
 
-- **Menu interativo**: seleção múltipla por setas e espaço. Os testes pendentes já vêm marcados, `A` marca todos e `P` volta a marcar só os pendentes.
+- **Menu interativo**: seleção múltipla por setas e espaço. Na Fase 2 os testes ficam em três seções (**Escritório**, **Dev** e **Opcional**); só os pendentes de Escritório já vêm marcados, `1`/`2`/`3` ligam ou desligam uma seção inteira, `A` marca todos e `P` volta a marcar só os pendentes de Escritório.
 - **Duas fases**: preparação da máquina (energia, Windows Update, Python, bloatware…) e testes de hardware.
 - **Cenários persistentes**: o histórico de execuções fica em `_state.json`. Numa reexecução, as evidências anteriores vão para `_anterior/` em vez de serem sobrescritas.
 - **Relatórios em vários formatos**: HTML, CSV, JSON e log completo, por execução e consolidados por cenário, além de CSVs temáticos prontos para BI.
 - **Extensível por convenção**: qualquer `.py` ou `.ps1` colocado em `Testes/` vira um item do menu.
 - **Feito para o operador**: overlays de progresso que não capturam cliques, parada segura com `Ctrl+Q` e pasta de exportação pronta para o Drive (sem `.etl` nem logs) e ZIP validado.
 - **Checagem antes da fila**: antes de soltar a fila, o hub aponta o que vai falhar (ex.: `.wpaProfile` ausente, ferramenta de dev faltando, notebook na bateria) e as sobras de testes anteriores consumindo recursos. Entre um teste e outro, limpa as sobras do teste que acabou.
+- **Monitor ao vivo no terminal**: durante a Fase 2, uma TUI (`rich`) mostra a fila com cronômetros, a etapa interna de cada teste (`[HUB:PROGRESS]`), CPU/clock/temperatura/RAM/energia, as últimas linhas de log e os alertas. Nos testes 0 e 5 entra em modo baixo impacto; sem `rich` no `.venv`, o hub volta ao painel clássico.
 - **Avisos e frequência da CPU no relatório**: o `_relatorio.html` lista as ressalvas da rodada e o clock da CPU por módulo, com aviso de throttling.
 
 ## Módulos de teste
@@ -62,7 +63,7 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 | 11 | Dev Git e arquivos | `11_dev_git_arquivos.py` | 20 mil arquivos de 4 KB (overhead de EDR) e `git clone --local` + `git status` do `home-assistant/core`, 3 execuções | ~3–5 min | todas as cargas OK e ≤ 10x a referência |
 
 ![Menu da Fase 2 com os nove módulos de teste agrupados por categoria](docs/assets/screenshots/03-fase2-testes.png)
-<br><sub>*Fase 2: os módulos aparecem agrupados por pasta, todos marcados na primeira execução.*</sub>
+<br><sub>*Fase 2 (captura anterior às seções): hoje os módulos aparecem nas seções Escritório (0 a 5, marcados na primeira execução), Dev (7 a 11) e Opcional (1-1, 2-1 e 6), as duas últimas desmarcadas.*</sub>
 
 > Os módulos 5 e 6 precisam de um operador presente: desconectar o carregador, no 5, e andar com o notebook, no 6. O passo a passo está no [manual](docs/manual-de-execucao.md#46-teste-de-bateria-módulo-5--passo-a-passo-do-operador).
 
@@ -155,11 +156,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\TesteHub\hub.ps1
 | Tecla | Ação |
 |:-----:|------|
 | `↑` `↓` | Navegar |
-| `Espaço` | Marcar ou desmarcar |
+| `Espaço` | Marcar ou desmarcar; sobre o cabeçalho de uma seção, a seção inteira |
+| `1` `2` `3` | Marcar ou desmarcar a seção inteira (Escritório, Dev, Opcional), na fileira de cima ou no teclado numérico |
 | `A` | Marcar ou desmarcar todos |
-| `P` | Marcar só os pendentes (nunca executados no cenário) |
+| `P` | Marcar só os pendentes (nunca executados no cenário). Na Fase 2, só os pendentes de **Escritório** |
 | `Enter` | Confirmar |
 | `Esc` | Cancelar |
+
+Na Fase 2, cada cabeçalho mostra `[X]` (seção toda marcada), `[-]` (parte) ou `[ ]` (nenhum) e a contagem `marcados/total`. A seção alterna assim: toda marcada → desmarca; parcial ou vazia → marca toda. A fila roda na ordem das seções: Escritório → Dev → Opcional. A Fase 1 (`Setup/`) continua agrupada por pasta, com todos os pendentes marcados.
 
 No resumo pré-execução, depois da checagem: `R` tira da fila os testes que vão falhar e `C` continua mesmo assim (as duas só aparecem quando há algo que impede), `F` encerra as sobras de teste (quando há) e `Esc` volta ao menu. Detalhes no [manual, seção 4.9](docs/manual-de-execucao.md#49-checagem-antes-da-fila-e-sobras-de-teste).
 
@@ -187,6 +191,12 @@ No resumo pré-execução, depois da checagem: `R` tira da fila os testes que v�
 | `CpuSampler.ThrottleAlertPct` | `20` | Queda do clock sob carga que vira aviso de throttling |
 | `CpuSampler.LoadMinPct` | `50` | Uso de CPU a partir do qual a amostra conta como "sob carga" |
 | `CpuSampler.SkipFolders` | `["0_consumo_basal", "5_bateria"]` | Testes em que o amostrador não roda |
+| `LiveMonitor.Enabled` | `true` | Monitor ao vivo (TUI `rich`) na Fase 2. `false`, ou `.venv` sem `rich`, usa o painel estático clássico |
+| `LiveMonitor.RefreshHz` | `1` | Redesenhos por segundo do painel |
+| `LiveMonitor.LogTailLines` | `8` | Linhas de saída do teste mostradas no bloco "Saída ao Vivo" |
+| `LiveMonitor.TelemetryIntervalSec` | `2` | Intervalo da leitura de CPU %, RAM, energia (`psutil`) e da última linha do `frequencia_cpu.csv` |
+| `LiveMonitor.LowImpactFolders` | `["0_consumo_basal", "5_bateria"]` | Testes em modo baixo impacto: sem timer nem telemetria, o painel só redesenha quando chega linha nova |
+| `TestSections` | Escritório (0 a 5), Dev (7 a 11), Opcional (1-1, 2-1, 6) | Seções do menu da Fase 2. Cada uma tem `Id`, `Label`, `Key` (atalho), `DefaultSelected` (pendentes já marcados e alvo do `P`), `Fallback` (recebe os scripts não listados) e `Scripts` (nomes sem extensão). Sem a chave, o hub usa o padrão |
 
 ### `config.local.json` (não versionado)
 
@@ -261,7 +271,8 @@ Ao criar um cenário, o hub pergunta o **nome do cenário**, o **modelo** e o **
 │   ├── 5_bateria/
 │   ├── 6_wifi_fast_transition/
 │   ├── 7_dev_dotnet/ … 11_dev_git_arquivos/   # cargas de dev (cargas.json + referencia.json)
-│   └── _lib/                  # bibliotecas (fora do menu): dev_cargas.py (7 a 11) e rede_calc.py (3)
+│   └── _lib/                  # bibliotecas (fora do menu): dev_cargas.py (7 a 11), rede_calc.py (3),
+│                              # hub_progress.py (protocolo [HUB:PROGRESS]) e live_monitor.py (TUI da Fase 2)
 ├── docs/                      # manual e metodologia (.md = fonte; .html gerado por gerar_html.py)
 │   └── assets/brand/          # logo, ícone, favicon e imagem de prévia do repositório
 └── .github/                   # CI, Dependabot e modelos de issue e de PR
@@ -272,6 +283,7 @@ Ao criar um cenário, o hub pergunta o **nome do cenário**, o **modelo** e o **
 1. Crie `Testes/12_categoria/12_meu_teste.py` (ou `.ps1`). O menu ordena pelo número (`9_` antes de `10_`).
 2. Grave as evidências em `os.environ["HUB_EVIDENCE_DIR"]`.
 3. Saia com `0` para PASS e com qualquer outro código para FAIL.
+4. (Recomendado) Emita a etapa atual com `emit_progress()` de `Testes/_lib/hub_progress.py` para o monitor ao vivo mostrar ciclo/rodada e barra de progresso.
 
 O hub encontra o script sozinho. Para regras de CSV temático, scripts auxiliares e o checklist completo, veja o [CONTRIBUTING.md](CONTRIBUTING.md).
 

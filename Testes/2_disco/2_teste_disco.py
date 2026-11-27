@@ -8,6 +8,20 @@ import threading
 from datetime import datetime
 import re
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress, is_live_monitor_active
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+    def is_live_monitor_active():
+        return False
+
+
 # --- CONFIGURAÇÕES FIXAS DO TESTE ---
 DRIVE_TESTE = "C:\\"
 BATERIAS = 10
@@ -169,24 +183,30 @@ def iniciar_teste(ui):
         for i in range(BATERIAS):
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Executando Bateria {i+1} de {BATERIAS}...")
             ui.atualizar(i+1, BATERIAS, "Executando Leitura...")
+            emit_progress(f"Bateria {i+1}/{BATERIAS}", i + 1, BATERIAS, "DiskSpd leitura sequencial",
+                          duracao_s=15, aviso="Teste de disco em andamento — não execute tarefas pesadas")
 
             # Teste de Leitura
             cmd_read = f'"{caminho_diskspd}" -b1M -d10 -o1 -t1 -W5 -S -w0 -c8G "{arquivo_teste}"'
             read_speed = executar_diskspd(cmd_read)
             if read_speed < 0:
                 print(f"[ERRO] Falha na leitura da bateria {i+1}")
+                emit_alert(f"Falha na leitura da bateria {i+1}", "error")
                 _exit_code = 1
                 break
             resultados_read.append(read_speed)
             print(f"  -> Leitura: {formatar_numero(read_speed)} MB/s")
 
             ui.atualizar(i+1, BATERIAS, "Executando Escrita...")
+            emit_progress(f"Bateria {i+1}/{BATERIAS}", i + 1, BATERIAS, "DiskSpd escrita sequencial",
+                          duracao_s=15, aviso="Teste de disco em andamento — não execute tarefas pesadas")
 
             # Teste de Escrita
             cmd_write = f'"{caminho_diskspd}" -b1M -d10 -o1 -t1 -W5 -S -w100 -c8G "{arquivo_teste}"'
             write_speed = executar_diskspd(cmd_write)
             if write_speed < 0:
                 print(f"[ERRO] Falha na escrita da bateria {i+1}")
+                emit_alert(f"Falha na escrita da bateria {i+1}", "error")
                 _exit_code = 1
                 break
             resultados_write.append(write_speed)
@@ -195,6 +215,8 @@ def iniciar_teste(ui):
             # Aguarda 1 minuto antes da proxima bateria (exceto apos a ultima)
             if i < BATERIAS - 1:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Aguardando 1 minuto para a proxima bateria...")
+                emit_progress(f"Bateria {i+1}/{BATERIAS}", i + 1, BATERIAS, "Intervalo de 1 min até a próxima bateria",
+                              duracao_s=60, aviso="Arrefecimento do SSD — aguarde a próxima bateria")
                 for seg in range(60, 0, -1):
                     ui.atualizar(i+1, BATERIAS, "Aguardando proxima bateria", seg)
                     time.sleep(1)
@@ -206,6 +228,7 @@ def iniciar_teste(ui):
         if _exit_code == 0:
             print("Gerando relatorios finais...")
             ui.atualizar(0, BATERIAS, "Gerando relatorios finais...")
+            emit_progress("Consolidação CSV", detalhe="disco.csv e relatório")
             gerar_relatorios(DIRETORIO_SAIDA, resultados_read, resultados_write)
             print("\n=== VALIDACAO DE DISCO CONCLUIDA COM SUCESSO ===")
 
@@ -217,7 +240,14 @@ def iniciar_teste(ui):
 
 
 if __name__ == "__main__":
-    ui = MonitorOverlay()
-    threading.Thread(target=iniciar_teste, args=(ui,), daemon=True).start()
-    ui.root.mainloop()
+    if is_live_monitor_active():
+        class _HeadlessUI:
+            def atualizar(self, *_a, **_k): pass
+            def fechar(self): pass
+
+        iniciar_teste(_HeadlessUI())
+    else:
+        ui = MonitorOverlay()
+        threading.Thread(target=iniciar_teste, args=(ui,), daemon=True).start()
+        ui.root.mainloop()
     sys.exit(_exit_code)

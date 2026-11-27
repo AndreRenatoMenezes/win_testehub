@@ -2,7 +2,7 @@
 #  Teste de regressao: Get-Scripts (hub.ps1)
 #
 #  Garante a ordenacao natural do menu ("10_" depois de "9_") e que a
-#  bibliotecas da pasta _lib (dev_cargas.py, rede_calc.py) nao viram item do menu.
+#  bibliotecas da pasta _lib (dev_cargas.py, rede_calc.py, hub_progress.py, live_monitor.py) nao viram item do menu.
 #  Executado pelo CI no Windows PowerShell 5.1 (runtime do hub).
 # =============================================================================
 Set-StrictMode -Version Latest
@@ -59,7 +59,9 @@ $testes = New-Tree @(
     "10_dev_containers/10_dev_containers.py",
     "11_dev_git_arquivos/11_dev_git_arquivos.py",
     "_lib/dev_cargas.py",
-    "_lib/rede_calc.py"
+    "_lib/rede_calc.py",
+    "_lib/hub_progress.py",
+    "_lib/live_monitor.py"
 )
 try {
     $nomes = @((Get-Scripts -Root $testes -Kind "test") | ForEach-Object { $_.Name })
@@ -72,6 +74,8 @@ try {
     Assert-Condition (($nomes -join ",") -eq ($esperado -join ",")) "ordem: $($nomes -join ', ')"
     Assert-Condition (-not ($nomes -contains "dev_cargas")) "dev_cargas.py fora do menu"
     Assert-Condition (-not ($nomes -contains "rede_calc")) "rede_calc.py (biblioteca do teste 3) fora do menu"
+    Assert-Condition (-not ($nomes -contains "hub_progress")) "hub_progress.py (protocolo do monitor ao vivo) fora do menu"
+    Assert-Condition (-not ($nomes -contains "live_monitor")) "live_monitor.py (TUI do monitor ao vivo) fora do menu"
     Assert-Condition (-not ($nomes -contains "boot_shutdown_duration")) "boot_shutdown_duration.ps1 continua fora do menu"
 } finally {
     Remove-Item $testes -Recurse -Force -ErrorAction SilentlyContinue

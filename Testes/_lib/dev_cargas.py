@@ -44,6 +44,19 @@ try:
 except ImportError:  # pragma: no cover - o setup do hub instala o psutil
     psutil = None
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress, is_live_monitor_active
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+    def is_live_monitor_active():
+        return False
+
 RAIZ_PROJETO = Path(__file__).resolve().parents[2]
 ARQUIVO_LOCAL = RAIZ_PROJETO / "workloads.local.json"
 FATOR_LIMITE = 10
@@ -466,9 +479,12 @@ def preparar_repos(definicao, ctx, executor, pasta_logs):
     env["GIT_TERMINAL_PROMPT"] = "0"  # sem prompt no terminal
     env["GCM_INTERACTIVE"] = "never"  # sem janela do Git Credential Manager
     with open(pasta_logs / "_repos.log", "ab") as arq:
-        for repo in definicao["repos"]:
+        total_repos = len(definicao["repos"])
+        for n_repo, repo in enumerate(definicao["repos"], 1):
             destino = work / repo["nome"]
             ref = repo["ref"]
+            emit_progress(f"Repositório {n_repo}/{total_repos} — {repo['nome']}", n_repo, total_repos,
+                          f"clone/checkout @ {ref}")
             ctx.ui.status(f"Preparando repositorio {repo['nome']} @ {ref}")
             ctx.ui.fase(f"repositorio {repo['nome']}")
             log(f"Repositorio {repo['nome']} @ {ref}")
@@ -536,8 +552,11 @@ def _registrar(definicao, ctx):
     return registros
 
 
-def medir_carga(carga, definicao, ctx, executor, pasta_logs, runs, limite_s, limite_fria_s=None):
+def medir_carga(carga, definicao, ctx, executor, pasta_logs, runs, limite_s, limite_fria_s=None,
+                indice=None, total_cargas=None):
     """Executa uma carga N vezes. Retorna o dicionario de resultado.
+
+    ``indice``/``total_cargas`` (opcionais) so alimentam o [HUB:PROGRESS] do monitor ao vivo.
 
     A 1a execucao (fria: caches do SO vazios) usa ``limite_fria_s`` (10x a fria da referencia);
     as demais, ``limite_s`` (10x a mediana). Frio se compara com frio.
@@ -556,6 +575,10 @@ def medir_carga(carga, definicao, ctx, executor, pasta_logs, runs, limite_s, lim
     caminho_log = pasta_logs / f"{cid}.log"
     fase = {"nome": "preparo", "medindo": False}
     limite_run = limite_s
+    if indice and total_cargas:
+        etapa_carga, atual_carga = f"Carga {indice}/{total_cargas} — {cid}", indice
+    else:
+        etapa_carga, atual_carga = f"Carga {cid}", None
     with open(caminho_log, "wb") as arq:
         arq.write(f"# {cid} - {os.environ.get('COMPUTERNAME', '')} - {datetime.now().isoformat(timespec='seconds')}\n"
                   .encode("utf-8"))
@@ -563,17 +586,25 @@ def medir_carga(carga, definicao, ctx, executor, pasta_logs, runs, limite_s, lim
             Path(cwd).mkdir(parents=True, exist_ok=True)
             ctx.ui.carga(cid, None, runs, None)
             if carga.get("preparo"):
+                emit_progress(etapa_carga, atual_carga, total_cargas, "Preparo (fora da medição)",
+                              aviso="Cargas Dev em andamento — não use a máquina")
                 ctx.ui.status(f"{cid}: preparo")
                 ctx.ui.fase("preparo")
                 _rodar_fase(executor, carga["preparo"], cwd, env, arq, "preparo",
                             time.monotonic() + timeout_setup)
             for i in range(1, runs + 1):
                 limite_run = limite_fria_s if i == 1 else limite_s
+                lim_txt = f" · limite {int(round(limite_run))}s" if limite_run else ""
                 ctx.ui.carga(cid, i, runs, limite_run)
+                if carga.get("setup"):
+                    emit_progress(etapa_carga, atual_carga, total_cargas, f"Execução {i}/{runs} — setup (fora da medição)",
+                                  aviso="Cargas Dev em andamento — não use a máquina")
                 fase.update(nome=f"setup run {i}", medindo=False)
                 ctx.ui.fase(f"setup run {i}")
                 _rodar_fase(executor, carga.get("setup", []), cwd, env, arq, f"setup run {i}",
                             time.monotonic() + timeout_setup)
+                emit_progress(etapa_carga, atual_carga, total_cargas, f"Execução {i}/{runs} — medindo{lim_txt}",
+                              aviso="MEDINDO CARGA DEV — não use a máquina")
                 ctx.ui.status(f"{cid}: medindo (run {i}/{runs})")
                 t0 = time.perf_counter()
                 inicio = time.monotonic()
@@ -591,6 +622,10 @@ def medir_carga(carga, definicao, ctx, executor, pasta_logs, runs, limite_s, lim
                 arq.write(f"### tempo run {i}: {dur:.2f}s\n".encode("utf-8"))
                 log(f"  {cid} run {i}: {dur:.1f}s")
                 ctx.ui.ultimo(f"run {i}: {dur:.1f}s")
+                if carga.get("cleanup"):
+                    emit_progress(etapa_carga, atual_carga, total_cargas,
+                                  f"Execução {i}/{runs} — cleanup (última: {dur:.1f}s)",
+                                  aviso="Cargas Dev em andamento — não use a máquina")
                 fase.update(nome=f"cleanup run {i}", medindo=False)
                 ctx.ui.fase(f"cleanup run {i}")
                 _rodar_fase(executor, carga.get("cleanup", []), cwd, env, arq, f"cleanup run {i}",
@@ -609,6 +644,8 @@ def medir_carga(carga, definicao, ctx, executor, pasta_logs, runs, limite_s, lim
         if res["status"] != OK:
             arq.write(f"### {res['status']}: {res['motivo']}\n".encode("utf-8"))
             log(f"  [!] {cid} {res['status']}: {res['motivo']} (log: {caminho_log})")
+            emit_alert(f"{cid} {res['status']}: {res['motivo']}",
+                       "warn" if res["status"] == INTERROMPIDO else "error")
             executor.ignorar_parada = True
             try:
                 _rodar_fase(executor, carga.get("cleanup", []), cwd, env, arq, "cleanup apos falha",
@@ -885,9 +922,11 @@ def _trabalho(pasta_modulo, args, ctx, resultado):
         ctx.ui.aviso(msg)
         resultado["erros"].append(msg)
         log(f"[X] {msg}")
+        emit_alert(msg, "error")
         time.sleep(3)
         return
 
+    emit_progress("Checagem de ferramentas")
     ctx.ui.status("Conferindo ferramentas...")
     resultado["versoes"], erros = checar_ferramentas(definicao, _env_carga(definicao, {}, ctx.tokens))
     for cmd, versao in resultado["versoes"].items():
@@ -897,6 +936,7 @@ def _trabalho(pasta_modulo, args, ctx, resultado):
         for e in erros:
             log(f"[X] {e}")
         ctx.ui.aviso("Pre-requisito ausente: " + "; ".join(erros))
+        emit_alert("Pre-requisito ausente: " + "; ".join(erros), "error")
         time.sleep(3)
         return
 
@@ -923,9 +963,10 @@ def _trabalho(pasta_modulo, args, ctx, resultado):
     except FalhaPasso as e:
         resultado["erros"].append(f"falha ao preparar repositorios: {e} (log: {pasta_logs / '_repos.log'})")
         log(f"[X] {resultado['erros'][-1]}")
+        emit_alert(resultado["erros"][-1], "error")
         return
 
-    for carga in cargas:
+    for n_carga, carga in enumerate(cargas, 1):
         cid = carga["id"]
         limite = limite_fria = None
         if referencia:
@@ -934,7 +975,8 @@ def _trabalho(pasta_modulo, args, ctx, resultado):
             if limite is None:
                 resultado["avisos"].append(f"{cid}: sem referencia, sem limite de tempo")
         log(f"== {cid} ==")
-        r = medir_carga(carga, definicao, ctx, executor, pasta_logs, args.runs, limite, limite_fria)
+        r = medir_carga(carga, definicao, ctx, executor, pasta_logs, args.runs, limite, limite_fria,
+                        indice=n_carga, total_cargas=len(cargas))
         resultado["cargas"][cid] = r
         if r["status"] == INTERROMPIDO:
             resultado["erros"].append(r["motivo"])
@@ -961,7 +1003,7 @@ def executar_modulo(arquivo_modulo, argv=None):
 
     ui = _SemUI()
     overlay = None
-    if not args.sem_overlay:
+    if not args.sem_overlay and not is_live_monitor_active():
         try:
             overlay = Overlay(f"Cargas dev - {pasta_modulo.name}")
             ui = overlay
@@ -995,6 +1037,7 @@ def executar_modulo(arquivo_modulo, argv=None):
     passou = todas_ok and not resultado["erros"]
     resultado["resultado"] = "PASS" if passou else "FAIL"
 
+    emit_progress("Consolidação CSV/JSON", detalhe=resultado["resultado"])
     nome_csv = resultado.get("csv") or f"dev_{pasta_modulo.name.split('_', 1)[-1]}.csv"
     with open(evidencias / f"{Path(nome_csv).stem}.json", "w", encoding="utf-8") as f:
         json.dump(resultado, f, ensure_ascii=False, indent=2)

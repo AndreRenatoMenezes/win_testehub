@@ -4,6 +4,23 @@ $ErrorActionPreference = "Continue"
 # ---- Carregar Configuracoes (JSON) -------------------------------------------
 $configFile = Join-Path $PSScriptRoot "config.json"
 
+function Get-DefaultTestSections {
+    return @(
+        [PSCustomObject]@{
+            Id = "escritorio"; Label = "Escritorio"; Key = "1"; DefaultSelected = $true; Fallback = $false
+            Scripts = @("0_teste_consumo_basal", "1_automacao_performance", "2_teste_disco", "3_teste_rede", "4_boot_shutdown_auto", "5_teste_bateria")
+        },
+        [PSCustomObject]@{
+            Id = "dev"; Label = "Dev"; Key = "2"; DefaultSelected = $false; Fallback = $false
+            Scripts = @("7_dev_dotnet", "8_dev_go", "9_dev_python", "10_dev_containers", "11_dev_git_arquivos")
+        },
+        [PSCustomObject]@{
+            Id = "opcional"; Label = "Opcional"; Key = "3"; DefaultSelected = $false; Fallback = $true
+            Scripts = @("1-1_automacao_performance_dlp", "2-1_teste_disco_dlp", "6_teste_fast_transition")
+        }
+    )
+}
+
 if (-not (Test-Path -LiteralPath $configFile)) {
     Write-Host "  [!] config.json nao encontrado. Criando um com os valores padrao..." -ForegroundColor Yellow
     $defaultConfig = @{
@@ -30,11 +47,20 @@ if (-not (Test-Path -LiteralPath $configFile)) {
             LoadMinPct       = 50
             SkipFolders      = @("0_consumo_basal", "5_bateria")
         }
+        LiveMonitor = @{
+            Enabled              = $true
+            RefreshHz            = 1
+            LogTailLines         = 8
+            TelemetryIntervalSec = 2
+            LowImpactFolders     = @("0_consumo_basal", "5_bateria")
+        }
+        TestSections = @(Get-DefaultTestSections)
     }
     $defaultConfig | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configFile -Encoding UTF8
 }
 
-$config = Get-Content -LiteralPath $configFile | ConvertFrom-Json
+# -Encoding UTF8: o config.json e UTF-8 sem BOM (rotulos acentuados); o padrao do PS 5.1 leria como ANSI
+$config = Get-Content -LiteralPath $configFile -Encoding UTF8 | ConvertFrom-Json
 
 $SetupRoot     = Join-Path $PSScriptRoot $config.Paths.SetupRoot
 $TestsRoot     = Join-Path $PSScriptRoot $config.Paths.TestsRoot
@@ -61,6 +87,61 @@ $PreflightSettings  = Merge-ConfigSection $config "Preflight"  @{ MinFreeGB = 20
 $CpuSamplerSettings = Merge-ConfigSection $config "CpuSampler" @{ Enabled = $true; IntervalSec = 5; ThrottleAlertPct = 20; LoadMinPct = 50; SkipFolders = @("0_consumo_basal", "5_bateria") }
 # "Enabled": "false" (com aspas) tambem desliga
 try { $CpuSamplerSettings.Enabled = [System.Convert]::ToBoolean([string]$CpuSamplerSettings.Enabled) } catch { $CpuSamplerSettings.Enabled = $true }
+# Monitor ao vivo da Fase 2 (TUI rich, Spec 004). Enabled=false ou .venv sem rich -> painel classico.
+$LiveMonitorSettings = Merge-ConfigSection $config "LiveMonitor" @{ Enabled = $true; RefreshHz = 1; LogTailLines = 8; TelemetryIntervalSec = 2; LowImpactFolders = @("0_consumo_basal", "5_bateria") }
+try { $LiveMonitorSettings.Enabled = [System.Convert]::ToBoolean([string]$LiveMonitorSettings.Enabled) } catch { $LiveMonitorSettings.Enabled = $true }
+$LiveMonitorScript = Join-Path $PSScriptRoot "Testes\_lib\live_monitor.py"
+
+# ---- Secoes do menu da Fase 2 (TestSections) ---------------------------------
+# Agrupamento logico por nome do script (sem extensao); as pastas de Testes/ nao mudam.
+
+# Normaliza TestSections do config.json; config antigo (sem a chave) usa o padrao.
+function Get-TestSectionsConfig {
+    param($Config)
+    $prop = $null
+    if ($null -ne $Config) { $prop = $Config.PSObject.Properties['TestSections'] }
+    if ($null -eq $prop -or $null -eq $prop.Value -or @($prop.Value).Count -eq 0) { return @(Get-DefaultTestSections) }
+
+    $sections = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $n = 0
+    foreach ($raw in @($prop.Value)) {
+        if ($null -eq $raw) { continue }
+        $n++
+        $vals = @{}
+        foreach ($name in "Id", "Label", "Key", "DefaultSelected", "Fallback", "Scripts") {
+            $p = $raw.PSObject.Properties[$name]
+            $vals[$name] = if ($null -ne $p) { $p.Value } else { $null }
+        }
+        $id    = if ([string]::IsNullOrWhiteSpace([string]$vals.Id)) { "secao$n" } else { [string]$vals.Id }
+        $label = if ([string]::IsNullOrWhiteSpace([string]$vals.Label)) { $id } else { [string]$vals.Label }
+        $key   = if ($null -eq $vals.Key) { "$n" } else { [string]$vals.Key }
+        $defSel = $false
+        if ($null -ne $vals.DefaultSelected) { try { $defSel = [System.Convert]::ToBoolean([string]$vals.DefaultSelected) } catch { $defSel = $false } }
+        $fallback = $false
+        if ($null -ne $vals.Fallback) { try { $fallback = [System.Convert]::ToBoolean([string]$vals.Fallback) } catch { $fallback = $false } }
+        $scripts = @(@($vals.Scripts) | Where-Object { $null -ne $_ -and [string]$_ -ne "" } | ForEach-Object { [string]$_ })
+        $sections.Add([PSCustomObject]@{
+            Id = $id; Label = $label; Key = $key; DefaultSelected = $defSel; Fallback = $fallback; Scripts = $scripts
+        })
+    }
+    if ($sections.Count -eq 0) { return @(Get-DefaultTestSections) }
+    return @($sections)
+}
+
+# Secao de um script: primeira secao que o lista (case-insensitive); senao a
+# primeira com Fallback; senao a ultima configurada.
+function Resolve-TestSection {
+    param([string]$ScriptName, [object[]]$Sections)
+    foreach ($sec in $Sections) {
+        foreach ($s in @($sec.Scripts)) {
+            if ([string]::Equals([string]$s, $ScriptName, [System.StringComparison]::OrdinalIgnoreCase)) { return $sec }
+        }
+    }
+    foreach ($sec in $Sections) { if ($sec.Fallback) { return $sec } }
+    return @($Sections)[-1]
+}
+
+$TestSectionsConfig = Get-TestSectionsConfig -Config $config
 
 # ---- Banner ------------------------------------------------------------------
 
@@ -375,51 +456,153 @@ function Write-PaddedLine {
     Write-Host $padded -ForegroundColor $Color
 }
 
+# Rotulo vindo do config.json (pode ter acento) em ASCII para o console CP850.
+function ConvertTo-AsciiText {
+    param([string]$Text)
+    if ([string]::IsNullOrEmpty($Text)) { return "" }
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($ch in $Text.Normalize([System.Text.NormalizationForm]::FormD).ToCharArray()) {
+        if ([System.Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -eq [System.Globalization.UnicodeCategory]::NonSpacingMark) { continue }
+        if ([int]$ch -lt 128) { [void]$sb.Append($ch) } else { [void]$sb.Append('?') }
+    }
+    return $sb.ToString()
+}
+
+# Sem -TestSections (Fase 1, Setup/): separadores por pasta e todos os pendentes
+# marcados. Com -TestSections (Fase 2, Testes/): cabecalhos de secao na ordem
+# declarada, ordenacao natural dentro da secao e so os pendentes das secoes
+# DefaultSelected marcados.
 function Build-MenuItems {
     param(
         [System.Collections.Generic.List[PSCustomObject]]$Scripts,
-        [hashtable]$PreviousResults
+        [hashtable]$PreviousResults,
+        [object[]]$TestSections
     )
     $items = [System.Collections.Generic.List[PSCustomObject]]::new()
-    $lastFolder = ""
 
-    foreach ($s in $Scripts) {
-        if ($s.ParentFolder -ne $lastFolder) {
-            $label = ($s.ParentFolder -replace '^\d+_', '' -replace '_', ' ')
-            $label = (Get-Culture).TextInfo.ToTitleCase($label)
-            $items.Add([PSCustomObject]@{
-                IsSeparator  = $true
-                Display      = $label
-                Name         = ""
-                Selected     = $false
-                Selectable   = $false
-                PrevStatus   = $null
-                PrevDuration = 0
-                PrevRunId    = 0
-            })
-            $lastFolder = $s.ParentFolder
-        }
-
-        $fileName = "$($s.Name).$($s.Type)"
+    function New-ScriptMenuItem {
+        param($Script, [string]$SectionId, [string]$SectionLabel, [bool]$DefaultSelected)
+        $fileName = "$($Script.Name).$($Script.Type)"
         $prev = if ($null -ne $PreviousResults -and $PreviousResults.ContainsKey($fileName)) { $PreviousResults[$fileName] } else { $null }
-        $isPending = ($null -eq $prev)
+        return [PSCustomObject]@{
+            IsSeparator     = $false
+            IsSectionHeader = $false
+            IsTestItem      = $true
+            Display         = $Script.Display
+            Name            = $Script.Name
+            Path            = $Script.Path
+            Type            = $Script.Type
+            Kind            = $Script.Kind
+            ParentFolder    = $Script.ParentFolder
+            SectionId       = $SectionId
+            SectionLabel    = $SectionLabel
+            SectionKey      = ""
+            DefaultSelected = $DefaultSelected
+            Selected        = ($DefaultSelected -and $null -eq $prev)
+            Selectable      = $true
+            PrevStatus      = if ($prev) { $prev.status } else { $null }
+            PrevDuration    = if ($prev) { $prev.duration } else { 0 }
+            PrevRunId       = if ($prev) { $prev.runId } else { 0 }
+        }
+    }
 
+    if ($null -eq $TestSections -or @($TestSections).Count -eq 0) {
+        $lastFolder = ""
+        foreach ($s in $Scripts) {
+            if ($s.ParentFolder -ne $lastFolder) {
+                $label = ($s.ParentFolder -replace '^\d+_', '' -replace '_', ' ')
+                $label = (Get-Culture).TextInfo.ToTitleCase($label)
+                $items.Add([PSCustomObject]@{
+                    IsSeparator     = $true
+                    IsSectionHeader = $false
+                    IsTestItem      = $false
+                    Display         = $label
+                    Name            = ""
+                    SectionId       = ""
+                    SectionLabel    = ""
+                    SectionKey      = ""
+                    DefaultSelected = $false
+                    Selected        = $false
+                    Selectable      = $false
+                    PrevStatus      = $null
+                    PrevDuration    = 0
+                    PrevRunId       = 0
+                })
+                $lastFolder = $s.ParentFolder
+            }
+            $items.Add((New-ScriptMenuItem -Script $s -SectionId "" -SectionLabel "" -DefaultSelected $true))
+        }
+        return ,$items
+    }
+
+    # Baldes por secao, na ordem declarada (Id repetido: vale a primeira)
+    $order   = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $buckets = @{}
+    foreach ($sec in $TestSections) {
+        if ($buckets.ContainsKey($sec.Id)) { continue }
+        $buckets[$sec.Id] = [System.Collections.Generic.List[PSCustomObject]]::new()
+        $order.Add($sec)
+    }
+    foreach ($s in $Scripts) {
+        $sec = Resolve-TestSection -ScriptName $s.Name -Sections @($order)
+        $buckets[$sec.Id].Add($s)
+    }
+
+    foreach ($sec in $order) {
+        $bucket = $buckets[$sec.Id]
+        if ($bucket.Count -eq 0) { continue }   # secao vazia nao aparece
+        $secLabel = ConvertTo-AsciiText $sec.Label
         $items.Add([PSCustomObject]@{
-            IsSeparator  = $false
-            Display      = $s.Display
-            Name         = $s.Name
-            Path         = $s.Path
-            Type         = $s.Type
-            Kind         = $s.Kind
-            ParentFolder = $s.ParentFolder
-            Selected     = $isPending
-            Selectable   = $true
-            PrevStatus   = if ($prev) { $prev.status } else { $null }
-            PrevDuration = if ($prev) { $prev.duration } else { 0 }
-            PrevRunId    = if ($prev) { $prev.runId } else { 0 }
+            IsSeparator     = $false
+            IsSectionHeader = $true
+            IsTestItem      = $false
+            Display         = $secLabel
+            Name            = ""
+            SectionId       = $sec.Id
+            SectionLabel    = $secLabel
+            SectionKey      = [string]$sec.Key
+            DefaultSelected = [bool]$sec.DefaultSelected
+            Selected        = $false
+            Selectable      = $true
+            PrevStatus      = $null
+            PrevDuration    = 0
+            PrevRunId       = 0
         })
+        foreach ($s in @($bucket | Sort-Object { Get-NaturalSortKey $_.Name })) {
+            $items.Add((New-ScriptMenuItem -Script $s -SectionId $sec.Id -SectionLabel $secLabel -DefaultSelected ([bool]$sec.DefaultSelected)))
+        }
     }
     return ,$items
+}
+
+# Estado agregado de uma secao: [X] todos, [-] parte, [ ] nenhum.
+function Get-SectionSelectionState {
+    param([System.Collections.Generic.List[PSCustomObject]]$Items, [string]$SectionId)
+    $tests = @($Items | Where-Object { $_.IsTestItem -and $_.SectionId -eq $SectionId })
+    $sel   = @($tests | Where-Object { $_.Selected }).Count
+    if ($tests.Count -gt 0 -and $sel -eq $tests.Count) { $state = "all"; $box = "[X]" }
+    elseif ($sel -gt 0) { $state = "partial"; $box = "[-]" }
+    else { $state = "none"; $box = "[ ]" }
+    return [PSCustomObject]@{ SelectedCount = $sel; TotalCount = $tests.Count; State = $state; Box = $box }
+}
+
+# Todos marcados -> desmarca a secao; parcial ou nenhum -> marca a secao.
+function Invoke-ToggleSectionSelection {
+    param([System.Collections.Generic.List[PSCustomObject]]$Items, [string]$SectionId)
+    $tests = @($Items | Where-Object { $_.IsTestItem -and $_.SectionId -eq $SectionId })
+    if ($tests.Count -eq 0) { return }
+    $allSel = (@($tests | Where-Object { -not $_.Selected }).Count -eq 0)
+    foreach ($t in $tests) { $t.Selected = -not $allSel }
+}
+
+# Tecla P: pendentes. Com -DefaultSectionsOnly (Fase 2) so os pendentes das
+# secoes DefaultSelected (Escritorio); sem o switch (Fase 1) todos os pendentes.
+function Invoke-SelectPendingItems {
+    param([System.Collections.Generic.List[PSCustomObject]]$Items, [switch]$DefaultSectionsOnly)
+    foreach ($it in @($Items | Where-Object { $_.IsTestItem })) {
+        $pending = ($null -eq $it.PrevStatus)
+        $it.Selected = if ($DefaultSectionsOnly) { ([bool]$it.DefaultSelected -and $pending) } else { $pending }
+    }
 }
 
 function Show-CheckboxMenu {
@@ -431,8 +614,31 @@ function Show-CheckboxMenu {
     }
     if ($selectableIdx.Count -eq 0) { return $Items }
 
+    $headers     = @($Items | Where-Object { $_.IsSectionHeader })
+    $hasSections = ($headers.Count -gt 0)
+    $totalTests  = @($Items | Where-Object { $_.IsTestItem }).Count
+    if ($hasSections) {
+        $keys = @($headers | Where-Object { $_.SectionKey -match '^[1-9]$' } | ForEach-Object { $_.SectionKey })
+        $keyHint = ""
+        if ($keys.Count -eq 1) {
+            $keyHint = "$($keys[0]) Secao  "
+        } elseif ($keys.Count -gt 1) {
+            $contiguous = $true
+            for ($ki = 1; $ki -lt $keys.Count; $ki++) {
+                if ([int]$keys[$ki] -ne ([int]$keys[$ki - 1] + 1)) { $contiguous = $false; break }
+            }
+            $keyHint = if ($contiguous) { "$($keys[0])-$($keys[-1]) Secao  " } else { "$($keys -join '/') Secao  " }
+        }
+        $defLabels = @($headers | Where-Object { $_.DefaultSelected } | ForEach-Object { $_.Display })
+        $pHint = if ($defLabels.Count -gt 0) { "P Pendentes ($($defLabels -join ', '))" } else { "P Pendentes" }
+        # Sem "setas Navegar" para caber em 120 colunas com o rotulo do P
+        $helpLine = "ESPACO Marcar  $($keyHint)A Todos  $pHint  ENTER Confirmar  ESC Cancelar"
+    } else {
+        $helpLine = "setas Navegar  ESPACO Selecionar  A Todos  P Pendentes  ENTER Confirmar  ESC Cancelar"
+    }
+
     $cursorPos  = 0
-    $maxVisible = [Math]::Min(20, [Console]::WindowHeight - 12)
+    $maxVisible = [Math]::Max(1, [Math]::Min(20, [Console]::WindowHeight - 12))
     $scrollOff  = 0
     $width      = [Console]::WindowWidth
 
@@ -447,11 +653,10 @@ function Show-CheckboxMenu {
             $actualIdx = $selectableIdx[$cursorPos]
             if ($actualIdx -lt $scrollOff) { $scrollOff = $actualIdx }
             if ($actualIdx -ge ($scrollOff + $maxVisible)) { $scrollOff = $actualIdx - $maxVisible + 1 }
-            $selCount = @($Items | Where-Object { $_.Selected }).Count
-            $totalSel = $selectableIdx.Count
+            $selCount = @($Items | Where-Object { $_.IsTestItem -and $_.Selected }).Count
 
             Safe-SetCursorPosition -X 0 -Y $startY
-            Write-PaddedLine -Text "  Selecionados: $selCount/$totalSel  |  setas Navegar  ESPACO Selecionar  A Todos  P Pendentes  ENTER Confirmar  ESC Cancelar" -Color DarkGray -Width $width
+            Write-PaddedLine -Text "  Selecionados: $selCount/$totalTests  |  $helpLine" -Color DarkGray -Width $width
             Write-PaddedLine -Width $width
 
             for ($slot = 0; $slot -lt $maxSlots; $slot++) {
@@ -461,6 +666,15 @@ function Show-CheckboxMenu {
                     if ($it.IsSeparator) {
                         $sepLine = "  -- $($it.Display) $('-' * [Math]::Max(1, 40 - $it.Display.Length))"
                         Write-PaddedLine -Text $sepLine -Color Cyan -Width $width
+                    } elseif ($it.IsSectionHeader) {
+                        $isCur  = ($i -eq $actualIdx)
+                        $st     = Get-SectionSelectionState -Items $Items -SectionId $it.SectionId
+                        $prefix = if ($isCur) { "  >> " } else { "     " }
+                        $keyTag = if ($it.SectionKey -ne "") { "[$($it.SectionKey)] " } else { "" }
+                        $head   = "$prefix$($st.Box) == $keyTag$($it.Display) ($($st.SelectedCount)/$($st.TotalCount)) "
+                        $line   = $head + ('=' * [Math]::Max(3, 62 - $head.Length))
+                        $clr    = if ($isCur) { "Yellow" } elseif ($st.State -eq "all") { "Green" } else { "Cyan" }
+                        Write-PaddedLine -Text $line -Color $clr -Width $width
                     } else {
                         $isCur  = ($i -eq $actualIdx)
                         $box    = if ($it.Selected) { "[X]" } else { "[ ]" }
@@ -494,9 +708,10 @@ function Show-CheckboxMenu {
                         $fullLine = "$linePadded$statusTag"
                         $fullPadded = $fullLine.PadRight($width - 1)
                         if ($fullPadded.Length -gt $width - 1) { $fullPadded = $fullPadded.Substring(0, $width - 1) }
+                        $cut = [Math]::Min($linePadded.Length, $fullPadded.Length)
 
-                        Write-Host $fullPadded.Substring(0, $linePadded.Length) -NoNewline -ForegroundColor $clr
-                        Write-Host $fullPadded.Substring($linePadded.Length) -ForegroundColor $statusClr
+                        Write-Host $fullPadded.Substring(0, $cut) -NoNewline -ForegroundColor $clr
+                        Write-Host $fullPadded.Substring($cut) -ForegroundColor $statusClr
                     }
                 } else { Write-PaddedLine -Width $width }
             }
@@ -505,23 +720,35 @@ function Show-CheckboxMenu {
             Write-PaddedLine -Width $width
 
             $key = [Console]::ReadKey($true)
-            switch ($key.Key) {
+            $keyName = [string]$key.Key
+            switch ($keyName) {
                 "UpArrow"   { $cursorPos = [Math]::Max(0, $cursorPos - 1) }
                 "DownArrow" { $cursorPos = [Math]::Min($selectableIdx.Count - 1, $cursorPos + 1) }
-                "Spacebar"  { $Items[$actualIdx].Selected = -not $Items[$actualIdx].Selected }
-                "A" {
-                    $allSel = (@($Items | Where-Object { $_.Selectable -and -not $_.Selected }).Count -eq 0)
-                    $Items | Where-Object { $_.Selectable } | ForEach-Object { $_.Selected = -not $allSel }
-                }
-                "P" {
-                    $Items | Where-Object { $_.Selectable } | ForEach-Object {
-                        $_.Selected = ($null -eq $_.PrevStatus)
+                "Spacebar"  {
+                    if ($Items[$actualIdx].IsSectionHeader) {
+                        Invoke-ToggleSectionSelection -Items $Items -SectionId $Items[$actualIdx].SectionId
+                    } else {
+                        $Items[$actualIdx].Selected = -not $Items[$actualIdx].Selected
                     }
                 }
+                "A" {
+                    $tests  = @($Items | Where-Object { $_.IsTestItem })
+                    $allSel = (@($tests | Where-Object { -not $_.Selected }).Count -eq 0)
+                    foreach ($t in $tests) { $t.Selected = -not $allSel }
+                }
+                "P"      { Invoke-SelectPendingItems -Items $Items -DefaultSectionsOnly:$hasSections }
                 "Enter"  { return $Items }
                 "Escape" {
-                    $Items | Where-Object { $_.Selectable } | ForEach-Object { $_.Selected = $false }
+                    foreach ($t in @($Items | Where-Object { $_.IsTestItem })) { $t.Selected = $false }
                     return $Items
+                }
+                default {
+                    # 1..9 (fileira superior ou teclado numerico): alterna a secao com essa Key
+                    if ($hasSections -and $keyName -match '^(?:D|NumPad)([1-9])$') {
+                        $digit = $Matches[1]
+                        $hdr = @($headers | Where-Object { $_.SectionKey -eq $digit }) | Select-Object -First 1
+                        if ($null -ne $hdr) { Invoke-ToggleSectionSelection -Items $Items -SectionId $hdr.SectionId }
+                    }
                 }
             }
         }
@@ -761,10 +988,165 @@ function Clear-KeyBuffer {
     try { while ([Console]::KeyAvailable) { [void][Console]::ReadKey($true) } } catch {}
 }
 
+# ---- Monitor ao vivo (TUI rich, Spec 004) ------------------------------------
+# O hub continua dono da orquestracao; Testes/_lib/live_monitor.py so executa o
+# teste mostrando o painel ao vivo e devolve o resultado em JSON.
+
+# Python do .venv (ou o do PATH, se o .venv ainda nao existir).
+function Resolve-PythonExe {
+    param([string]$VenvPath)
+    $venvExe = Join-Path $VenvPath "Scripts\python.exe"
+    if (Test-Path -LiteralPath $venvExe) { return $venvExe }
+    if (Get-Command python3 -ErrorAction SilentlyContinue) { return "python3" }
+    return "python"
+}
+
+# $true so se LiveMonitor.Enabled, o live_monitor.py existe e o Python importa rich.
+# Reason explica o motivo do fallback para o painel classico.
+function Test-LiveMonitorAvailable {
+    param([PSCustomObject]$Settings, [string]$PythonExe, [string]$MonitorScript)
+    $r = [PSCustomObject]@{ Available = $false; Reason = "" }
+    if ($null -eq $Settings -or -not $Settings.Enabled) { $r.Reason = "LiveMonitor.Enabled = false"; return $r }
+    if ([string]::IsNullOrEmpty($MonitorScript) -or -not (Test-Path -LiteralPath $MonitorScript)) { $r.Reason = "live_monitor.py nao encontrado"; return $r }
+    $ok = $false
+    try {
+        & $PythonExe -c "import rich" 2>$null | Out-Null
+        $ok = ($LASTEXITCODE -eq 0)
+    } catch { $ok = $false }
+    if (-not $ok) { $r.Reason = "Python do .venv sem o pacote rich (rode o Setup 5)"; return $r }
+    $r.Available = $true
+    return $r
+}
+
+# Testes sensiveis (LowImpactFolders): painel sem timer e sem telemetria.
+function Test-LiveMonitorLowImpact {
+    param([PSCustomObject]$Test, [PSCustomObject]$Settings)
+    if ($null -eq $Settings -or -not $Settings.PSObject.Properties['LowImpactFolders']) { return $false }
+    return (@($Settings.LowImpactFolders) -contains $Test.ParentFolder)
+}
+
+# Objeto do --state do live_monitor.py (contrato na spec 004, secao 4).
+function New-LiveMonitorStatePayload {
+    param(
+        [PSCustomObject]$State,
+        [int]$RunId,
+        [datetime]$RunStart,
+        [array]$Tests,
+        [array]$Results = @(),
+        [int]$CurrentIndex,
+        [PSCustomObject]$Settings,
+        [PSCustomObject]$Sampler
+    )
+    $queue = @()
+    for ($i = 0; $i -lt @($Tests).Count; $i++) {
+        $t = @($Tests)[$i]
+        $status = "pending"; $duration = 0.0
+        if ($i -lt @($Results).Count) {
+            $status = [string]@($Results)[$i].Status
+            $duration = [Math]::Round([double]@($Results)[$i].Duration, 3)
+        } elseif ($i -eq $CurrentIndex) {
+            $status = "running"
+        }
+        $section = ""
+        if ($t.PSObject.Properties['SectionLabel'] -and $t.SectionLabel) { $section = [string]$t.SectionLabel }
+        $queue += [PSCustomObject]@{ name = $t.Name; type = $t.Type; section = $section; status = $status; duration = $duration }
+    }
+    $warnings = @(Get-RunWarnings -State $State | Where-Object { $_.run -eq $RunId } |
+        ForEach-Object { [PSCustomObject]@{ fonte = [string]$_.fonte; texto = [string]$_.texto } })
+    $epoch = ([DateTimeOffset]$RunStart).ToUnixTimeMilliseconds() / 1000.0
+    $throttle = 20; $loadMin = 50
+    if ($null -ne $Sampler) {
+        if ($Sampler.PSObject.Properties['ThrottleAlertPct']) { $throttle = [double]$Sampler.ThrottleAlertPct }
+        if ($Sampler.PSObject.Properties['LoadMinPct'])       { $loadMin  = [double]$Sampler.LoadMinPct }
+    }
+    return [PSCustomObject]@{
+        scenario             = [string](Get-StateField $State "scenario")
+        machine              = [string](Get-StateField $State "machine")
+        modelo               = [string](Get-StateField $State "modelo")
+        patrimonio           = [string](Get-StateField $State "patrimonio")
+        runId                = $RunId
+        runStartEpoch        = $epoch
+        currentIndex         = $CurrentIndex
+        refreshHz            = [double]$Settings.RefreshHz
+        logTailLines         = [int]$Settings.LogTailLines
+        telemetryIntervalSec = [double]$Settings.TelemetryIntervalSec
+        throttleAlertPct     = $throttle
+        loadMinPct           = $loadMin
+        warnings             = $warnings
+        queue                = $queue
+    }
+}
+
+# Argumento de linha de comando com as regras de aspas do Windows (CommandLineToArgvW).
+function ConvertTo-ProcessArgument {
+    param([string]$Value)
+    if ($Value -ne "" -and $Value -notmatch '[\s"]') { return $Value }
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append('"')
+    $bs = 0
+    foreach ($ch in $Value.ToCharArray()) {
+        if ($ch -eq '\') { $bs++; continue }
+        if ($ch -eq '"') { [void]$sb.Append([char]'\', 2 * $bs + 1); [void]$sb.Append('"'); $bs = 0; continue }
+        if ($bs -gt 0) { [void]$sb.Append([char]'\', $bs); $bs = 0 }
+        [void]$sb.Append($ch)
+    }
+    if ($bs -gt 0) { [void]$sb.Append([char]'\', 2 * $bs) }
+    [void]$sb.Append('"')
+    return $sb.ToString()
+}
+
+# Executa o live_monitor.py herdando o console (sem redirecionar o stdout, para o
+# rich desenhar no terminal real). Devolve ExitCode, a saida capturada do teste e
+# o JSON de resultado (ou $null se ausente/invalido).
+function Invoke-LiveMonitorProcess {
+    param([string]$PythonExe, [string]$MonitorScript, [PSCustomObject]$Payload, [string[]]$Command, [string]$FreqCsv = "", [switch]$LowImpact)
+    $tag = [guid]::NewGuid().ToString('N')
+    $stateFile   = Join-Path $env:TEMP "wintesthub_live_state_$tag.json"
+    $resultFile  = Join-Path $env:TEMP "wintesthub_live_result_$tag.json"
+    $captureFile = Join-Path $env:TEMP "wintesthub_live_stdout_$tag.txt"
+    $out = [PSCustomObject]@{ ExitCode = -1; Lines = @(); Result = $null; Error = "" }
+    try {
+        $json = $Payload | ConvertTo-Json -Depth 6
+        [System.IO.File]::WriteAllText($stateFile, $json, (New-Object System.Text.UTF8Encoding($false)))
+        $argv = @("-u", $MonitorScript, "--state", $stateFile, "--result", $resultFile, "--log-capture", $captureFile)
+        if ($FreqCsv) { $argv += @("--freq-csv", $FreqCsv) }
+        if ($LowImpact) { $argv += "--low-impact" }
+        $argv += "--"
+        $argv += $Command
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $PythonExe
+        $psi.Arguments = (@($argv | ForEach-Object { ConvertTo-ProcessArgument ([string]$_) }) -join " ")
+        $psi.UseShellExecute = $false
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $proc.WaitForExit()
+        $out.ExitCode = $proc.ExitCode
+        if (Test-Path -LiteralPath $captureFile) {
+            $out.Lines = @([System.IO.File]::ReadAllLines($captureFile, [System.Text.Encoding]::UTF8))
+        }
+        if (Test-Path -LiteralPath $resultFile) {
+            try {
+                $out.Result = [System.IO.File]::ReadAllText($resultFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+                if ($null -eq $out.Result -or -not $out.Result.PSObject.Properties['exitCode']) {
+                    $out.Result = $null; $out.Error = "JSON de resultado do live_monitor.py invalido"
+                }
+            } catch { $out.Result = $null; $out.Error = "JSON de resultado do live_monitor.py invalido: $($_.Exception.Message)" }
+        } else {
+            $out.Error = "live_monitor.py terminou (exit $($out.ExitCode)) sem gravar o JSON de resultado"
+        }
+    } catch {
+        $out.Error = "Falha ao executar live_monitor.py: $($_.Exception.Message)"
+    } finally {
+        foreach ($f in $stateFile, $resultFile, "$resultFile.tmp", $captureFile) {
+            Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+        }
+    }
+    return $out
+}
+
 # ---- Execucao de cada script -------------------------------------------------
 
 function Invoke-TestScript {
-    param([PSCustomObject]$Test, [string]$LogFile, [string]$TraceRunDir, [switch]$Silent)
+    param([PSCustomObject]$Test, [string]$LogFile, [string]$TraceRunDir, [switch]$Silent, [PSCustomObject]$LivePayload = $null)
 
     $scriptTraceDir = Join-Path $TraceRunDir "$($Test.ParentFolder)"
     New-Item -ItemType Directory -Path $scriptTraceDir -Force | Out-Null
@@ -787,7 +1169,28 @@ function Invoke-TestScript {
     try {
         $capturedOut = [System.Collections.Generic.List[string]]::new()
         
-        if ($Test.Type -eq "ps1") {
+        if ($null -ne $LivePayload -and $Test.Kind -eq "test") {
+            # Monitor ao vivo: live_monitor.py executa o teste e desenha a TUI
+            $pyExe = Resolve-PythonExe -VenvPath $VenvPath
+            if ($Test.Type -eq "ps1") {
+                $cmd = @("powershell.exe", "-NonInteractive", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $Test.Path)
+            } else {
+                $cmd = @($pyExe, "-u", $Test.Path)
+            }
+            $freqCsv = if ($sampling) { Join-Path $scriptTraceDir "frequencia_cpu.csv" } else { "" }
+            $lowImpact = Test-LiveMonitorLowImpact -Test $Test -Settings $LiveMonitorSettings
+            $live = Invoke-LiveMonitorProcess -PythonExe $pyExe -MonitorScript $LiveMonitorScript -Payload $LivePayload -Command $cmd -FreqCsv $freqCsv -LowImpact:$lowImpact
+            foreach ($l in $live.Lines) { $capturedOut.Add([string]$l) }
+            if ($null -ne $live.Result) {
+                $exitCode = [int]$live.Result.exitCode
+                if ($exitCode -eq -1) { $status = "ERROR" }
+            } else {
+                $status   = "ERROR"
+                $exitCode = -1
+                $capturedOut.Add("[ERRO] [live_monitor] $($live.Error)")
+            }
+        }
+        elseif ($Test.Type -eq "ps1") {
             & powershell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -File $Test.Path 2>&1 | ForEach-Object {
                 $line = $_.ToString()
                 $capturedOut.Add($line)
@@ -797,12 +1200,7 @@ function Invoke-TestScript {
         }
         elseif ($Test.Type -eq "py") {
             # Logica de detecao do Virtual Environment (.venv)
-            $venvExe = Join-Path $VenvPath "Scripts\python.exe"
-            if (Test-Path -LiteralPath $venvExe) {
-                $pyExe = $venvExe
-            } else {
-                $pyExe = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
-            }
+            $pyExe = Resolve-PythonExe -VenvPath $VenvPath
 
             & $pyExe -u $Test.Path 2>&1 | ForEach-Object {
                 $line = $_.ToString()
@@ -813,7 +1211,7 @@ function Invoke-TestScript {
         }
 
         $output = ($capturedOut -join "`n").Trim()
-        if ($exitCode -ne 0) { $status = "FAIL" }
+        if ($exitCode -ne 0 -and $status -eq "PASS") { $status = "FAIL" }
     }
     catch {
         $status   = "ERROR"
@@ -2315,7 +2713,7 @@ if (-not $SkipSetup) {
         Write-Host "`n  $($allSetup.Count) script(s) encontrados. Selecione os que deseja executar:`n" -ForegroundColor White
 
         $afterSetup = Show-CheckboxMenu -Items $setupMenuItems
-        $setupToRun = @($afterSetup | Where-Object { $_.Selectable -and $_.Selected })
+        $setupToRun = @($afterSetup | Where-Object { $_.IsTestItem -and $_.Selected })
 
         if ($setupToRun.Count -gt 0) {
             Add-Content -LiteralPath $logFile -Value "`n-- PREPARACAO ($($setupToRun.Count) script(s)) --" -Encoding UTF8
@@ -2359,11 +2757,12 @@ if ($allTests.Count -eq 0) { exit 0 }
 
 $confirmed = $false
 while (-not $confirmed) {
-    $testMenuItems = Build-MenuItems -Scripts $allTests -PreviousResults $previousResults
+    $testMenuItems = Build-MenuItems -Scripts $allTests -PreviousResults $previousResults -TestSections $TestSectionsConfig
     Write-Host "`n  $($allTests.Count) teste(s) encontrado(s):`n" -ForegroundColor White
 
     $afterMenu = Show-CheckboxMenu -Items $testMenuItems
-    $toRun     = @($afterMenu | Where-Object { $_.Selectable -and $_.Selected })
+    # So itens de teste (nunca cabecalhos), na ordem do menu: Escritorio -> Dev -> Opcional
+    $toRun     = @($afterMenu | Where-Object { $_.IsTestItem -and $_.Selected })
 
     if ($toRun.Count -eq 0) {
         if ($allResults.Count -gt 0) {
@@ -2444,8 +2843,19 @@ foreach ($t in $toRun) {
 
 Add-Content -LiteralPath $logFile -Value "`n-- TESTES ($($toRun.Count) script(s)) --" -Encoding UTF8
 
-# Painel de progresso
-$progressY = Show-ExecutionProgress -TestsToRun $toRun -RunId $currentRunId
+# Painel de progresso: monitor ao vivo (rich) ou painel estatico classico
+$liveCheck = Test-LiveMonitorAvailable -Settings $LiveMonitorSettings -PythonExe (Resolve-PythonExe -VenvPath $VenvPath) -MonitorScript $LiveMonitorScript
+$useLiveMonitor = $liveCheck.Available
+if ($useLiveMonitor) {
+    Add-Content -LiteralPath $logFile -Value "[i] Monitor ao vivo (live_monitor.py) ativo nesta rodada." -Encoding UTF8
+    $progressY = 0
+} else {
+    if ($LiveMonitorSettings.Enabled) {
+        Add-Content -LiteralPath $logFile -Value "[!] Monitor ao vivo indisponivel ($($liveCheck.Reason)); usando o painel classico." -Encoding UTF8
+        Write-Host "  [!] Monitor ao vivo indisponivel ($($liveCheck.Reason)); usando o painel classico." -ForegroundColor DarkYellow
+    }
+    $progressY = Show-ExecutionProgress -TestsToRun $toRun -RunId $currentRunId
+}
 
 $stopFile = Join-Path $env:TEMP "wintesthub_parada_$PID.flag"
 Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
@@ -2453,10 +2863,16 @@ $env:HUB_STOP_FILE = $stopFile
 
 for ($idx = 0; $idx -lt $toRun.Count; $idx++) {
     $test = $toRun[$idx]
-    Update-ProgressLine -Y $progressY -TestIndex $idx -Name $test.Name -Type $test.Type -Status "running" -Detail "" -Current ($idx + 1) -Total $toRun.Count
+    $livePayload = $null
+    if ($useLiveMonitor) {
+        $livePayload = New-LiveMonitorStatePayload -State $stateObj -RunId $currentRunId -RunStart $runStart -Tests $toRun -Results @($testResults.ToArray()) -CurrentIndex $idx -Settings $LiveMonitorSettings -Sampler $CpuSamplerSettings
+        Clear-Host
+    } else {
+        Update-ProgressLine -Y $progressY -TestIndex $idx -Name $test.Name -Type $test.Type -Status "running" -Detail "" -Current ($idx + 1) -Total $toRun.Count
+    }
 
     $pidsBefore = @(Get-Process -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.Id })
-    $res = Invoke-TestScript -Test $test -LogFile $logFile -TraceRunDir $traceRunDir -Silent
+    $res = Invoke-TestScript -Test $test -LogFile $logFile -TraceRunDir $traceRunDir -Silent -LivePayload $livePayload
     $allResults.Add($res)
     $testResults.Add($res)
 
@@ -2473,22 +2889,30 @@ for ($idx = 0; $idx -lt $toRun.Count; $idx++) {
         if ($lastErrLine.Length -gt 60) { $lastErrLine = $lastErrLine.Substring(0, 57) + "..." }
         $detail += "  >>  $lastErrLine"
     }
-    Update-ProgressLine -Y $progressY -TestIndex $idx -Name $test.Name -Type $test.Type -Status $res.Status -Detail $detail -Current ($idx + 1) -Total $toRun.Count
+    if ($useLiveMonitor) {
+        $cor = if ($res.Status -eq "PASS") { "Green" } elseif ($res.Status -eq "FAIL") { "Red" } else { "Yellow" }
+        Write-Host "  [$($idx + 1)/$($toRun.Count)] $($test.Name).$($test.Type): $($res.Status)  $detail" -ForegroundColor $cor
+    } else {
+        Update-ProgressLine -Y $progressY -TestIndex $idx -Name $test.Name -Type $test.Type -Status $res.Status -Detail $detail -Current ($idx + 1) -Total $toRun.Count
+    }
 
     if (Test-StopSignal -StopFile $stopFile) {
-        for ($j = $idx + 1; $j -lt $toRun.Count; $j++) {
-            Update-ProgressLine -Y $progressY -TestIndex $j -Name $toRun[$j].Name -Type $toRun[$j].Type -Status "CANCEL" -Detail "(Ctrl+Q)" -Current ($idx + 1) -Total $toRun.Count
+        if (-not $useLiveMonitor) {
+            for ($j = $idx + 1; $j -lt $toRun.Count; $j++) {
+                Update-ProgressLine -Y $progressY -TestIndex $j -Name $toRun[$j].Name -Type $toRun[$j].Type -Status "CANCEL" -Detail "(Ctrl+Q)" -Current ($idx + 1) -Total $toRun.Count
+            }
         }
         $restantes = $toRun.Count - $idx - 1
         Add-Content -LiteralPath $logFile -Value "`n[!] Fila interrompida pelo operador (Ctrl+Q) em $($test.Name). $restantes teste(s) nao executado(s)." -Encoding UTF8
-        Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 1)
+        if (-not $useLiveMonitor) { Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 1) }
         Write-Host "  [!] Ctrl+Q: fila interrompida em $($test.Name). $restantes teste(s) cancelado(s)." -ForegroundColor Yellow
         Clear-KeyBuffer
         break
     }
 
     if ($res.Status -ne "PASS") {
-        Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 1)
+        # No modo ao vivo o live_monitor.py ja fechou o Live: a pergunta sai abaixo do ultimo quadro
+        if (-not $useLiveMonitor) { Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 1) }
         Write-Host "  [!] Teste falhou. Deseja continuar? (S para continuar)" -ForegroundColor Yellow
         Clear-KeyBuffer
         $confirm = [Console]::ReadKey($true)
@@ -2502,8 +2926,8 @@ for ($idx = 0; $idx -lt $toRun.Count; $idx++) {
 $env:HUB_STOP_FILE = ""
 Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
 
-# Posicionar cursor abaixo do painel
-Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 2)
+# Posicionar cursor abaixo do painel (o monitor ao vivo ja deixa o cursor no fim)
+if (-not $useLiveMonitor) { Safe-SetCursorPosition -X 0 -Y ($progressY + 2 + $toRun.Count + 2) }
 
 # Atualizar state file (setup + testes combinados)
 $combinedResults = @($setupResults.ToArray()) + @($testResults.ToArray())

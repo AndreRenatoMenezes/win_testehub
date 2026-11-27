@@ -17,6 +17,17 @@ from ctypes import wintypes
 from datetime import datetime, timedelta, timezone
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:  # protocolo do monitor ao vivo do hub (Spec 004)
+    from hub_progress import emit_alert, emit_progress
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+
 # =============================================================================
 # CONFIGURACOES DO TESTE
 # =============================================================================
@@ -1573,12 +1584,14 @@ def main():
             logger.error(f"FALHA: {e}")
             return 1
 
+        emit_progress("Compatibilidade e inventário de APs", detalhe="Adaptador, driver, BIOS, SO, energia e APs")
         ESTADO.ssid = amostra["ssid"]
         compat = coletar_compatibilidade(guid_txt, ESTADO.ssid, conexao_inicial)
         gws = (compat.get("ip") or {}).get("gateway") or []
         ESTADO.gateway = gws[0] if gws else None
         if not ESTADO.gateway:
             logger.warning("Gateway padrao nao encontrado; ping do gateway desativado.")
+            emit_alert("Gateway padrão não encontrado: ping do gateway desativado")
         atualizar_bss(wlan)
         aps_inicio = [dict(a) for a in ESTADO.aps.values()]
         for a in sorted(aps_inicio, key=lambda x: x["idx"]):
@@ -1606,6 +1619,7 @@ def main():
         abrir_navegador(url)
 
         # Espera o clique em 'Iniciar caminhada' (ou inicio automatico)
+        emit_progress("Aguardando início da caminhada", detalhe=f"Clique em Iniciar no painel do navegador (automático em {INICIO_AUTOMATICO_S}s)")
         ESTADO.aguardando_desde = time.monotonic()
         if not ESTADO.pedido_inicio.wait(INICIO_AUTOMATICO_S):
             logger.info(f"Inicio automatico apos {INICIO_AUTOMATICO_S}s.")
@@ -1625,7 +1639,17 @@ def main():
 
         fim_previsto = time.monotonic() + DURACAO_CAMINHADA_S
         ultimo_log = 0
+        ultimo_progresso = 0
         while time.monotonic() < fim_previsto:
+            if time.monotonic() - ultimo_progresso >= 15:
+                ultimo_progresso = time.monotonic()
+                decorrido = int(DURACAO_CAMINHADA_S - max(0, fim_previsto - time.monotonic()))
+                with ESTADO.lock:
+                    n_roam = len(ESTADO.roamings)
+                restante = max(1, int(fim_previsto - time.monotonic()))
+                emit_progress("Caminhada FT", decorrido, DURACAO_CAMINHADA_S,
+                              f"{decorrido}s de {DURACAO_CAMINHADA_S}s · roamings: {n_roam}",
+                              duracao_s=restante, aviso="Ande pelo escritório para provocar trocas de AP")
             if ESTADO.pedido_fim.wait(1.0):
                 logger.info("Caminhada encerrada pelo operador ('Encerrar agora').")
                 break
@@ -1647,11 +1671,13 @@ def main():
             th.join(timeout=5)
 
         logger.info("Processando resultados...")
+        emit_progress("Relatório", detalhe="Classificação dos roamings, CSV e relatório HTML")
         with ESTADO.lock:
             ESTADO.internet_ok = any(p[1] is not None for p in ESTADO.pings["internet"])
             avaliar_roamings()
         if not ESTADO.internet_ok:
             logger.warning(f"Ping para {HOST_INTERNET} sem resposta (bloqueado?). Metricas de internet = N/A.")
+            emit_alert(f"Ping para {HOST_INTERNET} sem resposta: métricas de internet = N/A")
         for r in ESTADO.roamings:
             logger.info(f"  Roaming #{r['n']} {r['hora']}: {r['ap_origem']} -> {r['ap_destino']} | {r['classificacao']} | "
                         f"AKM {r['akm_nome']} | {r['duracao_ms']} ms ({r['fonte_duracao']}; reassociacao "

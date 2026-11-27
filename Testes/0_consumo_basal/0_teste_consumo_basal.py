@@ -32,6 +32,19 @@ except Exception:
     kb = None
     ms = None
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+try:  # protocolo do monitor ao vivo do hub (Spec 004); poucos eventos: teste sensivel
+    from hub_progress import emit_alert, emit_progress, is_live_monitor_active
+except ImportError:  # pragma: no cover - fora da arvore do hub
+    def emit_progress(*_a, **_k):
+        pass
+
+    def emit_alert(*_a, **_k):
+        pass
+
+    def is_live_monitor_active():
+        return False
+
 # =============================================================================
 # CONFIGURACOES DO TESTE
 # =============================================================================
@@ -463,10 +476,21 @@ def _p95(values):
     return _percentile(values, 95.0)
 
 
-def _aggregate_tick_processes(proc_readings, self_pid=None):
+def _hub_monitor_pids():
+    """PIDs do monitor ao vivo do hub (HUB_MONITOR_PID), fora do ranking basal."""
+    raw = os.environ.get("HUB_MONITOR_PID", "")
+    try:
+        pid = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return frozenset()
+    return frozenset([pid]) if pid > 0 else frozenset()
+
+
+def _aggregate_tick_processes(proc_readings, self_pid=None, exclude_pids=()):
     """
     Agrega leituras de processos de um tick pelo nome do executavel.
-    Exclui PID 0, Idle e o proprio processo do Teste 0 (self_pid).
+    Exclui PID 0, Idle, o proprio processo do Teste 0 (self_pid) e os PIDs de
+    exclude_pids (monitor ao vivo do hub, HUB_MONITOR_PID).
     Retorna (by_name_dict, self_cpu_pct, self_ram_mb).
     """
     by_name = {}
@@ -480,6 +504,9 @@ def _aggregate_tick_processes(proc_readings, self_pid=None):
         if self_pid is not None and pid == self_pid:
             self_cpu += max(0.0, float(cpu_pct))
             self_ram_mb += max(0.0, float(rss_mb))
+            continue
+
+        if pid in exclude_pids:
             continue
 
         if pid == 0 or low_name in _IDLE_PROCESS_NAMES:
@@ -513,9 +540,10 @@ class BasalSampler:
     - CPU (%) normalizada por nucleos logicos e RAM RSS (MB) por nome de executavel
     """
 
-    def __init__(self, interval=SAMPLE_INTERVAL_SECONDS, self_pid=None):
+    def __init__(self, interval=SAMPLE_INTERVAL_SECONDS, self_pid=None, exclude_pids=None):
         self.interval = interval
         self.self_pid = os.getpid() if self_pid is None else self_pid
+        self.exclude_pids = _hub_monitor_pids() if exclude_pids is None else frozenset(exclude_pids)
         self._stop_event = threading.Event()
         self._thread = None
         self._lock = threading.Lock()
@@ -637,7 +665,7 @@ class BasalSampler:
     ):
         """Registra um tick de amostragem ja coletado (facilita testes deterministicos)."""
         by_name, self_cpu, self_ram_mb = _aggregate_tick_processes(
-            proc_readings, self_pid=self.self_pid
+            proc_readings, self_pid=self.self_pid, exclude_pids=self.exclude_pids
         )
         with self._lock:
             self.sys_cpu_samples.append(float(sys_cpu))
@@ -719,6 +747,13 @@ class BasalSampler:
 # =============================================================================
 # 4. SUPORTE WPR / WPA E CICLOS DE COLETA BASAL
 # =============================================================================
+_NO_WINDOW_KW = (
+    {"creationflags": subprocess.CREATE_NO_WINDOW}
+    if hasattr(subprocess, "CREATE_NO_WINDOW")
+    else {}
+)
+
+
 def cancel_wpr_if_active():
     """Cancela captura WPR pendente para evitar estado 'preso'."""
     logger.debug("Verificando/cancelando sessao WPR ativa...")
@@ -727,6 +762,7 @@ def cancel_wpr_if_active():
         shell=True,
         capture_output=True,
         text=True,
+        **_NO_WINDOW_KW,
     )
 
 
@@ -740,15 +776,25 @@ def _sleep_interruptible(seconds, on_tick=None):
         time.sleep(min(1.0, float(sec)))
 
 
+_AVISO_NAO_TOQUE = "NÃO UTILIZE MOUSE OU TECLADO — medindo consumo basal"
+
+
 def run_stabilization(ui, seconds=STABILIZE_SECONDS):
     """Aguarda estabilizacao inicial antes do Ciclo 1."""
     if seconds <= 0:
         return
     logger.info(f"Iniciando estabilizacao inicial de {seconds}s (maquina em repouso)...")
-    _sleep_interruptible(
-        seconds,
-        on_tick=lambda sec: ui.atualizar(0, "Estabilizando maquina em repouso...", sec) if ui is not None else None,
-    )
+    emit_progress("Estabilização", detalhe=f"Máquina em repouso ({seconds}s)",
+                  duracao_s=int(seconds), aviso=_AVISO_NAO_TOQUE)
+
+    def _on_tick(sec):
+        if ui is not None:
+            ui.atualizar(0, "Estabilizando maquina em repouso...", sec)
+        if sec < seconds and sec % 30 == 0:
+            emit_progress("Estabilização", detalhe=f"Máquina em repouso · restam ~{sec}s",
+                          duracao_s=sec, aviso=_AVISO_NAO_TOQUE)
+
+    _sleep_interruptible(seconds, on_tick=_on_tick)
 
 
 def run_cooldown(run_index, ui, seconds=COOLDOWN_SECONDS):
@@ -756,6 +802,8 @@ def run_cooldown(run_index, ui, seconds=COOLDOWN_SECONDS):
     if seconds <= 0:
         return
     logger.info(f"Iniciando cooldown de {seconds}s apos o ciclo {run_index}...")
+    emit_progress(f"Ciclo {run_index}/{TEST_RUNS}", run_index, TEST_RUNS, f"Cooldown ({seconds}s)",
+                  duracao_s=int(seconds), aviso=_AVISO_NAO_TOQUE)
     _sleep_interruptible(
         seconds,
         on_tick=lambda sec: ui.atualizar(run_index, "Intervalo entre ciclos (cooldown)...", sec) if ui is not None else None,
@@ -768,6 +816,10 @@ def run_basal_cycle(run_index, ui, profile_path=None):
     run_ts = now_dt.strftime('%Y%m%d_%H%M%S')
     timestamp_inicio = now_dt.strftime('%Y-%m-%d %H:%M:%S')
     logger.info(f"--- Iniciando Ciclo Basal {run_index} de {TEST_RUNS} ({DURATION_SECONDS}s) ---")
+    emit_progress(f"Ciclo {run_index}/{TEST_RUNS}", run_index, TEST_RUNS,
+                  f"Captura WPR + psutil ({DURATION_SECONDS}s)",
+                  duracao_s=int(DURATION_SECONDS) if DURATION_SECONDS >= 1 else None,
+                  aviso=_AVISO_NAO_TOQUE)
     check_stop()
 
     os.makedirs(OUTPUT_PATH, exist_ok=True)
@@ -783,7 +835,7 @@ def run_basal_cycle(run_index, ui, profile_path=None):
     cancel_wpr_if_active()
 
     wpr_start = 'wpr.exe -start Power.light -start VirtualAllocation.light -filemode -compress'
-    result = subprocess.run(wpr_start, shell=True, capture_output=True, text=True)
+    result = subprocess.run(wpr_start, shell=True, capture_output=True, text=True, **_NO_WINDOW_KW)
     if result.returncode != 0:
         err_msg = (result.stderr or result.stdout or "").strip()
         logger.error(f"Falha ao iniciar WPR: {err_msg}")
@@ -796,14 +848,22 @@ def run_basal_cycle(run_index, ui, profile_path=None):
         _interaction_tracker.start_cycle(run_index)
         sampler.start()
 
+        ultimo_marco = int(DURATION_SECONDS)
         while True:
             check_stop()
             elapsed = time.perf_counter() - cycle_start
             remaining = DURATION_SECONDS - elapsed
             if remaining <= 0:
                 break
+            rem_s = max(0, int(math.ceil(remaining)))
             if ui is not None:
-                ui.atualizar(run_index, "Medindo consumo basal (nao toque)...", max(0, int(math.ceil(remaining))))
+                ui.atualizar(run_index, "Medindo consumo basal (nao toque)...", rem_s)
+            if DURATION_SECONDS >= 30 and rem_s > 0 and rem_s <= ultimo_marco - 30:
+                ultimo_marco = (rem_s // 30) * 30
+                if ultimo_marco > 0:
+                    emit_progress(f"Ciclo {run_index}/{TEST_RUNS}", run_index, TEST_RUNS,
+                                  f"Captura WPR + psutil · restam ~{ultimo_marco}s",
+                                  duracao_s=ultimo_marco, aviso=_AVISO_NAO_TOQUE)
             time.sleep(min(1.0, max(0.05, remaining)))
 
         duracao_real = time.perf_counter() - cycle_start
@@ -811,6 +871,7 @@ def run_basal_cycle(run_index, ui, profile_path=None):
         interacoes = _interaction_tracker.stop_cycle()
         if interacoes > 0:
             logger.warning(f"Ciclo {run_index} concluido com {interacoes} evento(s) de interacao humana.")
+            emit_alert(f"Ciclo {run_index}: {interacoes} evento(s) de interação humana detectado(s)")
 
         if ui is not None:
             ui.atualizar(run_index, "Salvando arquivo Trace (.etl)...", "--")
@@ -820,6 +881,7 @@ def run_basal_cycle(run_index, ui, profile_path=None):
             shell=True,
             capture_output=True,
             text=True,
+            **_NO_WINDOW_KW,
         )
         if stop_result.returncode != 0:
             err_msg = (stop_result.stderr or stop_result.stdout or "").strip()
@@ -831,6 +893,7 @@ def run_basal_cycle(run_index, ui, profile_path=None):
         if profile_path and os.path.exists(profile_path):
             if ui is not None:
                 ui.atualizar(run_index, "Exportando dados WPA para CSV...", "--")
+            emit_progress(f"Ciclo {run_index}/{TEST_RUNS}", run_index, TEST_RUNS, "Exportação WPA")
             csv_folder = os.path.join(OUTPUT_PATH, f"CSV_{run_ts}_Run{run_index}")
             os.makedirs(csv_folder, exist_ok=True)
             wpa_cmd = (
@@ -838,7 +901,7 @@ def run_basal_cycle(run_index, ui, profile_path=None):
                 f'-profile "{profile_path}" '
                 f'-outputfolder "{csv_folder}"'
             )
-            wpa_result = subprocess.run(wpa_cmd, shell=True, capture_output=True, text=True)
+            wpa_result = subprocess.run(wpa_cmd, shell=True, capture_output=True, text=True, **_NO_WINDOW_KW)
             if wpa_result.returncode != 0:
                 err_msg = (wpa_result.stderr or wpa_result.stdout or "").strip()
                 logger.error(f"wpaexporter retornou erro (codigo {wpa_result.returncode}): {err_msg}")
@@ -1448,6 +1511,7 @@ def consolidate_results(ui=None, cycle_metrics=None, output_path=None):
     if ui is not None:
         ui.atualizar(-1, "Consolidando resultados basais...", "--")
     logger.info("Iniciando consolidacao de resultados...")
+    emit_progress("Consolidação", detalhe="consumo_basal.csv, ciclos_basal.csv, top_processos_basal.csv")
 
     target_output = output_path or OUTPUT_PATH
     cycles = _cycle_metrics if cycle_metrics is None else cycle_metrics
@@ -1586,12 +1650,14 @@ if __name__ == "__main__":
         ms_listener.start()
         logger.info("Listener de mouse ativo para deteccao de interacao humana.")
 
-    ui_overlay = MonitorOverlay()
-
-    script_thread = threading.Thread(target=worker_thread, args=(ui_overlay,), daemon=True)
-    script_thread.start()
-
-    ui_overlay.root.mainloop()
+    if is_live_monitor_active():
+        # Sob a TUI do hub nao abre janela Tkinter (terminal visivel + zero overhead de GUI)
+        worker_thread(None)
+    else:
+        ui_overlay = MonitorOverlay()
+        script_thread = threading.Thread(target=worker_thread, args=(ui_overlay,), daemon=True)
+        script_thread.start()
+        ui_overlay.root.mainloop()
 
     if kb_listener is not None:
         kb_listener.stop()

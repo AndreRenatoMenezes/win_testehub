@@ -22,6 +22,13 @@
         "LoadMinPct": 50,
         "SkipFolders": ["0_consumo_basal", "5_bateria"]
     },
+    "LiveMonitor": {
+        "Enabled": true,
+        "RefreshHz": 1,
+        "LogTailLines": 8,
+        "TelemetryIntervalSec": 2,
+        "LowImpactFolders": ["0_consumo_basal", "5_bateria"]
+    },
     "Rede": {
         "Rodadas": 10,
         "Aquecimento": 1,
@@ -35,5 +42,48 @@
         "PingsICMP": 10,
         "JanelaFundoSeg": 5,
         "LimiteTrafegoFundoKbps": 1000
-    }
+    },
+    "TestSections": [
+        {
+            "Id": "escritorio",
+            "Label": "Escritório",
+            "Key": "1",
+            "DefaultSelected": true,
+            "Fallback": false,
+            "Scripts": [
+                "0_teste_consumo_basal",
+                "1_automacao_performance",
+                "2_teste_disco",
+                "3_teste_rede",
+                "4_boot_shutdown_auto",
+                "5_teste_bateria"
+            ]
+        },
+        {
+            "Id": "dev",
+            "Label": "Dev",
+            "Key": "2",
+            "DefaultSelected": false,
+            "Fallback": false,
+            "Scripts": [
+                "7_dev_dotnet",
+                "8_dev_go",
+                "9_dev_python",
+                "10_dev_containers",
+                "11_dev_git_arquivos"
+            ]
+        },
+        {
+            "Id": "opcional",
+            "Label": "Opcional",
+            "Key": "3",
+            "DefaultSelected": false,
+            "Fallback": true,
+            "Scripts": [
+                "1-1_automacao_performance_dlp",
+                "2-1_teste_disco_dlp",
+                "6_teste_fast_transition"
+            ]
+        }
+    ]
 }
