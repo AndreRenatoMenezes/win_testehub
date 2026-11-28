@@ -507,6 +507,11 @@ mod._medicao["motivo"] = None
 mod.status_energia = real_status_energia
 
 ordem = []
+reais_8 = {n: getattr(mod, n) for n in (
+    "encerrar_fase_medida", "restaurar_na_bateria", "gerar_relatorio_bateria",
+    "concluir_resultado", "restaurar_tudo", "manter_tela_ligada",
+    "pos_medicao_pesada", "aguardar_reconexao_para_pos_medicao",
+)}
 stubs = {
     "encerrar_fase_medida": lambda: ordem.append("encerrar_fase_medida"),
     "restaurar_na_bateria": lambda: ordem.append("restaurar_na_bateria"),
@@ -533,6 +538,104 @@ mod.aguardar_reconexao_para_pos_medicao = lambda ui, c: ordem.append(f"reconexao
 codigo = mod.encerramento_e_pos_medicao(FakeUi(), {})
 confere(codigo == 1 and "restaurar_tudo" in ordem and ordem.index("restaurar_tudo") < ordem.index("reconexao(c=1)"),
         "falha no calculo do resultado: FAIL, mas a maquina ainda e restaurada antes da reconexao")
+for nome, funcao in reais_8.items():
+    setattr(mod, nome, funcao)
+
+# =============================================================================
+print("9. Refinamentos: apps abertos, progresso sem pulo, tela idempotente e espera")
+# =============================================================================
+# 9.1 Deteccao de aplicativos abertos (alerta opcional, nunca reprova)
+procs_fake = [
+    (100, "python.exe", ["python.exe", "5_teste_bateria.py"]),
+    (101, "explorer.exe", ["explorer.exe"]),
+    (102, "WindowsTerminal.exe", ["WindowsTerminal.exe"]),
+    (103, "Code.exe", ["Code.exe"]),
+    (104, "agy.exe", ["agy.exe"]),
+    (105, "MeuDriveFS.exe", ["MeuDriveFS.exe"]),
+    (106, "soffice.bin", ["soffice.bin", "-env:UserInstallation=file:///C:/tmp/wintesthub_lo_profile_calc"]),
+    (107, "soffice.bin", ["soffice.bin", "--writer", "usuario.odt"]),
+    (108, "OutroApp.exe", ["OutroApp.exe"]),
+    (109, "svchost.exe", ["svchost.exe"]),
+]
+apps = mod.detectar_aplicativos_abertos(processos=procs_fake, pids_janela={100, 101, 102, 108}, pid_atual=100)
+confere(apps == ["agy.exe", "Code.exe", "MeuDriveFS.exe", "OutroApp.exe", "soffice.bin"],
+        f"detectar_aplicativos_abertos: pega ruido/janelas e ignora sistema/teste ({apps})")
+real_det, real_alert = mod.detectar_aplicativos_abertos, mod.emit_alert
+alertas_emitidos = []
+mod.emit_alert = lambda texto, nivel="aviso": alertas_emitidos.append((nivel, texto))
+mod.detectar_aplicativos_abertos = lambda: ["agy.exe", "Code.exe"]
+mod._preflight.clear()
+sit = mod.conferir_aplicativos_abertos()
+confere(sit == "aviso" and not mod.itens_com_falha() and mod._apps_abertos == ["agy.exe", "Code.exe"]
+        and any(n == "aviso" and "Code.exe" in t for n, t in alertas_emitidos),
+        "conferir_aplicativos_abertos: registra 'aviso' sem falhar pre-voo nem invalidar")
+mod.detectar_aplicativos_abertos = lambda: []
+mod._preflight.clear()
+confere(mod.conferir_aplicativos_abertos() == "ok" and mod._apps_abertos == [],
+        "conferir_aplicativos_abertos: sem apps abertos -> ok")
+mod.detectar_aplicativos_abertos, mod.emit_alert = real_det, real_alert
+
+# 9.2 Progresso por minuto sem pulo cosmetico (ex.: 1079 s -> minuto 19, 1140 s -> 20)
+prog_emitidos = []
+real_prog = mod.emit_progress
+mod.emit_progress = lambda etapa, atual=None, total=None, detalhe="", **_k: prog_emitidos.append((etapa, atual, detalhe))
+mon = mod.MonitorMedicao(FakeUi())
+for dec in (1019, 1079, 1140):
+    mon._emitir_progresso("ociosa", {"decorrido_s": dec}, 87)
+minutos_ociosa = [a for _, a, _ in prog_emitidos]
+confere(minutos_ociosa == [18, 19, 20], f"progresso ociosa sem pulo (1019/1079/1140s -> {minutos_ociosa})")
+prog_emitidos.clear()
+for dec in (1079, 1081, 1140):
+    mon._emitir_progresso("escritorio", {"decorrido_s": dec}, 65)
+detalhes_esc = [d for _, _, d in prog_emitidos]
+confere(len(detalhes_esc) == 2 and "0h 18min" in detalhes_esc[0] and "0h 19min" in detalhes_esc[1],
+        "progresso escritorio arredonda minuto e deduplica leituras no mesmo minuto")
+mod.emit_progress = real_prog
+
+# 9.3 manter_tela_ligada idempotente (nao repete liberacao nem duplica log)
+chamadas_tela = []
+
+
+class FakeKernel32:
+    @staticmethod
+    def SetThreadExecutionState(flags):
+        chamadas_tela.append(flags)
+        return 1
+
+
+real_k32 = mod._kernel32
+mod._kernel32 = FakeKernel32()
+mod._tela_ligada["ativo"] = False
+mod.manter_tela_ligada(False)
+mod.manter_tela_ligada(True)
+mod.manter_tela_ligada(False)
+mod.manter_tela_ligada(False)
+mod.manter_tela_ligada(False)
+confere(len(chamadas_tela) == 2, f"manter_tela_ligada: libera uma unica vez ({len(chamadas_tela)} chamadas Win32)")
+mod._kernel32 = real_k32
+
+# 9.4 Espera pela reconexao do carregador registrada e sinalizada quando >= 60 s
+real_status_e, real_mono, real_alert = mod.status_energia, mod.time.monotonic, mod.emit_alert
+mod._stop_requested.clear()
+mod._medicao["motivo"] = "protecao_bateria"
+mod.status_energia = lambda: {"fonte": "bateria", "bateria_flag": 0, "carga_pct": 10, "economia_ligada": False}
+tempos_fake = iter([1000.0, 1000.0 + 3660.0])
+mod.time.monotonic = lambda: next(tempos_fake)
+alertas_rec = []
+mod.emit_alert = lambda texto, nivel="aviso": alertas_rec.append((nivel, texto))
+
+
+class FakeUiReconexao(FakeUi):
+    def pedir_janela(self, _construir, **_k):
+        return "tomada"
+
+
+esc_rec = mod.aguardar_reconexao_para_pos_medicao(FakeUiReconexao(), 0)
+confere(esc_rec == "tomada" and perto(mod._tempos_sessao["espera_reconexao_s"], 3660.0)
+        and any(n == "info" and "1h 01min" in t for n, t in alertas_rec),
+        "aguardar_reconexao_para_pos_medicao: mede e alerta tempo de espera pelo carregador")
+mod.status_energia, mod.time.monotonic, mod.emit_alert = real_status_e, real_mono, real_alert
+mod._medicao["motivo"] = None
 
 print()
 logging.shutdown()   # solta o log do script antes de remover a pasta (Windows)

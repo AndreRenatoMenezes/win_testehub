@@ -295,7 +295,7 @@ Na janela **"Teste de bateria — desconecte o carregador"**:
 2. Marque as três caixas e clique em **Confirmo o checklist**.
 3. Desconecte o carregador da tomada — a janela mostra "Carregador: DESCONECTADO" e a medição começa sozinha.
 
-O limite para isso é de **10 minutos**; depois disso o teste encerra sem medir (FAIL) e restaura a máquina. **Cancelar teste** ou `Ctrl+Q` interrompem com segurança.
+O limite para isso é de **10 minutos**; depois disso o teste encerra sem medir (FAIL) e restaura a máquina. **Cancelar teste** ou `Ctrl+Q` interrompem com segurança. Se o pré-voo detectar aplicativos abertos em segundo plano (IDEs, navegadores, apps de nuvem/mensageria), a mesma janela exibe um alerta opcional — você pode fechá-los, cancelar ou seguir normalmente sem invalidar o teste.
 
 **5. Não use a máquina até o fim da descarga**
 

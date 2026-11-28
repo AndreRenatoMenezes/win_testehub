@@ -574,7 +574,7 @@ def registrar_item(item, esperado, antes, acao, depois, situacao, observacao="")
                 break
         else:
             _preflight.append(linha)
-    nivel = logging.WARNING if situacao == "falhou" else logging.INFO
+    nivel = logging.WARNING if situacao in ("falhou", "aviso") else logging.INFO
     logger.log(nivel, sem_acento(
         f"Pre-voo | {item}: esperado={esperado} | antes={antes} | acao={acao} | "
         f"depois={depois} | situacao={situacao}" + (f" | {observacao}" if observacao else "")
@@ -1285,6 +1285,107 @@ def conferir_monitor():
     return "falhou"
 
 
+# Aplicativos de usuario que costumam gerar ruido de fundo na fase ociosa/bateria
+# (alerta opcional no pre-voo: continuar nao invalida o teste).
+APPS_RUIDO_CONHECIDOS = frozenset({
+    "code.exe", "agy.exe", "cursor.exe", "windsurf.exe", "devenv.exe",
+    "idea64.exe", "pycharm64.exe", "sublime_text.exe",
+    "chrome.exe", "firefox.exe", "brave.exe", "opera.exe",
+    "teams.exe", "ms-teams.exe", "slack.exe", "discord.exe",
+    "whatsapp.exe", "telegram.exe", "spotify.exe", "zoom.exe",
+    "outlook.exe", "olk.exe", "onedrive.exe", "dropbox.exe",
+    "soffice.bin", "soffice.exe",
+})
+_SUBSTR_RUIDO = ("drivefs",)
+_IGNORAR_JANELA = frozenset({
+    "explorer.exe", "applicationframehost.exe", "textinputhost.exe",
+    "shellexperiencehost.exe", "searchhost.exe", "startmenuexperiencehost.exe",
+    "systemsettings.exe", "taskmgr.exe", "nvidia overlay.exe",
+    "windowsterminal.exe", "conhost.exe", "openconsole.exe", "cmd.exe",
+    "powershell.exe", "pwsh.exe", "python.exe", "pythonw.exe",
+})
+_apps_abertos = []
+
+
+def listar_pids_janelas_visiveis():
+    """PIDs com janela top-level visivel e titulo nao vazio (Windows)."""
+    if os.name != "nt" or wintypes is None:
+        return set()
+    pids = set()
+    try:
+        user32 = ctypes.windll.user32
+        cb_tipo = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+        def callback(hwnd, _lparam):
+            if user32.IsWindowVisible(hwnd) and user32.GetWindowTextLengthW(hwnd) > 0:
+                pid = wintypes.DWORD(0)
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value:
+                    pids.add(int(pid.value))
+            return True
+
+        user32.EnumWindows(cb_tipo(callback), 0)
+    except Exception as e:
+        logger.debug(f"EnumWindows indisponivel para checagem de apps abertos: {e}")
+    return pids
+
+
+def detectar_aplicativos_abertos(processos=None, pids_janela=None, pid_atual=None):
+    """Retorna nomes unicos de apps de usuario abertos que podem gerar ruido.
+
+    Nao inclui o proprio processo, terminais/shell do hub nem instancias do
+    LibreOffice marcadas com o perfil do teste. Funcao pura quando processos e
+    pids_janela sao injetados (testavel no CI).
+    """
+    meu_pid = os.getpid() if pid_atual is None else pid_atual
+    janelas = listar_pids_janelas_visiveis() if pids_janela is None else set(pids_janela)
+    if processos is None:
+        if psutil is None:
+            return []
+        processos = []
+        for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+            try:
+                info = proc.info
+                processos.append((info.get("pid"), info.get("name") or "", info.get("cmdline") or []))
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
+    encontrados = {}
+    for pid, nome, cmdline in processos:
+        if not nome or pid == meu_pid:
+            continue
+        baixo = nome.lower()
+        if lo.is_test_libreoffice_proc(nome, cmdline):
+            continue
+        conhecido = baixo in APPS_RUIDO_CONHECIDOS or any(s in baixo for s in _SUBSTR_RUIDO)
+        janela_usuario = pid in janelas and baixo not in _IGNORAR_JANELA
+        if conhecido or janela_usuario:
+            encontrados.setdefault(baixo, nome)
+    return [encontrados[k] for k in sorted(encontrados)]
+
+
+def _formatar_apps_abertos(apps, limite=6):
+    if len(apps) <= limite:
+        return ", ".join(apps)
+    return ", ".join(apps[:limite]) + f" (+{len(apps) - limite})"
+
+
+def conferir_aplicativos_abertos():
+    """Alerta opcional no pre-voo sobre apps de usuario abertos (nunca reprova)."""
+    item, esperado = "Aplicativos abertos", "nenhum (recomendado)"
+    achados = detectar_aplicativos_abertos()
+    _apps_abertos[:] = achados
+    if not achados:
+        registrar_item(item, esperado, "nenhum", "conferido", "nenhum", "ok")
+        return "ok"
+    texto = _formatar_apps_abertos(achados)
+    registrar_item(item, esperado, texto, "conferido", texto, "aviso",
+                   "alerta opcional: fechar reduz ruído em repouso; continuar não invalida o teste")
+    emit_alert(f"Aplicativos abertos detectados: {texto} (opcional fechar; continuar não invalida o teste)",
+               nivel="aviso")
+    return "aviso"
+
+
 # =============================================================================
 # PRE-VOO — AJUSTES (aplicar, reler e registrar; cada ajuste empilha a volta)
 # =============================================================================
@@ -1991,11 +2092,12 @@ def executar_preflight(ui):
     check_stop()
 
     # Conferidos antes de qualquer ajuste: rede (com internet: radio Wi-Fi ativo e
-    # telemetria real dos agentes de SI) e monitor externo.
-    ui.atualizar("Pré-voo", "Conferindo rede e monitor externo...")
-    emit_progress("Pré-voo de padronização", detalhe="Rede, monitor externo, energia, brilho e Bluetooth")
+    # telemetria real dos agentes de SI), monitor externo e apps abertos (alerta).
+    ui.atualizar("Pré-voo", "Conferindo rede, monitor externo e aplicativos abertos...")
+    emit_progress("Pré-voo de padronização", detalhe="Rede, monitor externo, apps abertos, energia, brilho e Bluetooth")
     conferir_rede()
     conferir_monitor()
+    conferir_aplicativos_abertos()
     falhas = itens_com_falha()
     if falhas:
         return _falha_preflight(ui, falhas)
@@ -2060,9 +2162,15 @@ CHECKLIST_FISICO = [
 ]
 
 
+_tela_ligada = {"ativo": False}
+
+
 def manter_tela_ligada(ligar):
     """SetThreadExecutionState na thread chamadora (a worker): tela ligada e sem
-    suspensao/bloqueio por inatividade, sem simular entrada do usuario."""
+    suspensao/bloqueio por inatividade, sem simular entrada do usuario.
+    Idempotente: chamadas repetidas com ligar=False nao reexecutam nem duplicam o log."""
+    if not ligar and not _tela_ligada["ativo"]:
+        return
     flags = ES_CONTINUOUS | ((ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED) if ligar else 0)
     funcao = _kernel32.SetThreadExecutionState
     funcao.argtypes = [_DWORD]
@@ -2070,6 +2178,7 @@ def manter_tela_ligada(ligar):
     if funcao(flags) == 0:
         logger.warning("SetThreadExecutionState falhou.")
     else:
+        _tela_ligada["ativo"] = bool(ligar)
         logger.info("Tela mantida ligada (SetThreadExecutionState)." if ligar
                     else "SetThreadExecutionState liberado.")
 
@@ -2102,6 +2211,18 @@ def aviso_desconexao(ui):
             "A medição começa quando as duas coisas estiverem feitas. Depois disso,\n"
             "não use a máquina até o aviso de que o carregador pode ser reconectado."
         )).pack(anchor="w", pady=(4, 10))
+
+        if _apps_abertos:
+            lista_apps = _formatar_apps_abertos(_apps_abertos)
+            tk.Label(
+                janela, justify="left", font=FONTE_JANELA, fg="#8a4b00", bg="#fff6e0",
+                relief="solid", bd=1, padx=10, pady=8, wraplength=540,
+                text=(
+                    f"Atenção — aplicativos abertos detectados: {lista_apps}\n"
+                    "Feche-os se quiser evitar ruído na medição (ou clique em 'Cancelar teste'). "
+                    "Se preferir continuar assim mesmo, o teste seguirá normalmente e não será invalidado."
+                ),
+            ).pack(anchor="w", fill="x", pady=(0, 10))
 
         marcas = [tk.BooleanVar(value=False) for _ in CHECKLIST_FISICO]
         caixas = []
@@ -2578,7 +2699,8 @@ class MonitorMedicao(threading.Thread):
                     proximo_top += INTERVALO_TOP_PROCESSOS_S
             except Exception as e:
                 logger.warning(f"Monitor: {type(e).__name__}: {e}")
-            self._parar.wait(INTERVALO_VIGIA_S)
+            espera = min(INTERVALO_VIGIA_S, max(0.1, proxima_amostra - time.monotonic()))
+            self._parar.wait(espera)
 
     def _vigiar(self):
         st = status_energia()
@@ -2608,23 +2730,25 @@ class MonitorMedicao(threading.Thread):
     def _emitir_progresso(self, fase, amostra, carga):
         """[HUB:PROGRESS] no maximo 1x por minuto, so nas amostras ja feitas (sem timer extra).
 
-        Fase ativa: sem duracao fixa (atual/total = None), mostra decorrido e WPR."""
+        Fase ativa: sem duracao fixa (atual/total = None), mostra decorrido e WPR.
+        Usa arredondamento do minuto para evitar pulos cosmeticos (ex.: 18 -> 20)
+        quando uma amostra cai 1 s antes da fronteira de 60 s."""
         if amostra["decorrido_s"] is None:
             return
         if fase == "escritorio":
-            minuto = int(amostra["decorrido_s"]) // 60
+            minuto = int(round(amostra["decorrido_s"] / 60))
             if getattr(self, "_ultimo_progresso", None) == (fase, minuto):
                 return
             self._ultimo_progresso = (fase, minuto)
             emit_progress(NOMES_FASE[fase], None, None,
-                          f"Decorrido {texto_decorrido(amostra['decorrido_s'])} · carga {carga}% "
+                          f"Decorrido {texto_decorrido(minuto * 60)} · carga {carga}% "
                           f"(alvo {PROTECAO_BATERIA_PCT}%) · WPR {estado_wpr_ativa()}",
                           aviso="NÃO USE A MÁQUINA — teste de bateria em andamento")
             return
         if fase not in DURACAO_FASE:
             return
         total_min = max(1, (DURACAO_FASE[fase] + 59) // 60)
-        minuto = min(total_min, int(amostra["decorrido_s"]) // 60 + 1)
+        minuto = min(total_min, int(round(amostra["decorrido_s"] / 60)) + 1)
         if getattr(self, "_ultimo_progresso", None) == (fase, minuto):
             return
         self._ultimo_progresso = (fase, minuto)
@@ -2822,6 +2946,12 @@ def encerrar_fase_medida():
 # =============================================================================
 # POS-MEDICAO — EVIDENCIAS COMPLEMENTARES (falha = aviso; nao muda o resultado)
 # =============================================================================
+_tempos_sessao = {
+    "espera_reconexao_s": 0.0,
+    "pos_medicao_s": 0.0,
+}
+
+
 def aguardar_reconexao_para_pos_medicao(ui, codigo_resultado):
     """Depois do bateria.csv e da restauracao: espera o carregador para a pos-medicao pesada.
 
@@ -2829,6 +2959,7 @@ def aguardar_reconexao_para_pos_medicao(ui, codigo_resultado):
     (botao Continuar na bateria) ou 'pular' (parada segura/Ctrl+Q, botao Pular,
     janela fechada). Ja na tomada (sem parada segura), retorna 'tomada' sem abrir a janela.
     """
+    _tempos_sessao["espera_reconexao_s"] = 0.0
     if _stop_requested.is_set() or motivo_encerramento() == "parada_segura":
         logger.info("Parada segura ativa: pulando janela de reconexao e pos-medicao pesada.")
         return "pular"
@@ -2881,12 +3012,18 @@ def aguardar_reconexao_para_pos_medicao(ui, codigo_resultado):
     emit_progress("Aguardando o carregador", detalhe="bateria.csv gravado e máquina restaurada; "
                   "reconecte o carregador para wpaexporter/SRUM/energia")
     logger.info("Aguardando a reconexao do carregador para a pos-medicao pesada.")
+    inicio_espera = time.monotonic()
     try:
         escolha = ui.pedir_janela(construir)
     except KeyboardInterrupt:
         escolha = "pular"
+    espera_s = max(0.0, time.monotonic() - inicio_espera)
+    _tempos_sessao["espera_reconexao_s"] = espera_s
     escolha = escolha if escolha in ("tomada", "bateria", "pular") else "pular"
-    logger.info(f"Janela de reconexao: {escolha}")
+    logger.info(f"Janela de reconexao: {escolha} (aguardou {texto_decorrido(espera_s)} / {espera_s:.0f}s)")
+    if espera_s >= 60:
+        emit_alert(f"Aguardou {texto_decorrido(espera_s)} pela reconexão do carregador (fora do tempo de bateria)",
+                   nivel="info")
     return escolha
 
 
@@ -2983,13 +3120,22 @@ def finalizar_medicao_rapido(ui, estaticos):
 def encerramento_e_pos_medicao(ui, estaticos):
     """bateria.csv + restaurar_tudo() SEMPRE antes da janela de reconexao e da
     pos-medicao pesada (wpaexporter, SRUM, /energy). Retorna o exit code."""
+    _tempos_sessao["pos_medicao_s"] = 0.0
     codigo = finalizar_medicao_rapido(ui, estaticos)
     escolha = _etapa_segura("janela de reconexao", lambda: aguardar_reconexao_para_pos_medicao(ui, codigo))
     if escolha in ("tomada", "bateria"):
+        inicio_pos = time.monotonic()
         pos_medicao_pesada(ui)
+        _tempos_sessao["pos_medicao_s"] = max(0.0, time.monotonic() - inicio_pos)
     else:
         logger.info("Exportacao pesada pulada: traces .etl preservados em "
                     f"{OUTPUT_PATH}; bateria.csv e resultado mantidos.")
+    espera_s = _tempos_sessao["espera_reconexao_s"]
+    pos_s = _tempos_sessao["pos_medicao_s"]
+    if espera_s > 0 or pos_s > 0:
+        logger.info(f"Tempos apos a medicao (nao entram no bateria.csv): "
+                    f"espera pelo carregador={texto_decorrido(espera_s)} ({espera_s:.0f}s) | "
+                    f"pos-medicao={texto_decorrido(pos_s)} ({pos_s:.0f}s)")
     return codigo
 
 

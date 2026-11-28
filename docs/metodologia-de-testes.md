@@ -680,7 +680,7 @@ O script é `Testes/5_bateria/5_teste_bateria.py` (versão **2.0**). Ele aparece
 
 ### 9.3 Pré-voo de Padronização
 
-O pré-voo roda **na tomada**, antes de pedir a desconexão do carregador. Cada item vira uma linha do `bateria_preflight.csv` com `Esperado`, `Antes`, `Acao`, `Depois`, `Situacao` (`ok`, `ajustado`, `não aplicável` ou `falhou`) e `Observacao`.
+O pré-voo roda **na tomada**, antes de pedir a desconexão do carregador. Cada item vira uma linha do `bateria_preflight.csv` com `Esperado`, `Antes`, `Acao`, `Depois`, `Situacao` (`ok`, `ajustado`, `aviso`, `não aplicável` ou `falhou`) e `Observacao`.
 
 | Grupo | Item | Esperado | Como é tratado |
 |-------|------|----------|----------------|
@@ -690,6 +690,7 @@ O pré-voo roda **na tomada**, antes de pedir a desconexão do carregador. Cada 
 | Conferidos | LibreOffice | `soffice.exe` encontrado | Ausente: falha em segundos, sem alterar nada, pedindo o Setup `3_softwares_msStore`. Aceita `HUB_LIBREOFFICE_PATH` |
 | Conferidos | Conexão de rede | com acesso à internet | Mantém o rádio Wi-Fi ativo e a telemetria real dos agentes de SI. Registra `tipo \| rede \| sinal`; SSID ou sinal indisponíveis não reprovam |
 | Conferidos | Monitor externo | nenhum | Também pega a tampa fechada com monitor externo |
+| Conferidos | Aplicativos abertos | nenhum (recomendado) | Alerta opcional (`aviso`): detecta IDEs, navegadores, apps de comunicação/nuvem e janelas de usuário abertas; exibido também na janela de desconexão para o operador fechar, cancelar ou seguir normalmente sem invalidar o teste |
 | Ajustados | Plano de energia | Equilibrado | O mesmo plano do setup `2_opcoes_energia` |
 | Ajustados | Modo de energia na bateria | **Equilibrado** | Padrão real do Windows na bateria. Sem a API do modo na bateria (Windows antigo): aplicado e conferido já na bateria |
 | Ajustados | Economia de energia | desligada, limite 0% | Limite 0% = não liga sozinha; ligada manualmente: `falhou` (desligar nas Configurações) |

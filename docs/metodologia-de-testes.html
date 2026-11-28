@@ -1694,7 +1694,7 @@ li {
 <li><strong>pyautogui/pyperclip</strong> — digitação e edição simuladas; <strong>psutil</strong> — top 10 processos por CPU</li>
 </ul>
 <h3 id="93-pré-voo-de-padronização">9.3 Pré-voo de Padronização</h3>
-<p>O pré-voo roda <strong>na tomada</strong>, antes de pedir a desconexão do carregador. Cada item vira uma linha do <code>bateria_preflight.csv</code> com <code>Esperado</code>, <code>Antes</code>, <code>Acao</code>, <code>Depois</code>, <code>Situacao</code> (<code>ok</code>, <code>ajustado</code>, <code>não aplicável</code> ou <code>falhou</code>) e <code>Observacao</code>.</p>
+<p>O pré-voo roda <strong>na tomada</strong>, antes de pedir a desconexão do carregador. Cada item vira uma linha do <code>bateria_preflight.csv</code> com <code>Esperado</code>, <code>Antes</code>, <code>Acao</code>, <code>Depois</code>, <code>Situacao</code> (<code>ok</code>, <code>ajustado</code>, <code>aviso</code>, <code>não aplicável</code> ou <code>falhou</code>) e <code>Observacao</code>.</p>
 <table>
 <thead>
 <tr>
@@ -1740,6 +1740,12 @@ li {
 <td>Monitor externo</td>
 <td>nenhum</td>
 <td>Também pega a tampa fechada com monitor externo</td>
+</tr>
+<tr>
+<td>Conferidos</td>
+<td>Aplicativos abertos</td>
+<td>nenhum (recomendado)</td>
+<td>Alerta opcional (<code>aviso</code>): detecta IDEs, navegadores, apps de comunicação/nuvem e janelas de usuário abertas; exibido também na janela de desconexão para o operador fechar, cancelar ou seguir normalmente sem invalidar o teste</td>
 </tr>
 <tr>
 <td>Ajustados</td>
