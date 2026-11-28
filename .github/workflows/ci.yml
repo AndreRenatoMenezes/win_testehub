@@ -87,6 +87,9 @@ jobs:
       - name: Teste de regressão (Módulo 1 com LibreOffice)
         run: python -I -X utf8 .github/scripts/test_cpu_memo_libreoffice.py
 
+      - name: Teste de regressão (Módulo 5 — Bateria v2.0 com LibreOffice)
+        run: python -I -X utf8 .github/scripts/test_bateria.py
+
       - name: Teste de regressão (monitor ao vivo — hub_progress e live_monitor)
         run: python -I -X utf8 .github/scripts/test_live_monitor.py
 

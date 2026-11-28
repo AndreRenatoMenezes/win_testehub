@@ -44,15 +44,14 @@ O **WinTestHub** (Hardware Test Hub) é um framework Windows para validação de
 Os itens abaixo são instalados automaticamente pela **Fase de Setup** do hub. Não é necessário instalá-los manualmente antes da primeira execução:
 
 - Python 3.x (com ambiente virtual `.venv`)
-- LibreOffice (`TheDocumentFoundation.LibreOffice`, instalado pelo `3_softwares_msStore.ps1` — usado no Módulo 1 em modo 100% local e offline, sem login)
-- Microsoft Edge (nativo do Windows 10/11 — usado no teste de rede e na fase de escritório do teste de bateria)
+- LibreOffice (`TheDocumentFoundation.LibreOffice`, instalado pelo `3_softwares_msStore.ps1` — usado no Módulo 1 e na fase de escritório do Módulo 5, em modo 100% local e offline, sem login)
+- Microsoft Edge (nativo do Windows 10/11 — usado no teste de rede)
 - Dependências Python: `psutil`, `speedtest-cli`, `requests`, `selenium`, `pandas`, `pyautogui`, `pyperclip`, `pynput`
 
 Para o **teste de bateria (Módulo 5)**, além disso:
 
 - **Windows Performance Toolkit** (`wpr.exe` e `wpaexporter.exe`) no PATH — exigido pelos Módulos 0, 1 e 5
-- **Microsoft Edge com a conta Google já logada** (Google Docs e Sheets; exigido apenas no Módulo 5, pois o Módulo 1 utiliza o LibreOffice localmente)
-- **Feche o Edge antes de iniciar**: o teste encerra o Edge e reabre só com as páginas dele
+- **LibreOffice** (`soffice.exe`) — o mesmo do Módulo 1; sem ele o hub bloqueia o teste na checagem antes da fila. Nenhuma conta ou login é necessário
 
 Para as **cargas de desenvolvimento (Módulos 7 a 11)**, os setups `7_install_devtools_dev` e `10_preparar_podman` instalam Git, .NET SDK 10, Go, uv, docker-compose, WSL2 e Podman (veja a seção 4.8).
 
@@ -229,7 +228,7 @@ Na Fase 1 (preparação) não há seções: os scripts ficam agrupados por pasta
 Após confirmar, o hub faz a checagem antes da fila (seção 4.9), mostra o resumo dos testes selecionados e inicia a execução sequencial. Durante a execução:
 
 - O console exibe o **monitor ao vivo** (seção 4.4.1), com a fila, a etapa interna do teste, a telemetria da máquina, as últimas linhas de log e os alertas
-- Testes que abrem aplicativos sobre o terminal (CPU/Memória com LibreOffice, Rede com Edge e a fase de escritório da Bateria) exibem também um **overlay transparente** ("click-through") na tela. Os demais testes (Consumo Basal, Disco, variantes DLP/USB e cargas Dev 7–11) usam apenas a TUI do terminal quando o monitor ao vivo está ativo — mantendo o overlay ao rodar fora do hub ou no painel clássico
+- Testes que abrem aplicativos sobre o terminal (CPU/Memória com LibreOffice, Rede com Edge e a fase de escritório da Bateria, também no LibreOffice) exibem também um **overlay transparente** ("click-through") na tela. Os demais testes (Consumo Basal, Disco, variantes DLP/USB e cargas Dev 7–11) usam apenas a TUI do terminal quando o monitor ao vivo está ativo — mantendo o overlay ao rodar fora do hub ou no painel clássico
 
 #### 4.4.1 Monitor ao vivo no terminal
 
@@ -269,22 +268,22 @@ Ao final de todos os testes, um resumo geral é apresentado com contagem de PASS
 
 ### 4.6 Teste de Bateria (Módulo 5) — Passo a Passo do Operador
 
-O teste de bateria leva **~2h20–2h40** e precisa do operador no começo (para desconectar o carregador) e no fim (para reconectar). Prefira executá-lo **sozinho**, sem outros testes na mesma seleção.
+O teste de bateria (versão **2.0**) mede o **tempo real de bateria**: depois de 60 min ociosa, a fase de escritório no **LibreOffice** roda até a bateria chegar a **10%**. A duração total **varia com a autonomia do notebook** — conte com ~1h10 de preparação e fase ociosa, mais a descarga até 10% (tipicamente 3–12 h). O operador só é necessário no começo (para desconectar o carregador) e, quando quiser, no fim (para reconectar). Prefira executá-lo **sozinho**, sem outros testes na mesma seleção, e de preferência no fim do expediente: a descarga pode terminar de madrugada sem ninguém por perto.
 
 **1. Prepare a máquina, ainda na tomada**
 
 - Carregue a bateria até pelo menos **95%** (desative o limite de carga do fabricante, se houver).
-- Feche o Edge e os demais aplicativos. Deixe a conta Google logada no Edge.
+- Feche os demais aplicativos. Não é preciso login em nenhuma conta: a carga de escritório roda 100% local no LibreOffice (um LibreOffice já aberto pelo usuário não é tocado, mas feche-o para não pesar na medição).
 - Conecte a rede com acesso à internet e desconecte monitor externo e dock.
 - Se a política da máquina bloqueia a tela por inatividade, desative o bloqueio durante o teste (o teste mantém a tela ligada sem simular teclado ou mouse, mas não contorna política).
 
 **2. Selecione o teste**
 
-No menu de testes, marque `5_teste_bateria.py` (seção **Bateria**) e confirme com `Enter`.
+No menu de testes, marque `5_teste_bateria.py` (seção **Escritório**) e confirme com `Enter`. Sem o LibreOffice instalado, a checagem antes da fila já bloqueia o teste e pede o Setup `3_softwares_msStore`.
 
 **3. Aguarde o pré-voo (~1 min)**
 
-O teste confere a bateria, a carga, as ferramentas de captura, a rede e o monitor; abre e fecha o Edge para conferir a conta Google; e ajusta plano e modo de energia, Economia de energia, brilho, Bluetooth e suspensão. Se aparecer a janela **"Ação Necessária — Login no Google"** (ou "no Edge"), faça o login no Edge e clique em **OK**.
+O teste confere a bateria, a carga, as ferramentas de captura, o LibreOffice, a rede e o monitor, e ajusta plano de energia, modo de energia na bateria (**Equilibrado**), Economia de energia, brilho, Bluetooth e suspensão.
 
 Se algum item não puder ser ajustado, a janela **"Teste de bateria não iniciado"** lista os pendentes; nada é medido e as configurações já voltam ao que eram (veja a seção 7.1).
 
@@ -298,24 +297,28 @@ Na janela **"Teste de bateria — desconecte o carregador"**:
 
 O limite para isso é de **10 minutos**; depois disso o teste encerra sem medir (FAIL) e restaura a máquina. **Cancelar teste** ou `Ctrl+Q` interrompem com segurança.
 
-**5. Não use a máquina (~2h10)**
+**5. Não use a máquina até o fim da descarga**
 
-O overlay mostra a fase, a carga e os minutos restantes:
+O overlay mostra a fase e a carga; na fase de escritório, também o tempo decorrido e o estado do WPR:
 
 | Fase no overlay | O que acontece | Duração |
 |-----------------|----------------|---------|
 | Estabilização | Confere brilho, modo e Economia já na bateria (fora da medição) | 5 min |
 | Fase ociosa | Tela ligada, nada aberto pelo teste | 60 min |
-| Transição | Salva o trace e abre o Edge com documento, planilha e PDF | ~1–5 min |
-| Fase de escritório | O teste digita e navega no Edge sozinho | 60 min |
+| Transição | Salva o trace, gera o documento e a planilha e abre o LibreOffice Writer e Calc | ~1–5 min |
+| Fase de escritório (descarga real) | O teste digita no Writer e edita/recalcula a planilha no Calc sozinho. Na marca de 60 min o trace WPR é salvo ("WPR: salvo") e a descarga continua | até a carga chegar a 10% |
 
-Não toque no mouse nem no teclado — na fase de escritório o teste está usando os dois. Levar o mouse a um canto da tela aciona a parada segura. **Não reconecte o carregador** antes do aviso: isso invalida a medição.
+Não toque no mouse nem no teclado — na fase de escritório o teste está usando os dois. Levar o mouse a um canto da tela aciona a parada segura. **Não reconecte o carregador** antes do fim da medição: isso invalida a coleta.
 
-**6. Reconecte quando o aviso pedir**
+**6. Fim da medição em 10% e reconexão**
 
-A janela **"Teste de bateria — medição encerrada"** (e o overlay "O carregador já pode ser reconectado") indica o fim da medição. Reconecte o carregador. O teste ainda converte os traces e gera o SRUM e o relatório de energia (~5–20 min), restaura as configurações e devolve o resultado ao hub.
+Ao chegar a 10%, o teste fecha o LibreOffice, gera o relatório de bateria "depois", **grava o `bateria.csv`** e **restaura todas as configurações** em poucos segundos — o resultado já está salvo mesmo que ninguém esteja por perto. Em seguida aparece a janela **"Teste de bateria — medição encerrada"**, com o resultado (PASS/FAIL):
 
-O resultado detalhado fica em `5_bateria/bateria.csv`: `Coleta_Valida = sim` indica uma execução que serve para comparar baseline × agente.
+- **Reconecte o carregador**: a janela detecta a tomada sozinha e o teste converte os traces (wpaexporter), gera o SRUM e o relatório de energia (~5–30 min) e devolve o resultado ao hub. Se o notebook suspender enquanto espera, basta reconectar o carregador e acordá-lo.
+- **Continuar na bateria**: faz a mesma exportação sem tomada (só se houver carga suficiente).
+- **Pular exportação e finalizar**: encerra na hora, preservando os traces `.etl` em `5_bateria/` (podem ser exportados depois no WPA) e o resultado já gravado. Fechar a janela tem o mesmo efeito.
+
+O resultado detalhado fica em `5_bateria/bateria.csv`: `Coleta_Valida = sim` indica uma execução que serve para comparar baseline × agente; `Autonomia_Real_Equivalente_100pct` é a autonomia normalizada para 100% → 0%. Execuções da versão 2.0 não são comparáveis com as da 1.0 (Edge/Google, modo Melhor desempenho).
 
 ### 4.7 Teste de Wi-Fi Fast Transition (Módulo 6) — Passo a Passo do Operador
 
@@ -633,13 +636,14 @@ O amostrador não roda nos setups, no módulo 0 (`0_consumo_basal`) nem no teste
 | Bateria: "Este teste exige um notebook com bateria reconhecida pelo Windows" | Desktop ou bateria não reconhecida | O teste só roda em notebook; confira a bateria no Gerenciador de Dispositivos. Nada foi alterado na máquina |
 | Bateria: "Carga da bateria em X%; o mínimo para iniciar é 95%" | Bateria não carregada ou limite de carga do fabricante ativo | Carregue a bateria na tomada; desative o limite de carga do fabricante (app ou BIOS) e execute de novo |
 | Bateria: "Ferramentas de captura não encontradas no PATH" | Windows Performance Toolkit ausente | Instale o WPT (o mesmo do Módulo 1) e inclua a pasta dele no PATH |
+| Bateria: "LibreOffice (soffice.exe) não encontrado" | LibreOffice não instalado ou fora do caminho padrão | Rode o Setup `3_softwares_msStore`; se estiver em outra pasta, defina `HUB_LIBREOFFICE_PATH` com o caminho do `soffice.exe` |
 | Bateria: janela "Teste de bateria não iniciado" | Item do pré-voo fora do padrão ou "bloqueado por política" | A janela e o `bateria_preflight.csv` listam os itens pendentes; ajuste-os (ou peça exceção da política) e execute de novo. O teste já restaurou o que tinha alterado |
 | Bateria: "sem acesso à internet" ou "monitor externo conectado" no pré-voo | Rede sem internet ou monitor externo/dock ligado | Conecte a rede com internet e desconecte o monitor externo antes de iniciar |
 | Bateria: "O carregador não foi desconectado em 10 min" (`carregador_nao_desconectado`) | Operador ausente na hora do aviso | Execute de novo com o operador presente |
-| Bateria: FAIL com motivo `carregador_reconectado` | Carregador reconectado antes do aviso de fim da medição | Execute de novo e só reconecte quando a janela "medição encerrada" pedir |
-| Bateria: FAIL com motivo `protecao_bateria` | A carga chegou a 7% na fase ociosa ou antes de 30 min da fase de escritório | A bateria não sustenta as duas fases: comece com 100% de carga; se persistir, registre a autonomia baixa |
+| Bateria: FAIL com motivo `carregador_reconectado` | Carregador reconectado antes de a carga chegar a 10% | Execute de novo e só reconecte quando a janela "medição encerrada" aparecer |
+| Bateria: FAIL com motivo `protecao_bateria` | A carga chegou a 10% ainda na fase ociosa ou na transição (antes de abrir o LibreOffice) | A bateria não sustenta nem a fase ociosa: comece com 100% de carga; se persistir, registre a autonomia baixa. Chegar a 10% na fase de escritório é o fim normal (PASS) |
 | Bateria: FAIL com motivo `sessao_bloqueada` | A política de bloqueio por inatividade bloqueou a sessão | Desative o bloqueio automático de tela durante o teste (ou peça exceção da política) e execute de novo |
-| Bateria: FAIL com motivo `login_exigido` | O Google pediu login quando o Edge abriu já na bateria | Faça o login no Edge na tomada e execute de novo |
+| Bateria: FAIL com motivo `hibernacao_inesperada` | O notebook suspendeu ou hibernou no meio da medição (salto de relógio) — por exemplo, a bateria caiu bruscamente abaixo de 10% | O `bateria_amostras.csv` e o `bateria_checkpoint.json` guardam a medição até o último minuto; confira a política de suspensão/hibernação crítica do fabricante e execute de novo |
 | Bateria: FAIL com motivo `padronizacao_na_bateria` | Brilho, modo de energia ou Economia de energia não ficaram no padrão depois de desconectar | Veja as linhas "efetivo" no `bateria_preflight.csv`; confira o software de energia do fabricante |
 | Bateria: máquina ficou com brilho 50%, Bluetooth desligado ou energia alterada | O processo foi encerrado à força (ex.: janela do hub fechada) e a restauração automática não rodou | Use a coluna `Antes` do `bateria_preflight.csv`: brilho e Bluetooth pelas Configurações; para os itens de energia, `powercfg /setdcvalueindex SCHEME_CURRENT <subgrupo> <configuração> <valor>` seguido de `powercfg /setactive SCHEME_CURRENT` |
 

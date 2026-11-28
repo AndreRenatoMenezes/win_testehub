@@ -4,7 +4,6 @@ import sys
 import time
 import csv
 import json
-import winreg
 import queue
 import base64
 import random
@@ -13,19 +12,47 @@ import signal
 import uuid
 import ctypes
 import logging
+import tempfile
 import threading
 import subprocess
 import unicodedata
-import tkinter as tk
 import xml.etree.ElementTree as ET
-from ctypes import wintypes
 from datetime import datetime
-import psutil
-import pyautogui
-import pyperclip
-from pynput import keyboard as kb
+
+# Imports Windows-only/GUI opcionais: o script tambem e importado pelos testes
+# unitarios do CI (ubuntu-latest), onde essas bibliotecas nao existem.
+try:
+    import winreg
+except ImportError:  # pragma: no cover - fora do Windows
+    winreg = None
+try:
+    from ctypes import wintypes
+except (ImportError, ValueError):  # pragma: no cover
+    wintypes = None
+try:
+    import tkinter as tk
+except Exception:  # pragma: no cover
+    tk = None
+try:
+    import psutil
+except Exception:  # pragma: no cover
+    psutil = None
+try:
+    import pyautogui
+except Exception:  # pragma: no cover
+    pyautogui = None
+try:
+    import pyperclip
+except Exception:  # pragma: no cover
+    pyperclip = None
+try:
+    from pynput import keyboard as kb
+except Exception:  # pragma: no cover
+    kb = None
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
+import libreoffice_workload as lo  # noqa: E402  (carga Writer + Calc R2, spec 005)
+
 try:  # protocolo do monitor ao vivo do hub (Spec 004)
     from hub_progress import emit_alert, emit_progress, is_live_monitor_active
 except ImportError:  # pragma: no cover - fora da arvore do hub
@@ -42,42 +69,35 @@ except ImportError:  # pragma: no cover - fora da arvore do hub
 # =============================================================================
 # CONFIGURACOES DO TESTE
 # =============================================================================
-# Modulo 5 — Bateria (spec 003): pre-voo de padronizacao (aplicar, conferir e
-# registrar), aviso unico ao operador, estabilizacao, fase ociosa e fase de
-# escritorio na bateria, evidencias complementares, bateria.csv e restauracao.
+# Modulo 5 — Bateria v2.0 (spec 005): pre-voo de padronizacao (aplicar, conferir
+# e registrar), aviso unico ao operador, estabilizacao, fase ociosa fixa (60 min)
+# e fase ativa no LibreOffice (Writer + Calc R2) ate 10% de bateria, medindo o
+# tempo real. Ao bater 10%: bateria.csv + restauracao em ~15 s; a exportacao
+# pesada (wpaexporter, SRUM, /energy) so depois, com o carregador reconectado.
 # Exit code: 0 somente com coleta valida; qualquer outro caso, 1.
 
-# --- Valores da spec 003 (nao alterar sem nova spec) ---
+# --- Valores da spec 005 (nao alterar sem nova spec) ---
+VERSAO_TESTE = "2.0"                # nao comparavel diretamente com a 1.0
 DURACAO_OCIOSA_S = 60 * 60          # fase ociosa: tela ligada, sem entrada simulada
-DURACAO_ESCRITORIO_S = 60 * 60      # fase de escritorio: Edge com documento, planilha e PDF
+DURACAO_WPR_ESCRITORIO_S = 60 * 60  # WPR so na 1a hora da fase ativa (sem teto de tempo na fase)
 ESTABILIZACAO_S = 5 * 60            # apos desconectar o carregador, fora da medicao
 CARGA_INICIAL_MIN_PCT = 95          # carga minima para iniciar (%)
-PROTECAO_BATERIA_PCT = 7            # encerramento controlado ao atingir esta carga (%)
-ESCRITORIO_MINIMO_PASS_S = 30 * 60  # minimo medido na fase de escritorio para PASS
-INTERVALO_AMOSTRA_S = 60            # amostragem da bateria
+PROTECAO_BATERIA_PCT = 10           # fim da descarga real ao atingir esta carga (%)
+INTERVALO_RECALC_CALC_S = 5 * 60    # recalculo completo (Ctrl+Shift+F9) da R2
+WRITER_MAX_PARAGRAFOS = 60          # anti-bloat: reinicia o texto do Writer
+INTERVALO_AMOSTRA_S = 60            # amostragem da bateria + checkpoint
 ESPERA_CARREGADOR_S = 10 * 60       # espera maxima pela desconexao do carregador
 BRILHO_PADRAO_PCT = 50              # brilho da tela na bateria (%)
 
-# --- Parametros tecnicos (plan da spec 003) ---
+# --- Parametros tecnicos (plan da spec 005) ---
 INTERVALO_TOP_PROCESSOS_S = 5 * 60  # top 10 processos por CPU
-INTERVALO_VIGIA_S = 5               # vigia: carregador, protecao de bateria e Ctrl+Q
-ESTABILIZAR_EDGE_S = 15             # espera apos abrir o Edge para a fase de escritorio
+INTERVALO_VIGIA_S = 5               # vigia: carregador, protecao, Ctrl+Q e salto de relogio
+LIMIAR_SALTO_HIBERNACAO_S = 120     # salto de relogio acima disso = hibernacao/suspensao
+INTERVALO_SONDA_RECONEXAO_S = 2     # janela de reconexao: sonda o carregador
 TIMEOUT_EXPORTACAO_S = 30 * 60      # wpaexporter, por trace
 TIMEOUT_COLETOR_S = 15              # resposta do coletor PowerShell
-TENTATIVAS_LOGIN = 3                # pedidos de login (Edge/Google) na prontidao
-VERSAO_TESTE = "1.0"
 PROFILE_NAME = "Agentes_SI_Bateria_Profile.wpaProfile"
 WPR_PERFIL = "Power.light"
-
-URLS_PRONTIDAO = [  # paginas de lista: conferem o login sem criar documentos
-    "https://docs.google.com/document/u/0/",
-    "https://docs.google.com/spreadsheets/u/0/",
-]
-URLS_ESCRITORIO = [  # as mesmas do Modulo 1
-    "https://docs.google.com/document/create",
-    "https://docs.google.com/spreadsheets/create",
-    "https://dl.dell.com/topicspdf/inspiron-15-3567-laptop_service-manual_pt-br.pdf",
-]
 
 # --- GUIDs de energia ---
 PLANO_EQUILIBRADO = "381b4222-f694-41f0-9685-ff5bb260df2e"
@@ -100,6 +120,8 @@ NOMES_MODO = {
     MODO_EQUILIBRADO: "Equilibrado",
     MODO_MELHOR_EFICIENCIA: "Melhor eficiência energética",
 }
+MODO_ENERGIA_ALVO = MODO_EQUILIBRADO   # padrao real do Windows na bateria (spec 005)
+NOME_MODO_ALVO = NOMES_MODO[MODO_ENERGIA_ALVO]
 
 # Ferramentas de captura exigidas no PATH (mesma orientacao do Modulo 1)
 FERRAMENTAS_CAPTURA = {
@@ -205,28 +227,12 @@ def _on_key_release(key):
         _ctrl_pressed = False
 
 
-class PrazoDaFase(BaseException):
-    """Prazo da fase de escritorio vencido: interrompe a acao em andamento.
-
-    BaseException para atravessar os 'except Exception' do laco de acoes.
-    """
-
-
-_prazo_fase = {"fim": None}   # time.monotonic() do fim da fase de escritorio (so durante ela)
-
-
 def check_stop():
-    """Verifica se a parada segura (ou o encerramento da medicao) foi solicitada.
-
-    Durante a fase de escritorio, levanta PrazoDaFase quando a duracao vence.
-    """
+    """Levanta KeyboardInterrupt se a parada segura ou o encerramento da medicao foi pedido."""
     if _stop_requested.is_set():
         raise KeyboardInterrupt("Parada segura solicitada pelo usuario.")
     if _encerrar.is_set():
         raise KeyboardInterrupt("Encerramento da medicao solicitado.")
-    fim = _prazo_fase["fim"]
-    if fim is not None and time.monotonic() >= fim:
-        raise PrazoDaFase()
 
 
 def pausa(segundos):
@@ -269,8 +275,8 @@ class MonitorOverlay:
     # copiado de 1_automacao_performance.py (click-through), adaptado para
     # atualizar(fase, status, detalhe) e para a fila de janelas.
     # Com oculto_inicial=True (monitor ao vivo do hub ativo), a janela flutuante
-    # fica oculta no pre-voo/fase ociosa/pos-medicao e so aparece na Fase Escritorio
-    # (quando o Edge cobre o terminal); os dialogos Toplevel seguem abrindo normalmente.
+    # fica oculta no pre-voo/fase ociosa/pos-medicao e so aparece na fase ativa
+    # (quando o LibreOffice cobre o terminal); os dialogos Toplevel seguem abrindo normalmente.
     def __init__(self, oculto_inicial=False):
         self.root = tk.Tk()
         self.root.title("Monitor do Teste de Bateria")
@@ -519,14 +525,18 @@ def executar_ps(script, timeout=60):
     )
 
 
+_DWORD = wintypes.DWORD if wintypes else ctypes.c_uint32
+_WORD = wintypes.WORD if wintypes else ctypes.c_uint16
+
+
 class _SYSTEM_POWER_STATUS(ctypes.Structure):
     _fields_ = [
         ("ACLineStatus", ctypes.c_ubyte),
         ("BatteryFlag", ctypes.c_ubyte),
         ("BatteryLifePercent", ctypes.c_ubyte),
         ("SystemStatusFlag", ctypes.c_ubyte),
-        ("BatteryLifeTime", wintypes.DWORD),
-        ("BatteryFullLifeTime", wintypes.DWORD),
+        ("BatteryLifeTime", _DWORD),
+        ("BatteryFullLifeTime", _DWORD),
     ]
 
 
@@ -824,8 +834,8 @@ class ColetorBateria:
 # UserConfiguredDCPowerMode nao sao documentadas: a exportacao e checada antes.
 class GUID(ctypes.Structure):
     _fields_ = [
-        ("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
-        ("Data3", wintypes.WORD), ("Data4", ctypes.c_ubyte * 8),
+        ("Data1", _DWORD), ("Data2", _WORD),
+        ("Data3", _WORD), ("Data4", ctypes.c_ubyte * 8),
     ]
 
 
@@ -837,7 +847,20 @@ def _texto_guid(g):
     return str(uuid.UUID(bytes_le=bytes(g)))
 
 
-_powrprof = ctypes.WinDLL("powrprof.dll")
+class _DllSobDemanda:
+    """Carrega a DLL no primeiro uso: importar o script no CI Linux nao exige Win32."""
+
+    def __init__(self, nome):
+        self._nome = nome
+        self._dll = None
+
+    def __getattr__(self, atributo):
+        if self._dll is None:
+            self._dll = ctypes.WinDLL(self._nome)   # AttributeError fora do Windows
+        return getattr(self._dll, atributo)
+
+
+_powrprof = _DllSobDemanda("powrprof.dll")
 
 
 def api_modo_dc_disponivel():
@@ -871,7 +894,7 @@ def definir_overlay_ativo(guid):
     """Fallback sem a API DC: aplica o modo na fonte atual (usado ja na bateria)."""
     funcao = _powrprof.PowerSetActiveOverlayScheme
     funcao.argtypes = [GUID]
-    funcao.restype = wintypes.DWORD
+    funcao.restype = _DWORD
     rc = funcao(_guid(guid))
     if rc != 0:
         raise OSError(f"PowerSetActiveOverlayScheme retornou {rc}")
@@ -1031,6 +1054,8 @@ def definir_indice(sub, cfg, valor, fonte="dc"):
 
 
 def _ler_registro_hklm(subchave, valor):
+    if winreg is None:
+        return None
     try:
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, subchave, 0,
                             winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as chave:
@@ -1150,6 +1175,19 @@ def checagens_rapidas(ui):
     else:
         logger.warning(f"Profile WPA '{PROFILE_NAME}' nao encontrado em '{BASE_DIR}'. "
                        "A exportacao CSV sera ignorada.")
+
+    # 5. LibreOffice (fase ativa): ausente = falha rapida, antes de qualquer ajuste
+    item, esperado = "LibreOffice", "soffice.exe encontrado"
+    soffice = lo.find_libreoffice_executable()
+    if not soffice:
+        return _falha_rapida(
+            ui, item, esperado, "ausente",
+            "LibreOffice (soffice.exe) não encontrado. Instale-o com o Setup 3_softwares_msStore "
+            "e execute o teste novamente. Nenhuma configuração foi alterada.",
+            "defina HUB_LIBREOFFICE_PATH se estiver fora do caminho padrao",
+        )
+    _lo_state["soffice_path"] = soffice
+    registrar_item(item, esperado, "encontrado", "conferido", "encontrado", "ok", soffice)
     return True
 
 
@@ -1362,13 +1400,13 @@ def ajustar_plano():
 def ajustar_modo_dc():
     item = "Modo de energia na bateria"
     if not api_modo_dc_disponivel():
-        registrar_item(item, "Melhor desempenho", "indisponível", "adiado para a estabilização",
+        registrar_item(item, NOME_MODO_ALVO, "indisponível", "adiado para a estabilização",
                        "indisponível", "ok",
                        "API do modo de energia na bateria ausente nesta versão do Windows; "
                        "o modo será aplicado e conferido já na bateria")
         return "ok"
-    return ajustar_item(item, MODO_MELHOR_DESEMPENHO, modo_dc_configurado,
-                        lambda: definir_modo_dc(MODO_MELHOR_DESEMPENHO), definir_modo_dc, nome_modo)
+    return ajustar_item(item, MODO_ENERGIA_ALVO, modo_dc_configurado,
+                        lambda: definir_modo_dc(MODO_ENERGIA_ALVO), definir_modo_dc, nome_modo)
 
 
 def ajustar_economia():
@@ -1650,677 +1688,273 @@ AJUSTES = [
 
 
 # =============================================================================
-# EDGE E SIMULACAO DE ESCRITORIO (copiado de 1_automacao_performance.py)
+# FASE ATIVA — LIBREOFFICE WRITER + CALC R2 (Testes/_lib/libreoffice_workload.py)
 # =============================================================================
-# copiado de 1_automacao_performance.py (adaptacoes marcadas em cada funcao).
-# Reaproveitado por copia (o Modulo 1 nao e importado), sem o passo Selenium
-# (_configure_edge_startup_setting) e sem ciclos/cooldown: uma sessao continua.
-# Adaptado na simulacao de escritorio (type_text_safely a simulate_pdf_reading):
-# as esperas usam pausa() em vez de time.sleep(), para a fase parar no prazo e
-# reagir ao Ctrl+Q e ao encerramento da medicao em ate 0,5 s, mesmo no meio de uma acao.
-EDGE_FLAGS = [
-    "--disable-session-crashed-bubble",
-    "--disable-features=msEdgeTabRestorationService",
-]
-_edge = {"aberto_pelo_teste": False}
+# Writer e Calc abertos uma vez, cada um com subperfil isolado
+# (wintesthub_lo_profile_*): turnos alternados em ritmo de escritorio ate a
+# bateria chegar a PROTECAO_BATERIA_PCT. Todas as esperas usam pausa(), para a
+# fase reagir ao encerramento da medicao e ao Ctrl+Q em ate 0,5 s. Uma descarga
+# de varias horas nao cai por um erro pontual: Escape + relancamento do app que
+# fechou, aviso no log e segue.
+TITULO_ODT_BATERIA = "Documento de Benchmark — WinTestHub Modulo 5"
+MAX_FALHAS_SEGUIDAS_LO = 10    # erros de automacao consecutivos antes de desistir (erro)
 
 
-class LoginExigido(Exception):
-    """Boas-vindas do Edge ou login do Google ao abrir a fase de escritorio."""
+def _novo_estado_lo():
+    return {
+        "soffice_path": None, "work_dir": None, "roots": set(),
+        "odt_base": None, "xlsx_base": None, "aberturas": {},
+        "hwnd_writer": None, "hwnd_calc": None,
+        "tempo_abertura_writer_s": None, "tempo_abertura_calc_s": None,
+        "paragrafos_writer": 0, "paragrafos_desde_reset": 0,
+        "linhas_calc": 0, "recalculos_calc": 0,
+        "proxima_linha": 1, "indice_dados": 0,
+        "ativo": False,
+    }
 
 
-def kill_edge(ui=None):
-    """Encerra o Edge de forma verificavel.
+_lo_state = _novo_estado_lo()
 
-    copiado de 1_automacao_performance.py; adaptado: so 'msedge.exe' (o original
-    casa 'msedge' no nome e derruba tambem o msedgewebview2.exe de outros apps).
+
+def contadores_lo():
+    """Metricas do workload LibreOffice (bateria.csv e checkpoint)."""
+    st = _lo_state
+    return {
+        "tempo_abertura_writer_s": st["tempo_abertura_writer_s"],
+        "tempo_abertura_calc_s": st["tempo_abertura_calc_s"],
+        "paragrafos_writer": st["paragrafos_writer"],
+        "linhas_calc": st["linhas_calc"],
+        "recalculos_calc": st["recalculos_calc"],
+    }
+
+
+def _abrir_app(app):
+    """Abre Writer ('writer') ou Calc ('calc') com subperfil e copia do arquivo novos.
+
+    A 1a abertura usa wintesthub_lo_profile_<app> e cronometra o Tempo_Abertura_*;
+    um relancamento (app fechou no meio da descarga) usa um subperfil novo.
     """
-    if ui:
-        ui.atualizar("Edge", "Encerrando instâncias do Edge...")
-    result = subprocess.run(
-        "taskkill /F /IM msedge.exe",
-        shell=True, capture_output=True
+    st = _lo_state
+    n = st["aberturas"].get(app, 0) + 1
+    st["aberturas"][app] = n
+    sufixo = app if n == 1 else f"{app}{n}"
+    perfil = os.path.join(st["work_dir"], f"{lo.LO_PROFILE_PREFIX}_{sufixo}")
+    os.makedirs(perfil, exist_ok=True)
+    if app == "calc":
+        lo.seed_lo_profile(perfil)   # recalcula a R2 ao abrir e salva .xlsx sem aviso
+    base = st["odt_base"] if app == "writer" else st["xlsx_base"]
+    arquivo = os.path.join(st["work_dir"], f"{sufixo}_{os.path.basename(base)}")
+    shutil.copy2(base, arquivo)
+    modo, timeout = (("--writer", lo.APP_LAUNCH_TIMEOUT) if app == "writer"
+                     else ("--calc", lo.CALC_LAUNCH_TIMEOUT))
+    elapsed, _, hwnd = lo.launch_app(
+        st["soffice_path"], modo, arquivo, lo.build_user_installation_uri(perfil), st["roots"],
+        timeout=timeout, check_stop_fn=check_stop, sleep_fn=pausa, log=logger,
     )
-    # adaptado: a saida do taskkill vem na pagina OEM; 128 = nenhum msedge.exe aberto
-    if result.returncode not in (0, 128):
-        erro = result.stderr.decode("oem", "replace").strip()
-        logger.debug(f"taskkill retornou codigo {result.returncode}: {sem_acento(erro)}")
-
-    time.sleep(3)
-
-    # Verificar se realmente encerrou
-    for proc in psutil.process_iter(['name']):
-        if (proc.info['name'] or "").lower() == "msedge.exe":
-            logger.warning("Edge ainda rodando apos taskkill. Forcando via psutil...")
-            try:
-                proc.kill()
-            except psutil.NoSuchProcess:
-                pass
-    time.sleep(1)
-    _edge["aberto_pelo_teste"] = False
+    if app == "calc":
+        # a janela aparece antes do fim do recalculo da R2: nada de teclas ate o Calc ociosar
+        espera = lo.wait_lo_idle(hwnd, timeout=lo.CALC_LAUNCH_TIMEOUT, check_stop_fn=check_stop,
+                                 sleep_fn=pausa, log=logger)
+        if espera:
+            logger.info(f"Calc ocioso {espera:.1f}s depois de abrir a janela (recalculo da R2).")
+    st[f"hwnd_{app}"] = hwnd
+    if n == 1:
+        st[f"tempo_abertura_{app}_s"] = elapsed
+    elif app == "calc":
+        st["proxima_linha"] = 1             # copia nova da R2: recomeca na linha 1 da Trigger
+    else:
+        st["paragrafos_desde_reset"] = 0    # copia nova do .odt base
+    return hwnd
 
 
-def _edge_rodando():
-    return any((p.info['name'] or "").lower() == "msedge.exe" for p in psutil.process_iter(['name']))
+def preparar_e_abrir_libreoffice(ui):
+    """Transicao: sobras do teste, fixtures ODT + R2, subperfis e abertura do Writer e do Calc."""
+    st = _lo_state
+    st["soffice_path"] = st["soffice_path"] or lo.find_libreoffice_executable()
+    if not st["soffice_path"]:
+        raise RuntimeError("LibreOffice (soffice.exe) nao encontrado na transicao.")
+    lo.kill_test_libreoffice(log=logger)
+    st["work_dir"] = tempfile.mkdtemp(prefix="wintesthub_lo_bateria_")
+    st["ativo"] = True
+    st["odt_base"], st["xlsx_base"] = lo.generate_odf_fixtures(
+        os.path.join(st["work_dir"], "base"), title=TITULO_ODT_BATERIA)
+    logger.info(f"Fixtures do LibreOffice geradas em {st['work_dir']}")
+    ui.atualizar("Transição", "Abrindo o LibreOffice Writer...")
+    _abrir_app("writer")
+    check_stop()
+    ui.atualizar("Transição", "Abrindo o LibreOffice Calc (recálculo inicial da R2)...")
+    _abrir_app("calc")
+    logger.info(f"LibreOffice pronto: Writer em {st['tempo_abertura_writer_s']:.2f}s, "
+                f"Calc em {st['tempo_abertura_calc_s']:.2f}s.")
 
 
-def abrir_edge(ui, urls):
-    """Abre o Edge sem restaurar sessao anterior (copiado de open_edge_and_verify)."""
-    ui.atualizar("Edge", "Abrindo o Edge...")
-    _edge["aberto_pelo_teste"] = True
-    subprocess.Popen(["start", "msedge"] + EDGE_FLAGS + urls, shell=True)
-    time.sleep(5)
-    if not _edge_rodando():
-        logger.error("Edge nao iniciou apos abertura. Tentando novamente...")
-        subprocess.Popen(["start", "msedge"] + EDGE_FLAGS + urls, shell=True)
-        time.sleep(5)
-        if not _edge_rodando():
-            raise RuntimeError("Nao foi possivel iniciar o Microsoft Edge.")
-    logger.info("Edge iniciado com sucesso.")
-
-
-def _get_current_tab_url():
-    """
-    Lê a URL da aba ativa do Edge via barra de enderecos.
-    Retorna a URL em minusculas ou string vazia em caso de erro.
-    """
-    try:
-        original_clipboard = ""
-        try:
-            original_clipboard = pyperclip.paste()
-        except Exception:
-            pass
-
-        pyautogui.hotkey('ctrl', 'l')
-        time.sleep(0.5)
-        pyautogui.hotkey('ctrl', 'a')
-        time.sleep(0.2)
-        pyautogui.hotkey('ctrl', 'c')
-        time.sleep(0.3)
-
-        current_url = pyperclip.paste().strip().lower()
-
-        try:
-            pyperclip.copy(original_clipboard)
-        except Exception:
-            pass
-
-        pyautogui.press('escape')
-        time.sleep(0.3)
-
-        return current_url
-
-    except Exception as e:
-        logger.debug(f"Erro ao ler URL da aba ativa: {e}")
-        return ""
-
-
-def _check_edge_welcome_screen():
-    """
-    Verifica se o Edge caiu na tela de boas-vindas / primeiro uso.
-    Retorna True se detectar tela de welcome.
-    """
-    current_url = _get_current_tab_url()
-    if not current_url:
-        return False
-
-    welcome_patterns = [
-        "edge://welcome",
-        "edge://first-run",
-        "edge://settings/profiles",
-        "edge://newtab",
-    ]
-
-    for pattern in welcome_patterns:
-        if pattern in current_url:
-            logger.warning(f"Tela de boas-vindas do Edge detectada: {current_url}")
-            return True
-
-    return False
-
-
-def _check_google_login_screen(num_tabs):
-    """
-    Verifica se alguma aba do Edge esta na tela de login do Google.
-    Percorre todas as abas abertas procurando por URLs de autenticacao Google.
-    Retorna True se detectar tela de login. (adaptado: num_tabs parametrizado)
-    """
-    google_login_patterns = [
-        "accounts.google.com/signin",
-        "accounts.google.com/servicelogin",
-        "accounts.google.com/v3/signin",
-        "accounts.google.com/accountchooser",
-        "accounts.google.com/interactivelogin",
-    ]
-
-    # Verificar a aba ativa primeiro
-    current_url = _get_current_tab_url()
-    if any(pattern in current_url for pattern in google_login_patterns):
-        logger.warning(f"Tela de login do Google detectada na aba ativa: {current_url}")
-        return True
-
-    # Percorrer as demais abas (Ctrl+Tab para avancar, verificar cada uma)
-    for i in range(1, num_tabs):
-        pyautogui.hotkey('ctrl', 'tab')
-        time.sleep(1.5)
-        tab_url = _get_current_tab_url()
-        if any(pattern in tab_url for pattern in google_login_patterns):
-            logger.warning(f"Tela de login do Google detectada na aba {i + 1}: {tab_url}")
-            return True
-
-    return False
-
-
-def _check_extra_tabs(expected_tab_count):
-    """
-    Verifica se o Edge possui mais abas abertas do que o esperado.
-    Usa Ctrl+9 (ultima aba) e Ctrl+N (ultima aba esperada) para comparar.
-    Se as URLs forem diferentes, existem abas extras.
-    Retorna True se houver abas alem das esperadas.
-    """
-    try:
-        # Ctrl+9 no Edge vai para a uLTIMA aba aberta
-        pyautogui.hotkey('ctrl', '9')
-        time.sleep(1.0)
-        url_last = _get_current_tab_url()
-
-        # Ctrl+<N> vai para a aba na posicao N (1-indexed)
-        pyautogui.hotkey('ctrl', str(expected_tab_count))
-        time.sleep(1.0)
-        url_expected_last = _get_current_tab_url()
-
-        # Se as URLs diferem, Ctrl+9 apontou para uma aba alem da esperada
-        if url_last != url_expected_last:
-            logger.warning(
-                f"Abas extras detectadas no Edge. "
-                f"ultima aba esperada (Ctrl+{expected_tab_count}): {url_expected_last} | "
-                f"ultima aba real (Ctrl+9): {url_last}"
-            )
-            return True
-
-        # Voltar para a primeira aba
-        pyautogui.hotkey('ctrl', '1')
-        time.sleep(0.5)
-
-        logger.info(f"Edge possui exatamente {expected_tab_count} aba(s). OK.")
-        return False
-
-    except Exception as e:
-        logger.debug(f"Erro ao verificar abas extras: {e}")
-        return False
-
-
-# Textos das janelas de login (os do Modulo 1, com acentuacao)
-_TEXTO_LOGIN = {
-    "boas-vindas do Edge": (
-        "Ação Necessária — Login no Edge",
-        "A tela de boas-vindas do Microsoft Edge foi detectada.\n\n"
-        "Por favor:\n"
-        "1. Faça login na sua conta Microsoft no Edge\n"
-        "2. Complete a configuração inicial do navegador\n"
-        "3. Feche todas as abas de boas-vindas\n\n"
-        "Após concluir, clique em OK para continuar o teste.",
-    ),
-    "login do Google": (
-        "Ação Necessária — Login no Google",
-        "A tela de login do Google foi detectada.\n\n"
-        "O teste utiliza Google Docs e Google Sheets, que\n"
-        "requerem uma conta Google autenticada.\n\n"
-        "Por favor:\n"
-        "1. Faça login na sua conta Google no navegador\n"
-        "2. Aguarde o redirecionamento para o serviço Google\n\n"
-        "Após concluir o login, clique em OK para continuar o teste.",
-    ),
-}
-
-
-def _pendencia_edge(num_abas):
-    """'boas-vindas do Edge', 'login do Google' ou None (Edge pronto)."""
-    if _check_edge_welcome_screen():
-        return "boas-vindas do Edge"
-    if _check_google_login_screen(num_abas):
-        return "login do Google"
-    return None
-
-
-def verificar_prontidao_edge(ui):
-    """Na tomada: Edge e conta Google prontos para a fase de escritorio.
-
-    Usa as paginas de lista do Docs/Sheets (nao cria documentos). Boas-vindas ou
-    login -> janela pedindo o login -> reabre e confere, ate TENTATIVAS_LOGIN.
-    """
-    item, esperado = "Edge e conta Google", "prontos"
-    pedidos, antes, pendencia = 0, None, None
-    try:
-        while True:
-            check_stop()
-            kill_edge(ui)
-            abrir_edge(ui, URLS_PRONTIDAO)
-            ui.atualizar("Pré-voo", "Conferindo Edge e conta Google...")
-            pendencia = _pendencia_edge(len(URLS_PRONTIDAO))
-            if antes is None:
-                antes = f"{pendencia} pendente" if pendencia else "prontos"
-            if pendencia is None or pedidos >= TENTATIVAS_LOGIN:
-                break
-            pedidos += 1
-            titulo, texto = _TEXTO_LOGIN[pendencia]
-            ui.atualizar("Pré-voo", f"⚠ AGUARDANDO {pendencia.upper()} ⚠",
-                         f"Pedido {pedidos} de {TENTATIVAS_LOGIN}")
-            logger.warning(f"Teste PAUSADO — {pendencia} detectado. Aguardando login do analista "
-                           f"(pedido {pedidos} de {TENTATIVAS_LOGIN}).")
-            mostrar_mensagem(ui, titulo, texto)
-            logger.info("Analista confirmou o login. Conferindo de novo...")
-    except RuntimeError as e:
-        kill_edge(ui)
-        registrar_item(item, esperado, "Edge não iniciou", "conferido", "Edge não iniciou", "falhou", str(e))
-        return "falhou"
-    kill_edge(ui)
-    obs = f"{pedidos} pedido(s) de login ao operador" if pedidos else ""
-    if pendencia is None:
-        registrar_item(item, esperado, antes, "conferido", "prontos", "ok", obs)
-        return "ok"
-    registrar_item(item, esperado, antes, "conferido", f"{pendencia} pendente", "falhou",
-                   f"{pendencia} continua pendente após {TENTATIVAS_LOGIN} pedidos de login; "
-                   "faça o login no Edge na tomada e execute o teste novamente")
-    return "falhou"
-
-
-def abrir_edge_para_escritorio(ui):
-    """Abre o Edge com URLS_ESCRITORIO; login pedido aqui (ja na bateria) = LoginExigido."""
-    kill_edge(ui)
-    abrir_edge(ui, URLS_ESCRITORIO)
-    pendencia = _pendencia_edge(len(URLS_ESCRITORIO))
-    if pendencia:
-        raise LoginExigido(pendencia)
-    if _check_extra_tabs(len(URLS_ESCRITORIO)):
-        logger.warning("Abas extras encontradas. Fechando Edge e reabrindo somente com as URLs do teste...")
-        kill_edge(ui)
-        abrir_edge(ui, URLS_ESCRITORIO)
-        logger.info("Edge reaberto apenas com as URLs do teste.")
-    ui.atualizar("Transição", "Estabilizando páginas do Edge...")
-    pausa(ESTABILIZAR_EDGE_S)
-
-
-def type_text_safely(text):
-    """Digita texto usando clipboard para suportar acentos."""
-    pyperclip.copy(text)
-    pyautogui.hotkey('ctrl', 'v')
+def _reiniciar_texto_writer():
+    """Anti-bloat: troca o documento inteiro por um paragrafo base e salva."""
+    pyautogui.hotkey("ctrl", "a")
     pausa(0.3)
-
-
-# Textos variados para simular digitacao realista
-TYPING_SAMPLES = [
-    "O projeto continua avancando de acordo com as expectativas iniciais.",
-    "A equipe mantem o monitoramento constante dos indicadores de qualidade.",
-    "Os resultados parciais demonstram a eficacia da estrategia adotada.",
-    "O alinhamento continuo entre as areas tem garantido o progresso fluido.",
-    "As etapas de validacao estao ocorrendo sem impedimentos criticos.",
-    "Todos os requisitos documentados permanecem sob analise rigorosa.",
-    "A comunicacao transparente tem sido fundamental para evitar gargalos.",
-    "O foco principal segue direcionado para a entrega de valor ao cliente."
-]
-
-
-def _get_safe_content_area():
-    """
-    Retorna (x_min, x_max, y_min, y_max) da zona segura de conteudo,
-    evitando barra de abas, barra de enderecos, botao '+', scrollbar e overlay.
-
-    Zonas perigosas evitadas:
-    - Topo (< 18% da tela): abas, barra de endereco, botao nova aba (+)
-    - Direita (> 82%): scrollbar, overlay no canto superior direito
-    - Base (> 88%): barra de tarefas do Windows
-    - Esquerda (< 8%): sidebar do Edge
-    """
-    screen_w, screen_h = pyautogui.size()
-    return (
-        int(screen_w * 0.08),   # x_min
-        int(screen_w * 0.82),   # x_max
-        int(screen_h * 0.18),   # y_min
-        int(screen_h * 0.88),   # y_max
-    )
-
-
-def _click_safe_content_area():
-    """Clica em ponto aleatorio dentro da zona segura de conteudo."""
-    x_min, x_max, y_min, y_max = _get_safe_content_area()
-    x = random.randint(x_min, x_max)
-    y = random.randint(y_min, y_max)
-    pyautogui.click(x, y)
-    return x, y
-
-
-def _focus_content_after_tab_switch():
-    """
-    Apos trocar de aba, garante que o foco esta na area de conteudo.
-    Espera a aba carregar, pressiona Escape (fecha popups) e clica no
-    centro seguro da tela para ativar a area de edicao.
-    """
-    pausa(random.uniform(3.0, 5.0))  # Esperar aba carregar
-
-    # Escape para fechar qualquer popup de restauracao, sugestao, etc.
-    pyautogui.press('escape')
-    pausa(random.uniform(0.3, 0.5))
-
-    x_min, x_max, y_min, y_max = _get_safe_content_area()
-    center_x = (x_min + x_max) // 2
-    center_y = (y_min + y_max) // 2
-    pyautogui.click(center_x, center_y)
-    pausa(random.uniform(0.8, 1.5))  # Esperar foco estabilizar
-
-
-def simulate_document_editing(elapsed_ratio):
-    """Simula edicao de documento Google Docs (Aba 1)."""
-    logger.debug("Simulando edicao de documento...")
-
-    # Clicar na area de edicao para garantir foco
-    _click_safe_content_area()
-    pausa(random.uniform(0.8, 1.5))
-
-    # Digitar texto variado
-    text = random.choice(TYPING_SAMPLES)
-    type_text_safely(text)
-    pausa(random.uniform(1.0, 2.5))
-    pyautogui.press('enter')
-    pausa(random.uniform(2.0, 4.0))
-
-    # Ocasionalmente selecionar e formatar texto
-    if random.random() < 0.3:
-        pyautogui.hotkey('ctrl', 'a')  # Selecionar tudo
-        pausa(random.uniform(1.0, 2.0))
-        pyautogui.hotkey('ctrl', 'b')  # Negrito
-        pausa(random.uniform(1.0, 2.0))
-        _click_safe_content_area()
-        pausa(random.uniform(1.0, 2.0))
-
-    # Simular leitura/reposicionamento do cursor na area de edicao
-    _click_safe_content_area()
-    pausa(random.uniform(1.5, 3.0))
-
-
-# ---------------------------------------------------------------------------
-# SIMULACAO ESTRUTURADA DE PLANILHA
-# ---------------------------------------------------------------------------
-# Cabecalhos fixos — escritos na primeira visita
-_SHEET_HEADERS = ["Departamento", "Receita", "Despesa", "Lucro", "Margem(%)"]
-
-# Pool de linhas de dados realistas — simulando controle financeiro mensal
-_SHEET_DATA_POOL = [
-    ["Vendas",           "45.230",  "31.400",  "13.830",  "30,6%"],
-    ["Marketing",        "12.800",  "14.200",  "-1.400",  "-10,9%"],
-    ["TI",               "8.500",   "22.750",  "-14.250", "-167,6%"],
-    ["RH",               "3.200",   "9.800",   "-6.600",  "-206,3%"],
-    ["Operacoes",        "67.100",  "52.300",  "14.800",  "22,1%"],
-    ["Financeiro",       "5.400",   "7.650",   "-2.250",  "-41,7%"],
-    ["Logistica",        "28.900",  "24.100",  "4.800",   "16,6%"],
-    ["Juridico",         "1.800",   "6.300",   "-4.500",  "-250,0%"],
-    ["Suporte",          "9.750",   "11.200",  "-1.450",  "-14,9%"],
-    ["Diretoria",        "2.100",   "15.800",  "-13.700", "-652,4%"],
-    ["Compras",          "4.600",   "8.900",   "-4.300",  "-93,5%"],
-    ["Qualidade",        "3.350",   "5.100",   "-1.750",  "-52,2%"],
-    ["Engenharia",       "15.600",  "19.400",  "-3.800",  "-24,4%"],
-    ["Atendimento",      "11.200",  "8.700",   "2.500",   "22,3%"],
-    ["P&D",              "1.900",   "18.500",  "-16.600", "-873,7%"],
-    ["Administrativo",   "2.800",   "6.200",   "-3.400",  "-121,4%"],
-    ["Comercial",        "38.400",  "27.600",  "10.800",  "28,1%"],
-    ["Producao",         "52.700",  "41.300",  "11.400",  "21,6%"],
-]
-
-# Estado global da planilha — rastreia proxima linha a ser preenchida
-_sheet_state = {
-    "next_row": 0,          # Proxima linha (0 = cabecalho ainda nao escrito)
-    "data_index": 0,        # indice no pool de dados
-    "headers_written": False,
-}
-
-
-def _ensure_grid_focus():
-    """
-    Garante que o foco esta na grade do Google Sheets (nao em menus/toolbar).
-    1. Escape fecha qualquer menu, popup ou modo de edicao de celula aberto.
-    2. Clique no centro da tela (zona segura da grade, evitando toolbar/sidebar).
-    3. Pequena pausa para o foco estabilizar.
-    """
-    pyautogui.press('escape')
-    pausa(random.uniform(0.4, 0.7))
-    pyautogui.press('escape')  # Segundo Escape para menus aninhados
-    pausa(random.uniform(0.3, 0.5))
-
-    # Clicar no centro da tela — ponto mais seguro da grade
-    screen_w, screen_h = pyautogui.size()
-    center_x = screen_w // 2
-    center_y = int(screen_h * 0.55)  # Levemente abaixo do centro (evita toolbar)
-    pyautogui.click(center_x, center_y)
-    pausa(random.uniform(0.8, 1.2))
-
-
-def _navigate_to_cell_a1():
-    """Navega para A1 no Google Sheets usando Ctrl+Home."""
-    pyautogui.hotkey('ctrl', 'Home')
-    pausa(random.uniform(0.12, 1.2))
-
-
-def _navigate_to_row(target_row):
-    """
-    Navega para a coluna A de uma linha especifica no Google Sheets.
-    Usa Ctrl+Home para ir a A1, depois setas para baixo.
-    target_row: 0=A1 (cabecalho), 1=A2 (primeira linha de dados), etc.
-    """
-    _navigate_to_cell_a1()
-
-    if target_row <= 0:
-        return
-
-    # Para poucas linhas, usar setas individuais (mais confiavel)
-    if target_row <= 30:
-        for i in range(target_row):
-            pyautogui.press('down')
-            pausa(random.uniform(0.08, 0.15))
-        pausa(random.uniform(0.3, 0.5))
-    else:
-        # Para muitas linhas, repetir setas em blocos menores com pausas
-        remaining = target_row
-        while remaining > 0:
-            batch = min(remaining, 20)
-            for _ in range(batch):
-                pyautogui.press('down')
-                pausa(random.uniform(0.05, 0.10))
-            remaining -= batch
-            pausa(random.uniform(0.2, 0.4))
-        pausa(random.uniform(0.3, 0.5))
-
-
-def _type_cell_value(value):
-    """
-    Digita um valor na celula atual do Google Sheets.
-    Usa clipboard para suporte a acentos e caracteres especiais.
-    """
-    type_text_safely(value)
+    lo.type_text_safely(f"{TITULO_ODT_BATERIA} (texto reiniciado)", sleep_fn=pausa)
+    pyautogui.press("enter")
+    pausa(0.3)
+    pyautogui.hotkey("ctrl", "s")
     pausa(random.uniform(0.5, 1.0))
+    _lo_state["paragrafos_desde_reset"] = 0
+    logger.debug(f"Writer: texto reiniciado apos {WRITER_MAX_PARAGRAFOS} paragrafos (anti-bloat).")
 
 
-def _advance_to_next_column():
-    """Avanca para a proxima coluna usando Tab."""
-    pyautogui.press('tab')
-    pausa(random.uniform(0.25, 0.50))
+def simular_writer():
+    """Turno do Writer: digita 1 paragrafo, formata as vezes, rola (leitura) e salva."""
+    st = _lo_state
+    hwnd = st["hwnd_writer"]
+    lo.focus_window(hwnd, sleep_fn=pausa, log=logger)
+    lo.click_safe_content_area()
+    pausa(random.uniform(0.4, 0.8))
+    if st["paragrafos_desde_reset"] >= WRITER_MAX_PARAGRAFOS:
+        _reiniciar_texto_writer()
+    pyautogui.hotkey("ctrl", "end")
+    pausa(0.2)
+    pyautogui.press("enter")
+    lo.type_text_safely(random.choice(lo.TYPING_SAMPLES), sleep_fn=pausa)
+    pyautogui.press("enter")
+    st["paragrafos_writer"] += 1
+    st["paragrafos_desde_reset"] += 1
+    pausa(random.uniform(0.5, 1.2))
+    if random.random() < 0.3:   # formatacao ocasional
+        pyautogui.hotkey("ctrl", "a")
+        pausa(0.3)
+        pyautogui.hotkey("ctrl", "b")
+        pausa(0.3)
+        pyautogui.hotkey("ctrl", "end")
+        pausa(0.2)
+    pyautogui.scroll(random.randint(2, 5))       # releitura do texto
+    pausa(random.uniform(1.0, 2.5))
+    pyautogui.scroll(-random.randint(2, 5))
+    pausa(random.uniform(0.5, 1.0))
+    pyautogui.hotkey("ctrl", "s")
+    pausa(random.uniform(0.5, 1.0))
+    lo.verify_window_focused(hwnd)
 
 
-def _advance_to_next_row_col_a():
+def simular_calc(forcar_recalculo):
+    """Turno do Calc: 2 linhas na aba Trigger (ciclica 1-25) e salva.
+
+    forcar_recalculo (a cada INTERVALO_RECALC_CALC_S): Ctrl+Shift+F9 reavalia as
+    100.000 formulas da R2 e espera o Calc ficar ocioso antes de salvar.
     """
-    Apos preencher a ultima coluna de uma linha, move para coluna A da proxima.
-    Usa Right para confirmar o valor, Down para descer uma linha e Home para
-    voltar a coluna A — garantindo posicao correta.
-    """
-    pyautogui.press('right')       # Confirma o valor da celula atual
-    pausa(random.uniform(0.5, 0.8))
-    pyautogui.press('down')
-    pausa(random.uniform(0.5, 0.8))
-    pyautogui.press('home')        # Volta a coluna A da linha atual
-    pausa(random.uniform(0.5, 0.8))
+    st = _lo_state
+    hwnd = st["hwnd_calc"]
+    lo.focus_window(hwnd, sleep_fn=pausa, log=logger)
+    lo.ensure_grid_focus(sleep_fn=pausa)
+    lo.navigate_to_row(st["proxima_linha"], sleep_fn=pausa)
+    for _ in range(2):
+        check_stop()
+        dados = lo.SHEET_DATA_POOL[st["indice_dados"] % len(lo.SHEET_DATA_POOL)]
+        st["indice_dados"] += 1
+        lo.write_row(dados, sleep_fn=pausa)
+        st["linhas_calc"] += 1
+        st["proxima_linha"] = (st["proxima_linha"] % lo.TRIGGER_MAX_ROW) + 1
+    if forcar_recalculo:
+        pyautogui.hotkey("ctrl", "shift", "f9")
+        pausa(0.5)
+        lo.wait_lo_idle(hwnd, timeout=lo.CALC_LAUNCH_TIMEOUT, check_stop_fn=check_stop,
+                        sleep_fn=pausa, log=logger)
+        st["recalculos_calc"] += 1
+        logger.debug(f"Calc: recalculo completo da R2 n. {st['recalculos_calc']}.")
+    lo.verify_window_focused(hwnd)
+    pyautogui.hotkey("ctrl", "s")
+    pausa(random.uniform(0.5, 1.0))
+    lo.verify_window_focused(hwnd)
 
 
-def _write_row(values):
-    """
-    Escreve uma linha completa de dados na planilha.
-    Digita cada valor e navega entre colunas.
-    Ao final, posiciona o cursor em A da proxima linha.
-    """
-    num_cols = len(values)
-    for col_idx, value in enumerate(values):
-        _type_cell_value(value)
-
-        if col_idx < num_cols - 1:
-            # Nao e a ultima coluna → avancar para a direita
-            _advance_to_next_column()
-        else:
-            # ultima coluna → confirmar e ir para col A da proxima linha
-            _advance_to_next_row_col_a()
+def recuperar_app_se_fechou(app):
+    """Writer/Calc fechou no meio da descarga: relanca so ele. True se relancou."""
+    hwnd = _lo_state.get(f"hwnd_{app}")
+    if lo.is_window_alive(hwnd):
+        return False
+    logger.warning(f"LibreOffice {app} fechou inesperadamente (HWND={hwnd}); relancando com subperfil novo.")
+    emit_alert(f"LibreOffice {app} fechou; relançado sem interromper a descarga", nivel="aviso")
+    _abrir_app(app)
+    return True
 
 
-def simulate_spreadsheet_editing(elapsed_ratio):
-
-    global _sheet_state
-    logger.debug(
-        f"Simulando planilha — linha atual: {_sheet_state['next_row']}, "
-        f"cabecalho escrito: {_sheet_state['headers_written']}"
-    )
-
-    # ── 1. Garantir foco na grade da planilha ──
-    _ensure_grid_focus()
-
-    # ── 2. Escrever cabecalho na primeira visita ──
-    if not _sheet_state["headers_written"]:
-        logger.debug("Escrevendo cabecalho da planilha...")
-
-        # Ir para A1
-        _navigate_to_cell_a1()
-
-        # Escrever cabecalho
-        _write_row(_SHEET_HEADERS)
-
-        _sheet_state["headers_written"] = True
-        _sheet_state["next_row"] = 1  # Linha 0 = cabecalho; dados comecam na 1
-
-        # Pausa — simulando "pensando no que preencher"
-        pausa(random.uniform(1.5, 3.0))
-
-        # Cursor ja esta em A2 apos _write_row, pronto para dados
-        logger.debug("Cabecalho escrito. Cursor posicionado em A2.")
-    else:
-        # ── 3. Navegar ate a proxima linha vazia ──
-        logger.debug(f"Navegando para linha {_sheet_state['next_row']} (A{_sheet_state['next_row'] + 1})...")
-        _navigate_to_row(_sheet_state["next_row"])
-
-    # ── 4. Preencher 3 linhas de dados ──
-    rows_filled = 0
-    for row in range(3):
-        # Pegar proximo registro do pool (circular)
-        data_idx = _sheet_state["data_index"] % len(_SHEET_DATA_POOL)
-        row_data = _SHEET_DATA_POOL[data_idx]
-        _sheet_state["data_index"] += 1
-
-        current_row_num = _sheet_state['next_row'] + row
-        logger.debug(
-            f"  Preenchendo linha {current_row_num} "
-            f"(A{current_row_num + 1}): {row_data[0]}"
-        )
-
-        _write_row(row_data)
-        rows_filled += 1
-
-        # Pausa entre linhas — simulando consulta de dados
-        if row < 2:
-            pausa(random.uniform(1.5, 3.5))
-
-    _sheet_state["next_row"] += rows_filled
-    logger.info(
-        f"Planilha: {rows_filled} linhas preenchidas "
-        f"(total de linhas de dados: {_sheet_state['next_row'] - 1}, "
-        f"proxima linha: A{_sheet_state['next_row'] + 1})"
-    )
-
-
-def simulate_pdf_reading(elapsed_ratio):
-    """Simula leitura de PDF (Aba 3)."""
-    logger.debug("Simulando leitura de PDF...")
-
-    # Garantir foco na area do PDF antes de scrollar
-    _click_safe_content_area()
-    pausa(random.uniform(1.0, 2.0))
-
-    # Scroll variado simulando leitura
-    for _ in range(random.randint(1, 3)):
-        action = random.choice(['pagedown', 'scroll_down', 'scroll_up'])
-        if action == 'pagedown':
-            pyautogui.press('pagedown')
-        elif action == 'scroll_down':
-            pyautogui.scroll(-random.randint(2, 5))
-        else:
-            pyautogui.scroll(random.randint(1, 3))
-        pausa(random.uniform(3.0, 6.0))
-
-
-# Mapa de acoes por aba (indice da aba → funcao de simulacao)
-TAB_ACTIONS = [
-    simulate_document_editing,
-    simulate_spreadsheet_editing,
-    simulate_pdf_reading,
-]
-
-
-def executar_fase_escritorio(duracao_s):
-    """Laco continuo de TAB_ACTIONS ate a duracao (o ciclo do Modulo 1, sem cooldown).
-
-    A fase para no prazo, mesmo no meio de uma acao (PrazoDaFase pelo check_stop
-    das pausas). Erro pontual = aviso no log e segue; Ctrl+Q ou encerramento da
-    medicao levantam KeyboardInterrupt (check_stop); fail-safe do pyautogui = parada segura.
-    """
-    global _sheet_state
-    _sheet_state = {"next_row": 0, "data_index": 0, "headers_written": False}
-    nomes = {0: "documento", 1: "planilha", 2: "PDF"}
-    contagem = {nome: 0 for nome in nomes.values()}
-    inicio = time.monotonic()
-    current_tab = 0  # Rastrear aba atual (0=Doc, 1=Sheets, 2=PDF)
-    _prazo_fase["fim"] = inicio + duracao_s
+def fechar_libreoffice_teste():
+    """Fecha so o LibreOffice do teste e remove a pasta temporaria (idempotente)."""
+    st = _lo_state
     try:
-        pyautogui.hotkey('ctrl', '1')  # garante a primeira aba como atual
-        pausa(1)
+        lo.kill_test_libreoffice(st["roots"], log=logger)
+    except Exception as e:
+        logger.warning(f"Falha ao encerrar o LibreOffice do teste: {type(e).__name__}: {e}")
+    if st["work_dir"]:
+        shutil.rmtree(st["work_dir"], ignore_errors=True)
+        st["work_dir"] = None
+    st["ativo"] = False
+
+
+def encerrar_wpr_primeira_hora(ui):
+    """Marca 60 min de fase ativa: amostra-marco, salva o trace e segue sem WPR."""
+    amostra_marco("fim_wpr_escritorio")
+    ui.atualizar(NOMES_FASE["escritorio"], "Salvando o trace WPR da 1ª hora...",
+                 f"A descarga continua até {PROTECAO_BATERIA_PCT}%")
+    parar_wpr_ativo("Escritorio")
+    _wpr["escritorio_1h_salvo"] = True
+    logger.info("Trace WPR da 1a hora da fase ativa salvo; a descarga real continua sem WPR ate "
+                f"{PROTECAO_BATERIA_PCT}%.")
+    emit_progress(NOMES_FASE["escritorio"],
+                  detalhe=f"Trace WPR da 1ª hora salvo; descarga real continua sem WPR até {PROTECAO_BATERIA_PCT}%",
+                  aviso="NÃO USE A MÁQUINA — teste de bateria em andamento")
+
+
+def executar_fase_escritorio(ui):
+    """Laco Writer/Calc sem teto de tempo: so sai por KeyboardInterrupt (check_stop),
+    quando a vigia registra o encerramento (protecao 10%, carregador, hibernacao)
+    ou o operador pede parada segura. WPR so na 1a hora (DURACAO_WPR_ESCRITORIO_S)."""
+    inicio = time.monotonic()
+    ultimo_recalculo = inicio   # o Calc acabou de recalcular a R2 ao abrir
+    turno, falhas_seguidas = 0, 0
+    try:
         while True:
             check_stop()
-            elapsed = time.monotonic() - inicio
-            if elapsed >= duracao_s:
-                break
-            elapsed_ratio = elapsed / duracao_s
+            if not _wpr["escritorio_1h_salvo"] and time.monotonic() - inicio >= DURACAO_WPR_ESCRITORIO_S:
+                encerrar_wpr_primeira_hora(ui)
+                check_stop()
+            app = "writer" if turno % 2 == 0 else "calc"
             try:
-                # Executar acao especifica da aba atual
-                TAB_ACTIONS[current_tab](elapsed_ratio)
-                contagem[nomes[current_tab]] += 1
-                logger.debug(f"Acao concluida na aba {nomes[current_tab]}.")
-
-                # Pausa realista entre acoes (interrompivel)
-                pausa(random.uniform(4.0, 10.0))
-
-                # Alternar para proxima aba (Ctrl+Tab)
-                pyautogui.hotkey('ctrl', 'tab')
-                current_tab = (current_tab + 1) % len(TAB_ACTIONS)
-
-                # Aguardar carregamento da aba e clicar na area de conteudo
-                _focus_content_after_tab_switch()
-
-            except pyautogui.FailSafeException:
-                logger.warning("PyAutoGUI fail-safe ativado (mouse no canto).")
-                raise KeyboardInterrupt("Fail-safe do PyAutoGUI.")
+                if app == "writer":
+                    simular_writer()
+                else:
+                    forcar = time.monotonic() - ultimo_recalculo >= INTERVALO_RECALC_CALC_S
+                    simular_calc(forcar)
+                    if forcar:
+                        ultimo_recalculo = time.monotonic()
+                falhas_seguidas = 0
             except KeyboardInterrupt:
                 raise
             except Exception as e:
-                logger.warning(f"Erro durante automacao (continuando): {type(e).__name__}: {e}")
+                failsafe = getattr(pyautogui, "FailSafeException", ())
+                if failsafe and isinstance(e, failsafe):
+                    logger.warning("PyAutoGUI fail-safe ativado (mouse no canto).")
+                    raise KeyboardInterrupt("Fail-safe do PyAutoGUI.")
+                falhas_seguidas += 1
+                logger.warning(f"Erro na automacao do {app} (continuando, {falhas_seguidas} seguido(s)): "
+                               f"{type(e).__name__}: {e}")
+                if falhas_seguidas >= MAX_FALHAS_SEGUIDAS_LO:
+                    raise RuntimeError(f"{falhas_seguidas} falhas seguidas na automacao do LibreOffice") from e
+                try:
+                    pyautogui.press("escape")
+                except Exception:
+                    pass
+                try:
+                    recuperar_app_se_fechou(app)
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e2:
+                    logger.warning(f"Falha ao tentar recuperar LibreOffice {app}: {type(e2).__name__}: {e2}")
                 pausa(2)
-    except PrazoDaFase:
-        logger.debug("Prazo da fase de escritorio atingido.")
+            turno += 1
+            pausa(random.uniform(4.0, 10.0))   # pausa realista entre turnos
     finally:
-        _prazo_fase["fim"] = None
-        logger.info(f"Simulacao de escritorio: acoes por aba = {contagem} "
-                    f"em {time.monotonic() - inicio:.0f}s")
+        c = contadores_lo()
+        logger.info(f"Simulacao LibreOffice: {c['paragrafos_writer']} paragrafos, {c['linhas_calc']} linhas, "
+                    f"{c['recalculos_calc']} recalculo(s) da R2 em {time.monotonic() - inicio:.0f}s")
 
 
 # =============================================================================
@@ -2356,16 +1990,12 @@ def executar_preflight(ui):
         return False
     check_stop()
 
-    # Conferidos antes de qualquer ajuste: rede e monitor externo e, depois,
-    # a prontidao do Edge e da conta Google (login resolvido ainda na tomada).
+    # Conferidos antes de qualquer ajuste: rede (com internet: radio Wi-Fi ativo e
+    # telemetria real dos agentes de SI) e monitor externo.
     ui.atualizar("Pré-voo", "Conferindo rede e monitor externo...")
     emit_progress("Pré-voo de padronização", detalhe="Rede, monitor externo, energia, brilho e Bluetooth")
     conferir_rede()
     conferir_monitor()
-    falhas = itens_com_falha()
-    if falhas:
-        return _falha_preflight(ui, falhas)
-    verificar_prontidao_edge(ui)
     falhas = itens_com_falha()
     if falhas:
         return _falha_preflight(ui, falhas)
@@ -2385,7 +2015,7 @@ def executar_preflight(ui):
 # =============================================================================
 # MEDICAO — ESTADO COMPARTILHADO
 # =============================================================================
-MOTIVOS_PASS = ("concluido", "protecao_bateria")
+MOTIVOS_PASS = ("protecao_bateria",)
 _medicao = {
     "iniciada": False,       # carregador desconectado: a medicao comecou
     "motivo": None,          # primeiro motivo de encerramento registrado
@@ -2402,10 +2032,11 @@ def registrar_encerramento(motivo, detalhe=""):
         if primeiro:
             _medicao["motivo"] = motivo
     if primeiro:
-        nivel = logging.INFO if motivo == "concluido" else logging.WARNING
+        normal = motivo in MOTIVOS_PASS
+        nivel = logging.INFO if normal else logging.WARNING
         logger.log(nivel, f"Encerramento da medicao: {motivo}" + (f" — {sem_acento(detalhe)}" if detalhe else ""))
-        if motivo != "concluido":
-            emit_alert(f"Medição encerrada: {motivo}" + (f" ({detalhe})" if detalhe else ""))
+        emit_alert(f"Medição encerrada: {motivo}" + (f" ({detalhe})" if detalhe else ""),
+                   nivel="info" if normal else "warn")
     _encerrar.set()
 
 
@@ -2420,9 +2051,7 @@ def motivo_encerramento():
 ES_CONTINUOUS = 0x80000000
 ES_SYSTEM_REQUIRED = 0x00000001
 ES_DISPLAY_REQUIRED = 0x00000002
-_kernel32 = ctypes.WinDLL("kernel32")
-_kernel32.SetThreadExecutionState.argtypes = [wintypes.DWORD]
-_kernel32.SetThreadExecutionState.restype = wintypes.DWORD
+_kernel32 = _DllSobDemanda("kernel32")
 
 CHECKLIST_FISICO = [
     "Periféricos desconectados (mouse, teclado, pendrive, fone)",
@@ -2435,7 +2064,10 @@ def manter_tela_ligada(ligar):
     """SetThreadExecutionState na thread chamadora (a worker): tela ligada e sem
     suspensao/bloqueio por inatividade, sem simular entrada do usuario."""
     flags = ES_CONTINUOUS | ((ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED) if ligar else 0)
-    if _kernel32.SetThreadExecutionState(flags) == 0:
+    funcao = _kernel32.SetThreadExecutionState
+    funcao.argtypes = [_DWORD]
+    funcao.restype = _DWORD
+    if funcao(flags) == 0:
         logger.warning("SetThreadExecutionState falhou.")
     else:
         logger.info("Tela mantida ligada (SetThreadExecutionState)." if ligar
@@ -2609,12 +2241,12 @@ def conferir_na_bateria(coletor):
     # Modo de energia efetivo
     item = "Modo de energia efetivo"
     modo = modo_efetivo()
-    if modo == MODO_MELHOR_DESEMPENHO:
-        registrar_item(item, "Melhor desempenho", nome_modo(modo), "conferido", nome_modo(modo), "ok")
+    if modo == MODO_ENERGIA_ALVO:
+        registrar_item(item, NOME_MODO_ALVO, nome_modo(modo), "conferido", nome_modo(modo), "ok")
     elif not api_modo_dc_disponivel():
         erro = ""
         try:
-            definir_overlay_ativo(MODO_MELHOR_DESEMPENHO)
+            definir_overlay_ativo(MODO_ENERGIA_ALVO)
         except (OSError, AttributeError) as e:
             erro = f"ajuste falhou: {e}"
         finally:
@@ -2622,18 +2254,18 @@ def conferir_na_bateria(coletor):
             registrar_restauracao(f"Modo de energia na bateria -> {nome_modo(modo)}",
                                   lambda: _voltar_overlay_bateria(modo), na_bateria=True)
         depois = modo_efetivo()
-        situacao = "ajustado" if not erro and depois == MODO_MELHOR_DESEMPENHO else "falhou"
+        situacao = "ajustado" if not erro and depois == MODO_ENERGIA_ALVO else "falhou"
         ok &= situacao == "ajustado"
         if erro:
             obs = erro
         elif situacao == "falhou":
-            obs = "o Windows não aplicou o modo Melhor desempenho na bateria"
+            obs = f"o Windows não aplicou o modo {NOME_MODO_ALVO} na bateria"
         else:
             obs = "aplicado já na bateria (API do modo na bateria ausente)"
-        registrar_item(item, "Melhor desempenho", nome_modo(modo), "ajustado", nome_modo(depois), situacao, obs)
+        registrar_item(item, NOME_MODO_ALVO, nome_modo(modo), "ajustado", nome_modo(depois), situacao, obs)
     else:
         ok = False
-        registrar_item(item, "Melhor desempenho", nome_modo(modo), "conferido", nome_modo(modo), "falhou",
+        registrar_item(item, NOME_MODO_ALVO, nome_modo(modo), "conferido", nome_modo(modo), "falhou",
                        "o Windows não aplicou o modo configurado para a bateria")
 
     # Economia de energia efetiva
@@ -2652,7 +2284,7 @@ def _voltar_overlay_bateria(modo_anterior):
     if status_energia()["fonte"] == "bateria":
         definir_overlay_ativo(modo_anterior)
     else:
-        logger.warning(f"Modo de energia na bateria ficou em Melhor desempenho; o anterior era "
+        logger.warning(f"Modo de energia na bateria ficou em {sem_acento(NOME_MODO_ALVO)}; o anterior era "
                        f"{sem_acento(nome_modo(modo_anterior))} (restaure manualmente na bateria).")
 
 
@@ -2691,18 +2323,23 @@ COLUNAS_TOP = ["Data_Hora", "Fase", "Posicao", "Processo", "PID", "CPU_Pct", "Me
 FASES_MEDIDAS = ("ociosa", "escritorio")
 NOMES_FASE = {
     "estabilizacao": "Estabilização", "ociosa": "Fase ociosa", "transicao": "Transição",
-    "escritorio": "Fase de escritório", "encerramento": "Encerramento",
+    "escritorio": "Fase de escritório (descarga real)", "encerramento": "Encerramento",
 }
-DURACAO_FASE = {"estabilizacao": ESTABILIZACAO_S, "ociosa": DURACAO_OCIOSA_S,
-                "escritorio": DURACAO_ESCRITORIO_S}
+# Fases de duracao fixa; a fase ativa (escritorio) vai ate PROTECAO_BATERIA_PCT, sem teto
+DURACAO_FASE = {"estabilizacao": ESTABILIZACAO_S, "ociosa": DURACAO_OCIOSA_S}
 ESPACO_MINIMO_TRACES_B = 5 * 1024 ** 3
+ARQ_CHECKPOINT = "bateria_checkpoint.json"
+# tipo da amostra-marco -> chave em _marcos[fase]
+CHAVE_MARCO = {"inicio_fase": "inicio", "fim_fase": "fim", "fim_wpr_escritorio": "fim_wpr"}
 
 _fase = {"nome": None, "inicio": None}
-_marcos = {}            # fase -> {"inicio": amostra, "fim": amostra, "completa": bool}
+_marcos = {}            # fase -> {"inicio"/"fim"/"fim_wpr": amostra, "completa": bool}
 _amostras_medidas = []  # (fase, brilho, modo) das amostras das fases medidas
 _desvios = {"total": 0, "avisados": set()}
 _amostra_final = {"valor": None}
 _csv_lock = threading.Lock()
+_checkpoint_lock = threading.Lock()
+_monitor = {"obj": None}
 
 
 def definir_fase(nome):
@@ -2733,7 +2370,7 @@ def _anexar_csv(arquivo, colunas, linhas):
             f.flush()
 
 
-def coletar_amostra(tipo="periodica"):
+def coletar_amostra(tipo="periodica", salvar_checkpoint=True):
     """Grava uma linha em bateria_amostras.csv e devolve a amostra (marcos e metricas)."""
     st = status_energia()
     coletor = _coletor["obj"]
@@ -2753,7 +2390,7 @@ def coletar_amostra(tipo="periodica"):
         tipos = []
         if brilho is not None and brilho != BRILHO_PADRAO_PCT:
             tipos.append(f"brilho {brilho}%")
-        if modo != MODO_MELHOR_DESEMPENHO:
+        if modo != MODO_ENERGIA_ALVO:
             tipos.append(f"modo {sem_acento(nome_modo(modo))}")
         if st["economia_ligada"]:
             tipos.append("Economia de energia ligada")
@@ -2789,15 +2426,81 @@ def coletar_amostra(tipo="periodica"):
         logger.error(f"Falha ao gravar {ARQ_AMOSTRAS}: {e}")
     logger.debug(f"Amostra {fase}/{tipo}: {carga}% {amostra['energia_mwh']} mWh "
                  f"{amostra['taxa_descarga_mw']} mW brilho={brilho} fonte={amostra['fonte']}")
+    if salvar_checkpoint:
+        gravar_checkpoint(amostra)
     return amostra
 
 
 def amostra_marco(tipo):
-    """Marco no limite exato da fase (inicio_fase / fim_fase), guardado para as metricas."""
-    amostra = coletar_amostra(tipo)
+    """Marco de fase (inicio_fase / fim_fase / fim_wpr_escritorio), guardado para as metricas."""
+    amostra = coletar_amostra(tipo, salvar_checkpoint=False)
     marco = _marcos.setdefault(amostra["fase"], {})
-    marco["inicio" if tipo == "inicio_fase" else "fim"] = amostra
+    marco[CHAVE_MARCO[tipo]] = amostra
+    gravar_checkpoint(amostra)
     return amostra
+
+
+_CAMPOS_CHECKPOINT = ("data_hora", "fase", "tipo", "decorrido_s", "carga_pct", "energia_mwh",
+                      "taxa_descarga_mw", "tensao_mv", "fonte", "brilho_pct", "modo", "desvio")
+
+
+def _resumo_amostra(amostra):
+    if not isinstance(amostra, dict):
+        return amostra
+    return {campo: amostra.get(campo) for campo in _CAMPOS_CHECKPOINT}
+
+
+def montar_checkpoint(amostra=None):
+    """Estado serializavel da medicao (bateria_checkpoint.json)."""
+    with _medicao_lock:
+        fase = _fase["nome"]
+        desvios = _desvios["total"]
+        motivo = _medicao["motivo"]
+    marcos = {}
+    for nome, marco in list(_marcos.items()):
+        marcos[nome] = {chave: _resumo_amostra(valor) for chave, valor in list(marco.items())}
+    return {
+        "versao": VERSAO_TESTE,
+        "gravado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "fase": fase,
+        "motivo": motivo,
+        "ultima_amostra": _resumo_amostra(amostra),
+        "marcos": marcos,
+        "contadores_lo": contadores_lo(),
+        "wpr_escritorio_1h_salvo": bool(_wpr.get("escritorio_1h_salvo")),
+        "desvios": desvios,
+    }
+
+
+def gravar_checkpoint(amostra=None, caminho=None):
+    """Grava bateria_checkpoint.json atomicamente (*.tmp + os.replace).
+
+    Preserva o estado ate o ultimo minuto se a bateria apagar antes de 10%.
+    Falha = aviso no log (nunca derruba a medicao). Retorna True se gravou.
+    """
+    caminho = caminho or os.path.join(OUTPUT_PATH, ARQ_CHECKPOINT)
+    temporario = caminho + ".tmp"
+    try:
+        dados = montar_checkpoint(amostra)
+        with _checkpoint_lock:
+            with open(temporario, "w", encoding="utf-8") as f:
+                json.dump(dados, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temporario, caminho)
+        return True
+    except (OSError, TypeError, ValueError, RuntimeError) as e:
+        logger.warning(f"Falha ao gravar {ARQ_CHECKPOINT}: {type(e).__name__}: {e}")
+        return False
+
+
+def detectar_salto_hibernacao(prev_wall, prev_mono, now_wall, now_mono, limiar_s=LIMIAR_SALTO_HIBERNACAO_S):
+    """True se, entre dois tiques da vigia (~INTERVALO_VIGIA_S), o relogio de parede
+    andou mais que limiar_s, ou divergiu do monotonico em mais que limiar_s:
+    a maquina suspendeu/hibernou no meio da medicao (funcao pura)."""
+    decorrido_parede = now_wall - prev_wall
+    decorrido_mono = now_mono - prev_mono
+    return decorrido_parede > limiar_s or (decorrido_parede - decorrido_mono) > limiar_s
 
 
 def _preparar_top_processos():
@@ -2850,8 +2553,14 @@ class MonitorMedicao(threading.Thread):
         proxima_amostra = inicio
         proximo_top = inicio + INTERVALO_TOP_PROCESSOS_S
         bloqueio_visto = False
+        prev_wall, prev_mono = time.time(), time.monotonic()
         while not self._parar.is_set():
             try:
+                now_wall, now_mono = time.time(), time.monotonic()
+                if detectar_salto_hibernacao(prev_wall, prev_mono, now_wall, now_mono):
+                    registrar_encerramento("hibernacao_inesperada",
+                                           f"salto de {now_wall - prev_wall:.0f}s no relogio entre dois tiques da vigia")
+                prev_wall, prev_mono = now_wall, now_mono
                 self._vigiar()
                 agora = time.monotonic()
                 if agora >= proxima_amostra:
@@ -2882,17 +2591,37 @@ class MonitorMedicao(threading.Thread):
 
     def _atualizar_overlay(self, amostra):
         fase = amostra["fase"]
+        carga = "?" if amostra["carga_pct"] is None else amostra["carga_pct"]
+        if fase == "escritorio":
+            self.ui.atualizar(NOMES_FASE[fase],
+                              f"Carga: {carga}% (alvo {PROTECAO_BATERIA_PCT}%) — não use a máquina",
+                              f"Decorrido: {texto_decorrido(amostra['decorrido_s'])} · WPR: {estado_wpr_ativa()}")
+            self._emitir_progresso(fase, amostra, carga)
+            return
         detalhe = ""
         if fase in DURACAO_FASE and amostra["decorrido_s"] is not None:
             restante = max(0, DURACAO_FASE[fase] - amostra["decorrido_s"])
             detalhe = f"Restam ~{(restante + 59) // 60} min"
-        carga = "?" if amostra["carga_pct"] is None else amostra["carga_pct"]
         self.ui.atualizar(NOMES_FASE.get(fase, fase), f"Carga da bateria: {carga}% — não use a máquina", detalhe)
         self._emitir_progresso(fase, amostra, carga)
 
     def _emitir_progresso(self, fase, amostra, carga):
-        """[HUB:PROGRESS] no maximo 1x por minuto, so nas amostras ja feitas (sem timer extra)."""
-        if fase not in DURACAO_FASE or amostra["decorrido_s"] is None:
+        """[HUB:PROGRESS] no maximo 1x por minuto, so nas amostras ja feitas (sem timer extra).
+
+        Fase ativa: sem duracao fixa (atual/total = None), mostra decorrido e WPR."""
+        if amostra["decorrido_s"] is None:
+            return
+        if fase == "escritorio":
+            minuto = int(amostra["decorrido_s"]) // 60
+            if getattr(self, "_ultimo_progresso", None) == (fase, minuto):
+                return
+            self._ultimo_progresso = (fase, minuto)
+            emit_progress(NOMES_FASE[fase], None, None,
+                          f"Decorrido {texto_decorrido(amostra['decorrido_s'])} · carga {carga}% "
+                          f"(alvo {PROTECAO_BATERIA_PCT}%) · WPR {estado_wpr_ativa()}",
+                          aviso="NÃO USE A MÁQUINA — teste de bateria em andamento")
+            return
+        if fase not in DURACAO_FASE:
             return
         total_min = max(1, (DURACAO_FASE[fase] + 59) // 60)
         minuto = min(total_min, int(amostra["decorrido_s"]) // 60 + 1)
@@ -2906,13 +2635,29 @@ class MonitorMedicao(threading.Thread):
 
     def parar(self):
         self._parar.set()
-        self.join(timeout=2 * TIMEOUT_COLETOR_S + 10)
+        if self.is_alive():
+            self.join(timeout=2 * TIMEOUT_COLETOR_S + 10)
+
+
+def texto_decorrido(segundos):
+    """3725 -> '1h 02min'."""
+    if segundos is None:
+        return "?"
+    minutos = int(segundos) // 60
+    return f"{minutos // 60}h {minutos % 60:02d}min"
+
+
+def estado_wpr_ativa():
+    if _wpr.get("escritorio_1h_salvo"):
+        return "salvo (1ª hora)"
+    return "ativo" if _wpr.get("ativo") else "inativo"
 
 
 # =============================================================================
 # MEDICAO — CAPTURA WPR POR FASE
 # =============================================================================
-_wpr = {"ativo": False, "fase": None, "traces": {}}   # traces: "Ociosa"/"Escritorio" -> caminho .etl
+# traces: "Ociosa"/"Escritorio" -> caminho .etl; escritorio_1h_salvo: trace da 1a hora ativa salvo
+_wpr = {"ativo": False, "fase": None, "traces": {}, "escritorio_1h_salvo": False}
 _TIMEOUT_WPR_STOP_S = 30 * 60   # stop/merge de um trace de 60 min leva minutos
 
 
@@ -2991,6 +2736,7 @@ def executar_medicao(ui):
     Os marcos de cada fase ficam em _marcos (inclusive em encerramento antecipado).
     """
     monitor = MonitorMedicao(ui)
+    _monitor["obj"] = monitor
     definir_fase("estabilizacao")
     monitor.start()
     try:
@@ -3016,84 +2762,132 @@ def executar_medicao(ui):
         if interrompida:
             return
 
-        # Transicao (fora das metricas)
+        # Transicao (fora das metricas de fase): fixtures + abertura do Writer e do Calc
         if sessao_bloqueada():
             registrar_encerramento("sessao_bloqueada",
                                    "sessao bloqueada no inicio da fase de escritorio")
             return
         try:
-            abrir_edge_para_escritorio(ui)
-        except LoginExigido as e:
-            registrar_encerramento("login_exigido", f"{e} ao abrir o Edge ja na bateria")
-            return
+            emit_progress(NOMES_FASE["transicao"], detalhe="Gerando ODT/R2 e abrindo LibreOffice Writer e Calc",
+                          aviso="NÃO USE A MÁQUINA — teste de bateria em andamento")
+            preparar_e_abrir_libreoffice(ui)
         except KeyboardInterrupt:
             _motivo_interrupcao()
             return
 
-        # Fase de escritorio: simulacao continua do Modulo 1 (Edge cobre o terminal -> mostra overlay)
+        # Fase ativa ate PROTECAO_BATERIA_PCT (o LibreOffice cobre o terminal -> mostra overlay)
         if is_live_monitor_active():
             ui.mostrar()
         wpr_iniciar("Escritorio")
         definir_fase("escritorio")
         amostra_marco("inicio_fase")
         try:
-            executar_fase_escritorio(DURACAO_ESCRITORIO_S)
-            # A medicao terminou no prazo: religar o carregador ou Ctrl+Q durante o
-            # stop do trace nao invalida mais a coleta (o primeiro motivo vence).
-            registrar_encerramento("concluido")
+            executar_fase_escritorio(ui)
         except KeyboardInterrupt:
             _motivo_interrupcao()
         finally:
             if is_live_monitor_active():
                 ui.ocultar()
             amostra_marco("fim_fase")
-            _marcos["escritorio"]["completa"] = motivo_encerramento() == "concluido"
+            _marcos["escritorio"]["completa"] = motivo_encerramento() in MOTIVOS_PASS
             definir_fase("encerramento")
-            parar_wpr_ativo("Escritorio")
     finally:
-        # Encerramento (normal ou antecipado): trace ativo, monitor, amostra final,
-        # voltas que exigem a bateria (antes do aviso de reconexao), Edge
-        if _wpr["ativo"]:
-            parar_wpr_ativo(_wpr["fase"] or "Parcial")
+        encerrar_fase_medida()
+
+
+def encerrar_fase_medida():
+    """Passos 1-2 do encerramento rapido (idempotente): para monitor, coleta amostra
+    final e fecha o LibreOffice ANTES do wpr -stop (libera RAM/CPU para o merge e
+    preserva a carga final real da bateria)."""
+    monitor = _monitor["obj"]
+    if monitor is not None:
         monitor.parar()
-        if _fase["nome"] != "encerramento":
-            definir_fase("encerramento")
+        _monitor["obj"] = None
+    if _fase["nome"] != "encerramento":
+        definir_fase("encerramento")
+    if _amostra_final["valor"] is None:
         try:
             _amostra_final["valor"] = coletar_amostra("periodica")
         except Exception as e:
             logger.warning(f"Amostra final falhou: {e}")
-        restaurar_na_bateria()
-        if _edge["aberto_pelo_teste"]:
-            kill_edge(ui)
+    if _lo_state["ativo"] or _lo_state["work_dir"]:
+        fechar_libreoffice_teste()
+    try:
+        if _wpr["ativo"]:
+            parar_wpr_ativo(_wpr["fase"] or "Parcial")
+    except Exception as e:
+        logger.warning(f"Captura WPR: {type(e).__name__}: {e}")
 
 
 # =============================================================================
 # POS-MEDICAO — EVIDENCIAS COMPLEMENTARES (falha = aviso; nao muda o resultado)
 # =============================================================================
-def mostrar_aviso(ui, titulo, texto):
-    """Janela com OK que nao bloqueia a worker."""
+def aguardar_reconexao_para_pos_medicao(ui, codigo_resultado):
+    """Depois do bateria.csv e da restauracao: espera o carregador para a pos-medicao pesada.
+
+    Retorna 'tomada' (carregador reconectado, sondado a cada 2 s), 'bateria'
+    (botao Continuar na bateria) ou 'pular' (parada segura/Ctrl+Q, botao Pular,
+    janela fechada). Ja na tomada (sem parada segura), retorna 'tomada' sem abrir a janela.
+    """
+    if _stop_requested.is_set() or motivo_encerramento() == "parada_segura":
+        logger.info("Parada segura ativa: pulando janela de reconexao e pos-medicao pesada.")
+        return "pular"
+    if status_energia()["fonte"] == "tomada":
+        logger.info("Carregador ja conectado: pos-medicao pesada sem aguardar.")
+        return "tomada"
+    resultado_txt = "PASS (coleta válida)" if codigo_resultado == 0 else "FAIL (coleta inválida)"
+
     def construir(root, concluir):
-        janela = _nova_janela(root, titulo)
-        tk.Label(janela, text=texto, font=FONTE_JANELA, justify="left", wraplength=520).pack(anchor="w")
-        tk.Button(janela, text="OK", font=FONTE_JANELA_NEGRITO, width=14,
-                  command=lambda: concluir("ok")).pack(pady=(16, 0))
-        janela.protocol("WM_DELETE_WINDOW", lambda: concluir("ok"))
+        janela = _nova_janela(root, "Teste de bateria — medição encerrada")
+        estado = {"fim": False, "tiques": 0}
+
+        def finalizar(escolha):
+            estado["fim"] = True
+            concluir(escolha)
+
+        tk.Label(janela, text=f"Medição encerrada: {resultado_txt}", font=FONTE_JANELA_NEGRITO).pack(anchor="w")
+        tk.Label(janela, justify="left", font=FONTE_JANELA, wraplength=560, text=(
+            "O bateria.csv já foi gravado e todas as configurações da máquina já foram restauradas.\n\n"
+            "Reconecte o carregador: a conversão dos traces (wpaexporter), o relatório SRUM e o "
+            "relatório de energia (60 s) começam sozinhos assim que a tomada for detectada."
+        )).pack(anchor="w", pady=(4, 10))
+        lbl = tk.Label(janela, text="Carregador: desconectado — aguardando...", font=FONTE_JANELA_NEGRITO,
+                       fg="#b35900")
+        lbl.pack(anchor="w", pady=(0, 10))
+        botoes = tk.Frame(janela)
+        botoes.pack(fill="x", pady=(6, 0))
+        tk.Button(botoes, text="Continuar na bateria", font=FONTE_JANELA, width=20,
+                  command=lambda: finalizar("bateria")).pack(side="left")
+        tk.Button(botoes, text="Pular exportação e finalizar", font=FONTE_JANELA, width=26,
+                  command=lambda: finalizar("pular")).pack(side="right")
+        janela.protocol("WM_DELETE_WINDOW", lambda: finalizar("pular"))
+
+        def tique():
+            if estado["fim"]:
+                return
+            if estado["tiques"] % INTERVALO_SONDA_RECONEXAO_S == 0 and status_energia()["fonte"] == "tomada":
+                lbl.config(text="Carregador: CONECTADO ✓", fg="#1a7f37")
+                finalizar("tomada")
+                return
+            estado["tiques"] += 1
+            janela.after(1000, tique)
+
         _centralizar(janela)
+        tique()
         return janela
 
-    ui.pedir_janela(construir, esperar=False)
-
-
-def avisar_reconexao(ui):
-    logger.info("Medicao encerrada: o carregador ja pode ser reconectado.")
-    ui.atualizar("Medição encerrada", "O carregador já pode ser reconectado.",
-                 "Exportando evidências...")
-    mostrar_aviso(
-        ui, "Teste de bateria — medição encerrada",
-        "A medição terminou: o carregador já pode ser reconectado.\n\n"
-        "O teste ainda vai converter os traces e gerar os relatórios complementares, "
-        "o que pode levar alguns minutos. Não é preciso acompanhar.",
-    )
+    ui.atualizar("Medição encerrada", f"{resultado_txt}. Configurações restauradas.",
+                 "Reconecte o carregador para exportar")
+    emit_progress("Aguardando o carregador", detalhe="bateria.csv gravado e máquina restaurada; "
+                  "reconecte o carregador para wpaexporter/SRUM/energia")
+    logger.info("Aguardando a reconexao do carregador para a pos-medicao pesada.")
+    try:
+        escolha = ui.pedir_janela(construir)
+    except KeyboardInterrupt:
+        escolha = "pular"
+    escolha = escolha if escolha in ("tomada", "bateria", "pular") else "pular"
+    logger.info(f"Janela de reconexao: {escolha}")
+    return escolha
 
 
 def exportar_traces(ui):
@@ -3110,7 +2904,7 @@ def exportar_traces(ui):
         pasta = os.path.join(OUTPUT_PATH, f"CSV_{nome_fase}_{SESSION_TIMESTAMP}")
         os.makedirs(pasta, exist_ok=True)
         ui.atualizar("Medição encerrada", f"Convertendo o trace da fase {nome_fase} para CSV...",
-                     "O carregador já pode ser reconectado")
+                     "Pode levar alguns minutos")
         logger.info(f"Exportando trace {nome_fase} com o perfil WPA...")
         cmd = ["wpaexporter.exe", "-i", etl, "-profile", perfil, "-outputfolder", pasta]
         try:
@@ -3151,22 +2945,52 @@ def gerar_relatorio_energia():
         logger.warning(f"Relatorio de energia nao gerado (rc={rc}): {sem_acento(saida)[-200:]}")
 
 
-def pos_medicao(ui):
-    """Relatorio 'depois' -> aviso de reconexao -> exportacao WPA -> SRUM -> relatorio de energia."""
-    etapas = [
-        ("relatorio de bateria 'depois'", lambda: gerar_relatorio_bateria("depois")),
-        ("aviso de reconexao", lambda: avisar_reconexao(ui)),
-        ("exportacao dos traces", lambda: exportar_traces(ui)),
-        ("relatorio SRUM", gerar_srum),
-        ("relatorio de energia", gerar_relatorio_energia),
-    ]
-    emit_progress("SRUM/relatório", detalhe="Relatório de bateria, exportação WPA, SRUM e relatório de energia")
-    for nome, etapa in etapas:
-        try:
-            etapa()
-        except Exception as e:
-            logger.warning(f"Pos-medicao: {nome} falhou ({type(e).__name__}: {e}).")
-            emit_alert(f"Pós-medição: {nome} falhou ({type(e).__name__})")
+def _etapa_segura(nome, funcao):
+    """Etapa de encerramento/pos-medicao: falha = aviso, nunca impede as seguintes."""
+    try:
+        return funcao()
+    except Exception as e:
+        logger.warning(f"Pos-medicao: {nome} falhou ({type(e).__name__}: {e}).")
+        emit_alert(f"Pós-medição: {nome} falhou ({type(e).__name__})")
+        return None
+
+
+def pos_medicao_pesada(ui):
+    """Exportacao WPA -> SRUM -> relatorio de energia (so depois do bateria.csv e da restauracao)."""
+    emit_progress("SRUM/relatório", detalhe="Exportação WPA, SRUM e relatório de energia")
+    _etapa_segura("exportacao dos traces", lambda: exportar_traces(ui))
+    _etapa_segura("relatorio SRUM", gerar_srum)
+    _etapa_segura("relatorio de energia", gerar_relatorio_energia)
+
+
+def finalizar_medicao_rapido(ui, estaticos):
+    """Encerramento imediato em ~15 s, ainda na carga de protecao: amostra final e
+    LibreOffice fechado, voltas na bateria, batteryreport 'depois', bateria.csv
+    (resultado final) e restauracao completa da maquina. Retorna o exit code."""
+    _etapa_segura("encerramento da fase medida", encerrar_fase_medida)
+    _etapa_segura("restauracao na bateria", restaurar_na_bateria)
+    _etapa_segura("relatorio de bateria 'depois'", lambda: gerar_relatorio_bateria("depois"))
+    try:
+        codigo = concluir_resultado(ui, estaticos)
+    except Exception as e:
+        codigo = 1
+        logger.error(f"Falha ao calcular o resultado: {type(e).__name__}: {e}", exc_info=True)
+    _etapa_segura("restauracao das configuracoes", restaurar_tudo)
+    _etapa_segura("liberacao da tela", lambda: manter_tela_ligada(False))
+    return codigo
+
+
+def encerramento_e_pos_medicao(ui, estaticos):
+    """bateria.csv + restaurar_tudo() SEMPRE antes da janela de reconexao e da
+    pos-medicao pesada (wpaexporter, SRUM, /energy). Retorna o exit code."""
+    codigo = finalizar_medicao_rapido(ui, estaticos)
+    escolha = _etapa_segura("janela de reconexao", lambda: aguardar_reconexao_para_pos_medicao(ui, codigo))
+    if escolha in ("tomada", "bateria"):
+        pos_medicao_pesada(ui)
+    else:
+        logger.info("Exportacao pesada pulada: traces .etl preservados em "
+                    f"{OUTPUT_PATH}; bateria.csv e resultado mantidos.")
+    return codigo
 
 
 # =============================================================================
@@ -3210,16 +3034,55 @@ def calcular_metricas_fase(inicio, fim, carga_cheia_mwh):
     return metricas
 
 
+def calcular_metricas_globais(inicio_ociosa, fim_medicao, carga_cheia_mwh):
+    """Tempo real na bateria da 1a amostra da ociosa ao fim da fase ativa (funcao pura).
+
+    energia_total = E_inicio - E_fim (mWh); sem mWh num marco, ou capacidade em
+    unidade relativa (carga cheia <= 100): (%_inicio - %_fim)/100 x carga cheia,
+    marcada como estimada. taxa_global (W) = energia / horas / 1000.
+    autonomia_equiv_100pct (h) = horas x (carga cheia / energia); sem carga cheia,
+    pelo %: horas x 100 / queda. Sem dados = None.
+    """
+    metricas = {"tempo_total_min": None, "tempo_total_h": None, "energia_total_mwh": None,
+                "taxa_global_w": None, "autonomia_equiv_100pct_h": None, "estimada": False}
+    if not inicio_ociosa or not fim_medicao:
+        return metricas
+    duracao_s = fim_medicao["t"] - inicio_ociosa["t"]
+    metricas["tempo_total_min"] = max(0.0, duracao_s / 60)
+    metricas["tempo_total_h"] = metricas["tempo_total_min"] / 60
+    if duracao_s <= 0:
+        return metricas
+    horas = duracao_s / 3600
+    pct_ini, pct_fim = inicio_ociosa.get("carga_pct"), fim_medicao.get("carga_pct")
+    queda = (pct_ini - pct_fim) if pct_ini is not None and pct_fim is not None else None
+    e_ini, e_fim = inicio_ociosa.get("energia_mwh"), fim_medicao.get("energia_mwh")
+    relativa = carga_cheia_mwh is not None and carga_cheia_mwh <= 100
+    if e_ini is not None and e_fim is not None and not relativa:
+        metricas["energia_total_mwh"] = e_ini - e_fim
+    elif queda is not None and carga_cheia_mwh:
+        metricas["energia_total_mwh"] = queda / 100 * carga_cheia_mwh
+        metricas["estimada"] = True
+    energia = metricas["energia_total_mwh"]
+    if energia is not None:
+        metricas["taxa_global_w"] = energia / horas / 1000
+    if energia and energia > 0 and carga_cheia_mwh:
+        metricas["autonomia_equiv_100pct_h"] = horas * (carga_cheia_mwh / energia)
+    elif queda and queda > 0:
+        metricas["autonomia_equiv_100pct_h"] = horas * (100 / queda)
+    return metricas
+
+
 def decidir_exit_code(estado):
-    """0 somente com coleta valida: pre-voo e conferencia na bateria ok, fase ociosa
-    completa, >= ESCRITORIO_MINIMO_PASS_S na fase de escritorio com motivo
-    'concluido' ou 'protecao_bateria', energia (medida ou estimada) nas duas fases,
-    e bateria.csv e bateria_amostras.csv gravados."""
+    """0 somente com coleta valida (spec 005): pre-voo e conferencia na bateria ok,
+    fase ociosa completa, fase ativa iniciada e drenada ate a protecao de bateria
+    (sem minimo de duracao), energia (medida ou estimada) nas duas fases, e
+    bateria.csv e bateria_amostras.csv gravados."""
     valido = (
         bool(estado.get("preflight_ok"))
         and bool(estado.get("conferencia_ok"))
         and bool(estado.get("ociosa_completa"))
-        and (estado.get("escritorio_s") or 0) >= ESCRITORIO_MINIMO_PASS_S
+        and bool(estado.get("escritorio_iniciada"))
+        and (estado.get("escritorio_s") or 0) > 0
         and estado.get("motivo") in MOTIVOS_PASS
         and bool(estado.get("energia_ok"))
         and bool(estado.get("bateria_csv"))
@@ -3244,25 +3107,45 @@ def _predominante(valores):
     return max(set(valores), key=valores.count)
 
 
-def linhas_bateria_csv(coleta_valida, motivo, ociosa, escritorio, estaticos,
-                       carga_inicial, carga_final, plano, modo, brilho, bluetooth, desvios):
-    """Linhas do bateria.csv (Metrica, Valor, Unidade), na ordem do plan."""
+def _horas(minutos):
+    return None if minutos is None else minutos / 60
+
+
+def linhas_bateria_csv(coleta_valida, motivo, globais, ociosa, escritorio, escritorio_1h, contadores,
+                       estaticos, carga_inicial, carga_final, plano, modo, brilho, bluetooth, desvios):
+    """Linhas do bateria.csv v2.0 (Metrica, Valor, Unidade), na ordem da spec 005."""
+    contadores = contadores or {}
     linhas = [
         ["Versao_Teste", VERSAO_TESTE, "texto"],
         ["Coleta_Valida", "sim" if coleta_valida else "nao", "texto"],
         ["Motivo_Encerramento", motivo or "N/A", "texto"],
-    ]
-    for prefixo, m in (("Ociosa", ociosa), ("Escritorio", escritorio)):
-        linhas += [
-            [f"{prefixo}_Duracao_Medida", _ponto(m["duracao_min"]), "min"],
-            [f"{prefixo}_Energia_Consumida", _ponto(m["energia_mwh"]), "mWh"],
-            [f"{prefixo}_Taxa_Media_Descarga", _ponto(m["taxa_w"]), "W"],
-            [f"{prefixo}_Queda_Carga", _ponto(m["queda_pp"]), "pp"],
-            [f"{prefixo}_Queda_Carga_Hora", _ponto(m["queda_pp_h"]), "pp/h"],
-            [f"{prefixo}_Autonomia_Projetada", _ponto(m["autonomia_h"]), "h"],
-        ]
-    linhas += [
-        ["Energia_Estimada", "sim" if (ociosa["estimada"] or escritorio["estimada"]) else "nao", "texto"],
+        ["Protecao_Bateria_Limite", str(PROTECAO_BATERIA_PCT), "%"],
+        ["Tempo_Total_Bateria_Real_min", _ponto(globais["tempo_total_min"]), "min"],
+        ["Tempo_Total_Bateria_Real_h", _ponto(globais["tempo_total_h"]), "h"],
+        ["Energia_Total_Consumida", _ponto(globais["energia_total_mwh"]), "mWh"],
+        ["Taxa_Media_Global", _ponto(globais["taxa_global_w"]), "W"],
+        ["Autonomia_Real_Equivalente_100pct", _ponto(globais["autonomia_equiv_100pct_h"]), "h"],
+        ["Ociosa_Duracao_Medida", _ponto(ociosa["duracao_min"]), "min"],
+        ["Ociosa_Energia_Consumida", _ponto(ociosa["energia_mwh"]), "mWh"],
+        ["Ociosa_Taxa_Media_Descarga", _ponto(ociosa["taxa_w"]), "W"],
+        ["Ociosa_Queda_Carga", _ponto(ociosa["queda_pp"]), "pp"],
+        ["Ociosa_Queda_Carga_Hora", _ponto(ociosa["queda_pp_h"]), "pp/h"],
+        ["Ociosa_Autonomia_Projetada", _ponto(ociosa["autonomia_h"]), "h"],
+        ["Escritorio_Duracao_Medida", _ponto(escritorio["duracao_min"]), "min"],
+        ["Escritorio_Duracao_Medida_h", _ponto(_horas(escritorio["duracao_min"])), "h"],
+        ["Escritorio_Energia_Consumida", _ponto(escritorio["energia_mwh"]), "mWh"],
+        ["Escritorio_Taxa_Media_Descarga", _ponto(escritorio["taxa_w"]), "W"],
+        ["Escritorio_1h_Taxa_Media_Descarga", _ponto(escritorio_1h["taxa_w"]), "W"],
+        ["Escritorio_Queda_Carga", _ponto(escritorio["queda_pp"]), "pp"],
+        ["Escritorio_Queda_Carga_Hora", _ponto(escritorio["queda_pp_h"]), "pp/h"],
+        ["Escritorio_Autonomia_Projetada", _ponto(escritorio["autonomia_h"]), "h"],
+        ["Tempo_Abertura_Writer", _ponto(contadores.get("tempo_abertura_writer_s")), "s"],
+        ["Tempo_Abertura_Calc", _ponto(contadores.get("tempo_abertura_calc_s")), "s"],
+        ["Paragrafos_Digitados_Writer", _inteiro_ou_na(contadores.get("paragrafos_writer")), "un"],
+        ["Linhas_Editadas_Calc", _inteiro_ou_na(contadores.get("linhas_calc")), "un"],
+        ["Recalculos_Calc_R2", _inteiro_ou_na(contadores.get("recalculos_calc")), "un"],
+        ["Energia_Estimada", "sim" if (globais["estimada"] or ociosa["estimada"] or escritorio["estimada"])
+         else "nao", "texto"],
         ["Carga_Bateria_Inicial", _inteiro_ou_na(carga_inicial), "%"],
         ["Carga_Bateria_Final", _inteiro_ou_na(carga_final), "%"],
         ["Capacidade_Carga_Cheia", _inteiro_ou_na(estaticos.get("carga_cheia_mwh")), "mWh"],
@@ -3286,19 +3169,32 @@ def _amostras_gravadas():
         return False
 
 
-def concluir_resultado(ui, estaticos):
-    """Metricas por fase, bateria.csv e exit code (chamado sempre que a medicao comecou)."""
-    carga_cheia = estaticos.get("carga_cheia_mwh")
-    ociosa = calcular_metricas_fase(_marcos.get("ociosa", {}).get("inicio"),
-                                    _marcos.get("ociosa", {}).get("fim"), carga_cheia)
-    escritorio = calcular_metricas_fase(_marcos.get("escritorio", {}).get("inicio"),
-                                        _marcos.get("escritorio", {}).get("fim"), carga_cheia)
-    for nome, m in (("ociosa", ociosa), ("escritorio", escritorio)):
-        logger.info(f"Metricas {nome}: duracao={_ponto(m['duracao_min'])} min | energia={_ponto(m['energia_mwh'])} mWh | "
-                    f"taxa={_ponto(m['taxa_w'])} W | queda={_ponto(m['queda_pp'])} pp | "
-                    f"autonomia={_ponto(m['autonomia_h'])} h" + (" (estimada)" if m["estimada"] else ""))
+def _log_metricas(nome, m):
+    logger.info(f"Metricas {nome}: duracao={_ponto(m['duracao_min'])} min | energia={_ponto(m['energia_mwh'])} mWh | "
+                f"taxa={_ponto(m['taxa_w'])} W | queda={_ponto(m['queda_pp'])} pp | "
+                f"autonomia={_ponto(m['autonomia_h'])} h" + (" (estimada)" if m["estimada"] else ""))
 
-    inicio_ociosa = _marcos.get("ociosa", {}).get("inicio")
+
+def concluir_resultado(ui, estaticos):
+    """Metricas por fase e globais, bateria.csv e exit code (sempre que a medicao comecou)."""
+    carga_cheia = estaticos.get("carga_cheia_mwh")
+    m_ociosa = _marcos.get("ociosa", {})
+    m_escritorio = _marcos.get("escritorio", {})
+    ociosa = calcular_metricas_fase(m_ociosa.get("inicio"), m_ociosa.get("fim"), carga_cheia)
+    escritorio = calcular_metricas_fase(m_escritorio.get("inicio"), m_escritorio.get("fim"), carga_cheia)
+    escritorio_1h = calcular_metricas_fase(m_escritorio.get("inicio"), m_escritorio.get("fim_wpr"), carga_cheia)
+    _log_metricas("ociosa", ociosa)
+    _log_metricas("escritorio", escritorio)
+    _log_metricas("escritorio 1a hora", escritorio_1h)
+
+    inicio_ociosa = m_ociosa.get("inicio")
+    fim_medicao = m_escritorio.get("fim") or m_ociosa.get("fim")
+    globais = calcular_metricas_globais(inicio_ociosa, fim_medicao, carga_cheia)
+    logger.info(f"Tempo real na bateria: {_ponto(globais['tempo_total_min'])} min "
+                f"({_ponto(globais['tempo_total_h'])} h) | energia={_ponto(globais['energia_total_mwh'])} mWh | "
+                f"taxa global={_ponto(globais['taxa_global_w'])} W | autonomia 100%->0% equivalente="
+                f"{_ponto(globais['autonomia_equiv_100pct_h'])} h" + (" (estimada)" if globais["estimada"] else ""))
+
     final = _amostra_final["valor"]
     with _medicao_lock:
         medidas = list(_amostras_medidas)
@@ -3307,7 +3203,8 @@ def concluir_resultado(ui, estaticos):
     estado = {
         "preflight_ok": not any(l["Situacao"] == "falhou" for l in _preflight),
         "conferencia_ok": _medicao["conferencia_ok"],
-        "ociosa_completa": _marcos.get("ociosa", {}).get("completa", False),
+        "ociosa_completa": m_ociosa.get("completa", False),
+        "escritorio_iniciada": m_escritorio.get("inicio") is not None,
         "escritorio_s": (escritorio["duracao_min"] or 0) * 60,
         "motivo": motivo_encerramento(),
         "energia_ok": ociosa["energia_mwh"] is not None and escritorio["energia_mwh"] is not None,
@@ -3316,9 +3213,10 @@ def concluir_resultado(ui, estaticos):
     }
     provisorio = decidir_exit_code(estado)
     linhas = linhas_bateria_csv(
-        coleta_valida=provisorio == 0, motivo=estado["motivo"], ociosa=ociosa, escritorio=escritorio,
+        coleta_valida=provisorio == 0, motivo=estado["motivo"], globais=globais, ociosa=ociosa,
+        escritorio=escritorio, escritorio_1h=escritorio_1h, contadores=contadores_lo(),
         estaticos=estaticos, carga_inicial=(inicio_ociosa or {}).get("carga_pct"),
-        carga_final=(final or {}).get("carga_pct"), plano=plano,
+        carga_final=(final or fim_medicao or {}).get("carga_pct"), plano=plano,
         modo=_predominante([m for _, _, m in medidas]), brilho=_predominante([b for _, b, _ in medidas]),
         bluetooth=_bluetooth_preflight["estado"], desvios=desvios,
     )
@@ -3326,6 +3224,8 @@ def concluir_resultado(ui, estaticos):
     try:
         with open(caminho, "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerows([["Metrica", "Valor", "Unidade"]] + linhas)
+            f.flush()
+            os.fsync(f.fileno())
         logger.info(f"CSV tematico gravado: {caminho}")
         estado["bateria_csv"] = True
     except OSError as e:
@@ -3337,6 +3237,7 @@ def concluir_resultado(ui, estaticos):
     else:
         ui.atualizar("Teste concluído", f"Coleta inválida (FAIL): {estado['motivo']}.", "Veja o log")
     logger.info(f"Resultado: {'PASS' if codigo == 0 else 'FAIL'} — {estado}")
+    gravar_checkpoint(final)
     return codigo
 
 
@@ -3406,19 +3307,15 @@ def worker_thread(ui):
         ui.atualizar("Erro", "Erro inesperado! Verifique o log.")
 
     finally:
-        # 14-16. Pos-medicao e resultado: sempre que a medicao comecou
+        # 14-17. Sempre que a medicao comecou: encerramento rapido (bateria.csv +
+        # restauracao) ANTES da janela de reconexao e da pos-medicao pesada
         if _medicao["iniciada"]:
             try:
-                pos_medicao(ui)
+                _exit_code = encerramento_e_pos_medicao(ui, estaticos)
             except Exception as e:
-                logger.warning(f"Pos-medicao falhou: {type(e).__name__}: {e}")
-            try:
-                _exit_code = concluir_resultado(ui, estaticos)
-            except Exception as e:
-                _exit_code = 1
-                logger.error(f"Falha ao calcular o resultado: {type(e).__name__}: {e}", exc_info=True)
+                logger.error(f"Encerramento falhou: {type(e).__name__}: {e}", exc_info=True)
             fim = motivo_encerramento() or fim
-        # 17. Qualquer caminho: trace ativo, restauracao, tela, Edge, coletor
+        # 18. Qualquer caminho: trace ativo, restauracao, tela, LibreOffice, coletor (idempotentes)
         try:
             if _wpr["ativo"]:
                 parar_wpr_ativo(_wpr["fase"] or "Parcial")
@@ -3427,11 +3324,8 @@ def worker_thread(ui):
         restaurar_tudo()
         if _medicao["iniciada"]:
             manter_tela_ligada(False)
-        if _edge["aberto_pelo_teste"]:
-            try:
-                kill_edge()
-            except Exception as e:
-                logger.warning(f"Falha ao fechar o Edge: {e}")
+        if _lo_state["ativo"] or _lo_state["work_dir"]:
+            fechar_libreoffice_teste()
         if _coletor["obj"]:
             _coletor["obj"].fechar()
         logger.info(f"FIM: {'PASS' if _exit_code == 0 else 'FAIL'} — {fim}")
@@ -3447,6 +3341,12 @@ if __name__ == "__main__":
     logger.info(f"Diretorio base: {BASE_DIR}")
     logger.info(f"Saida: {OUTPUT_PATH}")
     logger.info(f"Log: {LOG_FILE}")
+
+    faltando = [nome for nome, modulo in (("tkinter", tk), ("psutil", psutil), ("pyautogui", pyautogui),
+                                           ("pyperclip", pyperclip), ("pynput", kb)) if modulo is None]
+    if faltando:
+        logger.critical("Modulo(s) Python ausente(s): " + ", ".join(faltando) + " (rode o Setup 5_install_py_dependencies).")
+        sys.exit(1)
 
     # Iniciar listener de parada segura
     kb_listener = kb.Listener(on_press=_on_key_press, on_release=_on_key_release)

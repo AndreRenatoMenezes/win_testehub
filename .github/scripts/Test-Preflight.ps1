@@ -120,6 +120,10 @@ try {
     Assert-Condition ($fLo.Count -eq 1 -and $fLo[0].Nivel -eq "Impede" -and $fLo[0].Acao -match 'Setup 3_softwares_msStore') "1_automacao_performance sem LibreOffice -> Impede mandando rodar o Setup 3"
     Assert-Condition ($fLo.Count -eq 1 -and ($fLo[0].Testes -contains "1_automacao_performance.py") -and ($fLo[0].Testes -notcontains "1-1_automacao_performance_dlp.py")) "LibreOffice ausente bloqueia apenas 1_automacao_performance.py, nao 1-1_automacao_performance_dlp.py"
     Assert-Condition ((Find-Item (Get-F @($tCpuDlp)) 'LibreOffice').Count -eq 0) "1-1_automacao_performance_dlp isolado sem LibreOffice -> sem achado de LibreOffice"
+    $fLo5 = Find-Item (Get-F @($tBat)) 'LibreOffice'
+    Assert-Condition ($fLo5.Count -eq 1 -and $fLo5[0].Nivel -eq "Impede" -and $fLo5[0].Testes -contains "5_teste_bateria.py" -and $fLo5[0].Item -match '5_bateria' -and $fLo5[0].Acao -match 'Setup 3_softwares_msStore') "5_teste_bateria sem LibreOffice -> Impede mandando rodar o Setup 3 (spec 005)"
+    $fLo15 = Find-Item (Get-F @($tCpu, $tBat)) 'LibreOffice'
+    Assert-Condition ($fLo15.Count -eq 2 -and @($fLo15 | Where-Object { $_.Testes -contains "1_automacao_performance.py" }).Count -eq 1 -and @($fLo15 | Where-Object { $_.Testes -contains "5_teste_bateria.py" }).Count -eq 1) "modulos 1 e 5 sem LibreOffice -> um Impede por modulo"
     $fakeSoffice = Join-Path $hub "fake_soffice.exe"
     Set-Content -LiteralPath $fakeSoffice -Value "bin"
     $oldLoPath = $env:HUB_LIBREOFFICE_PATH
@@ -261,8 +265,9 @@ try {
     Assert-Condition ($py.Count -eq 1 -and $py[0].Pids -contains 21 -and $py[0].Pids -notcontains 20 -and $py[0].Pids -notcontains 22) "Python de Testes\ detectado; Python de fora (e de Testes_old\) fica"
     $ign = @(Get-TestLeftovers -TestsRoot $testsRoot -IgnorePids @(40, 42) | Where-Object { $_.Id -eq "dotnet" })
     Assert-Condition ($ign.Count -eq 0) "processos que ja existiam antes do teste (IgnorePids) nao sao sobra"
-    $edge5 = @(Get-TestLeftovers -TestsRoot $testsRoot -Folders @("5_bateria") | ForEach-Object { $_.Id })
-    Assert-Condition ($edge5 -contains "edge") "Edge da automacao tambem e limpo depois do teste 5"
+    $ids5 = @(Get-TestLeftovers -TestsRoot $testsRoot -Folders @("5_bateria") | ForEach-Object { $_.Id })
+    Assert-Condition ($ids5 -notcontains "edge") "teste 5 (v2.0, LibreOffice) nao limpa mais o Edge da automacao"
+    Assert-Condition (($ids5 -contains "libreoffice") -and ($ids5 -contains "wpr") -and ($ids5 -contains "wpaexporter") -and ($ids5 -contains "python")) "sobras do teste 5: libreoffice, wpr, wpaexporter e python"
     $loLeft = @($all | Where-Object { $_.Id -eq "libreoffice" })
     Assert-Condition ($loLeft.Count -eq 1 -and ($loLeft[0].Pids -contains 51) -and ($loLeft[0].Pids -contains 52) -and ($loLeft[0].Pids -contains 54) -and ($loLeft[0].Pids -notcontains 50) -and ($loLeft[0].Pids -notcontains 53) -and ($loLeft[0].Pids -notcontains 55)) "LibreOffice da automacao exige wintesthub_lo_profile no CommandLine, ignorando LibreOffice do usuario (50), descendente nao relacionado (53) e filho soffice sem marcador (--writer user.odt, 55)"
     $allIgn = Get-TestLeftovers -TestsRoot $testsRoot -Folders @("1_cpu_memo") -IgnorePids @(54)

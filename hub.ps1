@@ -2327,10 +2327,20 @@ function Get-PreflightFindings {
         }
     }
 
-    if ($byFolder.Contains("1_cpu_memo")) {
-        $loNames = @($byFolder["1_cpu_memo"] | Where-Object { $_ -match '^1_automacao_performance\.' })
-        if ($loNames.Count -gt 0 -and -not (Test-LibreOfficeAvailable)) {
-            $findings.Add((New-PreflightFinding "Impede" $loNames "LibreOffice (soffice.exe) nao encontrado (1_cpu_memo)" "Instale: rode o Setup 3_softwares_msStore"))
+    # Modulos com carga no LibreOffice: 1 (ciclos Writer/Calc) e 5 (fase ativa da bateria v2.0)
+    $loModules = [ordered]@{
+        "1_cpu_memo" = '^1_automacao_performance\.'
+        "5_bateria"  = '^5_teste_bateria\.'
+    }
+    $loDisponivel = $null
+    foreach ($folder in $loModules.Keys) {
+        if (-not $byFolder.Contains($folder)) { continue }
+        $pattern = $loModules[$folder]
+        $loNames = @($byFolder[$folder] | Where-Object { $_ -match $pattern })
+        if ($loNames.Count -eq 0) { continue }
+        if ($null -eq $loDisponivel) { $loDisponivel = [bool](Test-LibreOfficeAvailable) }
+        if (-not $loDisponivel) {
+            $findings.Add((New-PreflightFinding "Impede" $loNames "LibreOffice (soffice.exe) nao encontrado ($folder)" "Instale: rode o Setup 3_softwares_msStore"))
         }
     }
 
@@ -2478,7 +2488,7 @@ function Get-TestLeftovers {
     }
 
     if (Test-WprRecording (Get-WprStatus)) {
-        & $add "wpr" "sessao do WPR gravando" "wpr -status" @() @("0_consumo_basal", "1_cpu_memo")
+        & $add "wpr" "sessao do WPR gravando" "wpr -status" @() @("0_consumo_basal", "1_cpu_memo", "5_bateria")
     }
 
     # IgnorePids: processos que ja existiam antes do teste (entre testes, so o
@@ -2491,7 +2501,7 @@ function Get-TestLeftovers {
         @($procs | Where-Object { $_.Name -match $Pattern })
     }
 
-    foreach ($exe in @(@{ N = "wpaexporter"; T = @("0_consumo_basal", "1_cpu_memo") }, @{ N = "diskspd"; T = @("2_disco") })) {
+    foreach ($exe in @(@{ N = "wpaexporter"; T = @("0_consumo_basal", "1_cpu_memo", "5_bateria") }, @{ N = "diskspd"; T = @("2_disco") })) {
         $p = @(& $byName ("^" + $exe.N + "\.exe$"))
         if ($p.Count -gt 0) { & $add $exe.N "$($exe.N).exe" "$($p.Count) processo(s)" @($p | ForEach-Object { $_.ProcessId }) $exe.T }
     }
@@ -2503,14 +2513,14 @@ function Get-TestLeftovers {
     $edge = @($procs | Where-Object { $_.Name -match '^msedge\.exe$' -and ([string]$_.CommandLine -match '--enable-automation' -or $drvPids -contains [int]$_.ParentProcessId) })
     $edgePids = @($drv | ForEach-Object { $_.ProcessId }) + @($edge | ForEach-Object { $_.ProcessId })
     if ($edgePids.Count -gt 0) {
-        & $add "edge" "Edge da automacao" "$($drv.Count) msedgedriver, $($edge.Count) msedge" $edgePids @("3_rede", "5_bateria", "6_wifi_fast_transition")
+        & $add "edge" "Edge da automacao" "$($drv.Count) msedgedriver, $($edge.Count) msedge" $edgePids @("3_rede", "6_wifi_fast_transition")
     }
 
     # LibreOffice da automacao: soffice.exe ou soffice.bin com subperfil wintesthub_lo_profile
     $lo = @($procs | Where-Object { $_.Name -match '^soffice\.(exe|bin)$' -and [string]$_.CommandLine -match '(?i)wintesthub_lo_profile' })
     $loPids = @($lo | ForEach-Object { $_.ProcessId })
     if ($loPids.Count -gt 0) {
-        & $add "libreoffice" "LibreOffice da automacao" "$($lo.Count) processo(s)" $loPids @("1_cpu_memo")
+        & $add "libreoffice" "LibreOffice da automacao" "$($lo.Count) processo(s)" $loPids @("1_cpu_memo", "5_bateria")
     }
 
     # Python rodando um script de Testes\ (o hub roda um teste por vez; fora

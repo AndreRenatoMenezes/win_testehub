@@ -402,13 +402,13 @@ li {
 - Velocidade de leitura e escrita do disco principal
 - Velocidade de conexão de rede (download, upload, latência, jitter) no speedtest interno e na internet (fast.com)
 - Tempo de inicialização (boot) e desligamento (shutdown) do Windows
-- Consumo de energia na bateria (máquina ociosa e sob carga de escritório) e autonomia projetada
+- Consumo de energia na bateria (máquina ociosa e sob carga de escritório no LibreOffice) e tempo real de bateria até 10%, com a autonomia normalizada para 100% → 0%
 - Roaming Wi-Fi entre APs com Fast Transition (802.11r) e compatibilidade de adaptador, driver e BIOS
 - Tempo de tarefas reais de desenvolvimento (build .NET e Go, testes, <code>pip install</code>, containers, git e arquivos pequenos) com repositórios open source fixados</p>
 <p><strong>O que NÃO é testado:</strong>
 - Periféricos (teclado, mouse, webcam, impressora)
 - GPU / desempenho gráfico
-- Saúde da bateria, ciclos de carga e descarga completa (a saúde é registrada pelo setup <code>1_captura_infos_pc</code>)
+- Saúde da bateria, ciclos de carga e descarga abaixo de 10% (a saúde é registrada pelo setup <code>1_captura_infos_pc</code>)
 - Conformidade de software (licenciamento, versões)</p>
 <h3 id="13-como-usar-este-documento-para-auditoria-gestão">1.3 Como Usar Este Documento para Auditoria <span class="tag tag-gestao">Gestão</span></h3>
 <p>Este documento descreve o <strong>procedimento padronizado</strong> de cada teste. Para auditar uma execução:</p>
@@ -1681,16 +1681,17 @@ li {
 <div class="section">
 <h2 id="9-módulo-5--bateria">9. Módulo 5 — Bateria</h2>
 <h3 id="91-objetivo">9.1 Objetivo</h3>
-<p>Medir o consumo de energia do notebook na bateria em duas fases padronizadas — <strong>60 minutos ociosa</strong>, com a tela ligada, e <strong>60 minutos sob carga de escritório</strong> — para comparar o cenário <strong>baseline</strong> (sem agente) com o cenário <strong>com agente de segurança</strong> na mesma máquina. Antes de medir, o teste padroniza a máquina sozinho (<strong>pré-voo</strong>), relê cada ajuste e registra o valor antes e depois como evidência.</p>
-<p>O script é <code>Testes/5_bateria/5_teste_bateria.py</code>. Ele aparece no menu do hub na seção <strong>Bateria</strong>, logo após <strong>Boot Shutdown</strong>, e precisa de um operador para desconectar o carregador. O teste substitui o procedimento manual anterior (<code>cpu_stress_controller_pro.exe</code> com 60% de CPU por 120 minutos e a linha de comando do <code>Comando_Bateria.txt</code>); os resultados novos <strong>não são comparáveis</strong> com as medições antigas.</p>
+<p>Medir o consumo de energia e o <strong>tempo real de bateria</strong> do notebook em duas fases padronizadas — <strong>60 minutos ociosa</strong>, com a tela ligada, e uma <strong>fase ativa de escritório no LibreOffice (Writer + Calc) que roda até a bateria chegar a 10%</strong>, sem teto de tempo — para comparar o cenário <strong>baseline</strong> (sem agente) com o cenário <strong>com agente de segurança</strong> na mesma máquina. Antes de medir, o teste padroniza a máquina sozinho (<strong>pré-voo</strong>), relê cada ajuste e registra o valor antes e depois como evidência.</p>
+<p>O script é <code>Testes/5_bateria/5_teste_bateria.py</code> (versão <strong>2.0</strong>). Ele aparece no menu do hub na seção <strong>Escritório</strong>, logo após <strong>Boot Shutdown</strong>, e precisa de um operador para desconectar o carregador. A carga de escritório roda 100% local — sem Edge, sem conta Google e sem login — e reaproveita a planilha <strong>R2</strong> do Módulo 1 pelo módulo compartilhado <code>Testes/_lib/libreoffice_workload.py</code>.</p>
+<div class="callout callout-info"><strong>Versão 2.0 não é comparável com a 1.0.</strong>A 1.0 rodava 60 + 60 min no Edge (Google Docs/Sheets/PDF), no modo <b>Melhor desempenho</b>, e só projetava a autonomia por extrapolação; a 2.0 usa o LibreOffice, o modo <b>Equilibrado</b> e mede a descarga real até 10%. Compare apenas execuções com o mesmo <code>Versao_Teste</code>. Os resultados também não são comparáveis com as medições antigas de 60% de CPU por 120 minutos (<code>cpu_stress_controller_pro.exe</code>).</div>
 <h3 id="92-ferramentas-utilizadas">9.2 Ferramentas Utilizadas</h3>
 <ul>
 <li><strong>WMI de bateria</strong> (<code>root\wmi</code>): <code>BatteryStatus</code> (energia restante em mWh, taxa de descarga, tensão), <code>BatteryFullChargedCapacity</code> e <code>BatteryCycleCount</code>, lidos por um único processo PowerShell que fica aberto durante o teste — a leitura custa poucos milissegundos por amostra e não pesa na fase ociosa</li>
 <li><strong>API do Windows</strong>: <code>GetSystemPowerStatus</code> (fonte de alimentação, % de carga e estado da Economia de energia) e <code>powrprof</code> (modo de energia)</li>
 <li><strong>powercfg</strong>: plano e configurações de energia da bateria, relatório de bateria (<code>/batteryreport</code>, antes e depois), SRUM (<code>/srumutil</code>) e relatório de energia (<code>/energy</code>)</li>
-<li><strong>Windows Performance Recorder</strong> (<code>wpr.exe</code>, perfil <code>Power.light</code>) — um trace por fase — e <strong>WPA Exporter</strong> (<code>wpaexporter.exe</code>) com o perfil <code>Agentes_SI_Bateria_Profile.wpaProfile</code>, o mesmo do procedimento anterior</li>
-<li><strong>Microsoft Edge</strong> com Google Docs, Google Sheets e um PDF — simulação contínua de carga de escritório no navegador durante a fase de escritório da bateria</li>
-<li><strong>psutil</strong> — top 10 processos por CPU</li>
+<li><strong>Windows Performance Recorder</strong> (<code>wpr.exe</code>, perfil <code>Power.light</code>) — um trace da fase ociosa e um da <strong>1ª hora</strong> da fase ativa — e <strong>WPA Exporter</strong> (<code>wpaexporter.exe</code>) com o perfil <code>Agentes_SI_Bateria_Profile.wpaProfile</code></li>
+<li><strong>LibreOffice</strong> (<code>soffice.exe</code>, instalado pelo setup <code>3_softwares_msStore.ps1</code>) — Writer com um documento <code>.odt</code> e Calc com a planilha R2 (5.000 linhas, 100.000 fórmulas), cada um num subperfil isolado <code>wintesthub_lo_profile_*</code>; o LibreOffice do usuário não é tocado</li>
+<li><strong>pyautogui/pyperclip</strong> — digitação e edição simuladas; <strong>psutil</strong> — top 10 processos por CPU</li>
 </ul>
 <h3 id="93-pré-voo-de-padronização">9.3 Pré-voo de Padronização</h3>
 <p>O pré-voo roda <strong>na tomada</strong>, antes de pedir a desconexão do carregador. Cada item vira uma linha do <code>bateria_preflight.csv</code> com <code>Esperado</code>, <code>Antes</code>, <code>Acao</code>, <code>Depois</code>, <code>Situacao</code> (<code>ok</code>, <code>ajustado</code>, <code>não aplicável</code> ou <code>falhou</code>) e <code>Observacao</code>.</p>
@@ -1714,7 +1715,7 @@ li {
 <td>Conferidos</td>
 <td>Carga inicial</td>
 <td>≥ 95%</td>
-<td>Abaixo do mínimo: informa a carga atual e pede para carregar</td>
+<td>Abaixo do mínimo: informa a carga atual e pede para carregar (aceita notebooks com limite de carga em 95–99%)</td>
 </tr>
 <tr>
 <td>Conferidos</td>
@@ -1724,21 +1725,21 @@ li {
 </tr>
 <tr>
 <td>Conferidos</td>
+<td>LibreOffice</td>
+<td><code>soffice.exe</code> encontrado</td>
+<td>Ausente: falha em segundos, sem alterar nada, pedindo o Setup <code>3_softwares_msStore</code>. Aceita <code>HUB_LIBREOFFICE_PATH</code></td>
+</tr>
+<tr>
+<td>Conferidos</td>
 <td>Conexão de rede</td>
 <td>com acesso à internet</td>
-<td>Registra <code>tipo \| rede \| sinal</code>; SSID ou sinal indisponíveis não reprovam</td>
+<td>Mantém o rádio Wi-Fi ativo e a telemetria real dos agentes de SI. Registra <code>tipo \| rede \| sinal</code>; SSID ou sinal indisponíveis não reprovam</td>
 </tr>
 <tr>
 <td>Conferidos</td>
 <td>Monitor externo</td>
 <td>nenhum</td>
 <td>Também pega a tampa fechada com monitor externo</td>
-</tr>
-<tr>
-<td>Conferidos</td>
-<td>Edge e conta Google</td>
-<td>prontos</td>
-<td>Boas-vindas do Edge ou login do Google: janela pede o login (até 3 vezes). Usa as páginas de lista do Docs/Sheets, sem criar documentos</td>
 </tr>
 <tr>
 <td>Ajustados</td>
@@ -1749,8 +1750,8 @@ li {
 <tr>
 <td>Ajustados</td>
 <td>Modo de energia na bateria</td>
-<td>Melhor desempenho</td>
-<td>Sem a API do modo na bateria (Windows antigo): aplicado e conferido já na bateria</td>
+<td><strong>Equilibrado</strong></td>
+<td>Padrão real do Windows na bateria. Sem a API do modo na bateria (Windows antigo): aplicado e conferido já na bateria</td>
 </tr>
 <tr>
 <td>Ajustados</td>
@@ -1827,7 +1828,7 @@ li {
 <tr>
 <td>Na bateria</td>
 <td>Modo de energia efetivo</td>
-<td>Melhor desempenho</td>
+<td>Equilibrado</td>
 <td>Conferido na estabilização</td>
 </tr>
 <tr>
@@ -1857,7 +1858,7 @@ li {
 <tbody>
 <tr>
 <td>1</td>
-<td>Checagens rápidas: bateria, carga, ferramentas e perfil WPA</td>
+<td>Checagens rápidas: bateria, carga, ferramentas, perfil WPA e LibreOffice</td>
 <td>segundos</td>
 </tr>
 <tr>
@@ -1867,66 +1868,82 @@ li {
 </tr>
 <tr>
 <td>3</td>
-<td>Prontidão do Edge e da conta Google (na tomada)</td>
-<td>~30 s (+ login, se pedido)</td>
-</tr>
-<tr>
-<td>4</td>
-<td>Ajustes de energia, brilho e Bluetooth; grava <code>bateria_preflight.csv</code></td>
+<td>Ajustes de energia (modo <strong>Equilibrado</strong>), brilho e Bluetooth; grava <code>bateria_preflight.csv</code></td>
 <td>~15 s</td>
 </tr>
 <tr>
-<td>5</td>
-<td>Relatório de bateria "antes" (HTML e XML)</td>
+<td>4</td>
+<td>Relatório de bateria "antes" (HTML e XML) e coletor WMI</td>
 <td>~5 s</td>
 </tr>
 <tr>
-<td>6</td>
+<td>5</td>
 <td><strong>Aviso único</strong>: desconectar o carregador e confirmar o checklist físico</td>
 <td>até 10 min</td>
 </tr>
 <tr>
-<td>7</td>
+<td>6</td>
 <td><strong>Estabilização</strong> na bateria, fora da medição, com a conferência de brilho, modo e Economia</td>
 <td>5 min</td>
 </tr>
 <tr>
-<td>8</td>
+<td>7</td>
 <td><strong>Fase ociosa</strong>: tela ligada, nenhum aplicativo aberto pelo teste, nenhuma entrada simulada; trace WPR</td>
-<td>60 min</td>
+<td>60 min fixos</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Transição: salva o trace da ociosa, confere se a sessão está bloqueada, gera <code>workload_doc.odt</code> e <code>workload_calc_r2.xlsx</code>, abre o Writer e o Calc e espera o recálculo inicial da R2</td>
+<td>~1–5 min</td>
 </tr>
 <tr>
 <td>9</td>
-<td>Transição: salva o trace, confere se a sessão está bloqueada e abre o Edge com documento, planilha e PDF</td>
-<td>~1–5 min</td>
-</tr>
-<tr>
-<td>10</td>
-<td><strong>Fase de escritório</strong>: simulação contínua de escritório no Edge (Google Docs, Google Sheets e PDF), sem ciclos nem cooldown; trace WPR</td>
+<td><strong>Fase ativa — bloco 1</strong> (primeiros 60 min): LibreOffice Writer + Calc com trace WPR</td>
 <td>60 min</td>
 </tr>
 <tr>
-<td>11</td>
-<td>Encerramento: salva o trace, amostra final, fecha o Edge, relatório de bateria "depois" e aviso de que o carregador pode ser reconectado</td>
+<td>10</td>
+<td>Marca de 60 min: amostra-marco <code>fim_wpr_escritorio</code> e o trace <code>Trace_Bateria_Escritorio_*</code> é salvo — a fase ativa <strong>continua</strong></td>
 <td>~1–5 min</td>
 </tr>
 <tr>
+<td>11</td>
+<td><strong>Fase ativa — bloco 2</strong> (sem WPR): o mesmo ritmo de escritório até a bateria chegar a <strong>10%</strong></td>
+<td>até 10% (sem teto)</td>
+</tr>
+<tr>
 <td>12</td>
-<td>Pós-medição: exportação WPA dos traces, SRUM, relatório de energia (60 s de observação), <code>bateria.csv</code> e restauração</td>
-<td>~5–20 min</td>
+<td><strong>Encerramento imediato em 10%</strong>: fecha o LibreOffice, amostra final, relatório de bateria "depois", <strong>grava <code>bateria.csv</code></strong> e <strong>restaura todas as configurações</strong> (inclusive tela/suspensão)</td>
+<td>~15 s</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Janela de reconexão: espera o carregador (sondado a cada 2 s) ou os botões <strong>Continuar na bateria</strong> / <strong>Pular exportação e finalizar</strong></td>
+<td>até o operador</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Pós-medição pesada: exportação WPA dos traces, SRUM e relatório de energia (60 s de observação)</td>
+<td>~5–30 min</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Tempo total estimado:</strong> ~2h20–2h40.</p>
+<p><strong>Tempo total:</strong> variável — depende da autonomia real. Conte com ~1h10 de preparação, estabilização e fase ociosa, mais o tempo de descarga da fase ativa até 10% (tipicamente 3–12 h).</p>
+<p>Na fase ativa, o teste alterna turnos entre os dois aplicativos, com pausas realistas de 4–10 s:</p>
+<ul>
+<li><strong>Writer</strong>: digita um parágrafo (via área de transferência), formata em ~30% dos turnos, rola o texto como leitura e salva (<code>Ctrl+S</code>). A cada <strong>60 parágrafos</strong> o texto é reiniciado para o <code>.odt</code> não crescer sem limite.</li>
+<li><strong>Calc</strong>: preenche 2 linhas na aba <code>Trigger</code> (linhas cíclicas 1–25) e salva. A cada <strong>~5 min</strong> dispara o recálculo completo das 100.000 fórmulas da R2 (<code>Ctrl+Shift+F9</code>) e espera o Calc ficar ocioso — carga realista de escritório, não stress sintético contínuo.</li>
+<li>Perda de foco ou erro pontual: <code>Escape</code> e nova tentativa; se o Writer ou o Calc fechar sozinho, só ele é relançado (subperfil novo) e a descarga continua.</li>
+</ul>
 <p>Durante toda a medição:</p>
 <ul>
 <li>A tela fica ligada e a sessão não é bloqueada por inatividade, sem simular teclado ou mouse (<code>SetThreadExecutionState</code>).</li>
-<li>Uma <strong>amostra</strong> da bateria é gravada a cada 60 s e o <strong>top 10 processos</strong> a cada 5 min.</li>
-<li>Uma <strong>vigia</strong> a cada 5 s encerra a medição de forma controlada se o carregador for reconectado, se a carga chegar a <strong>7%</strong> (proteção de bateria) ou se o operador pressionar Ctrl+Q.</li>
-<li>O overlay mostra fase, carga e minutos restantes, atualizado só a cada amostra para não gerar atividade de tela na fase ociosa.</li>
+<li>Uma <strong>amostra</strong> da bateria é gravada a cada 60 s (com flush) e o <strong>top 10 processos</strong> a cada 5 min. A cada amostra e marco, o estado é gravado de forma atômica em <code>bateria_checkpoint.json</code> — se a bateria apagar antes de 10%, os dados ficam preservados até o último minuto.</li>
+<li>Uma <strong>vigia</strong> a cada 5 s encerra a medição de forma controlada se o carregador for reconectado, se a carga chegar a <strong>10%</strong> (proteção de bateria), se o operador pressionar Ctrl+Q ou se o relógio saltar mais de 120 s entre dois tiques (<code>hibernacao_inesperada</code>: a máquina suspendeu ou hibernou).</li>
+<li>O overlay mostra fase e carga; na fase ativa, também o tempo decorrido e se o WPR está ativo ou já salvo. Na fase ociosa ele só muda a cada amostra, para não gerar atividade de tela.</li>
 </ul>
 <h3 id="95-métricas-coletadas">9.5 Métricas Coletadas</h3>
-<p>As métricas de cada fase saem de duas amostras-marco tiradas nos limites exatos da fase (<code>inicio_fase</code> e <code>fim_fase</code>). A <strong>energia em mWh é a medida principal</strong>; o percentual de carga é complementar.</p>
+<p>As métricas saem das amostras-marco tiradas nos limites exatos das fases (<code>inicio_fase</code>, <code>fim_wpr_escritorio</code> e <code>fim_fase</code>). A <strong>energia em mWh é a medida principal</strong>; o percentual de carga é complementar.</p>
 <table>
 <thead>
 <tr>
@@ -1937,9 +1954,34 @@ li {
 </thead>
 <tbody>
 <tr>
+<td><code>Protecao_Bateria_Limite</code></td>
+<td>%</td>
+<td>Carga em que a descarga real termina (<code>10</code>)</td>
+</tr>
+<tr>
+<td><code>Tempo_Total_Bateria_Real_min</code> / <code>_h</code></td>
+<td>min / h</td>
+<td>Tempo real na bateria, do início da fase ociosa ao fim da fase ativa</td>
+</tr>
+<tr>
+<td><code>Energia_Total_Consumida</code></td>
+<td>mWh</td>
+<td>Energia restante no início da ociosa − energia restante no fim da fase ativa</td>
+</tr>
+<tr>
+<td><code>Taxa_Media_Global</code></td>
+<td>W</td>
+<td>Energia total ÷ tempo total</td>
+</tr>
+<tr>
+<td><code>Autonomia_Real_Equivalente_100pct</code></td>
+<td>h</td>
+<td>Tempo total × (capacidade de carga cheia ÷ energia total): autonomia <strong>normalizada para 100% → 0%</strong>, comparável entre execuções que começaram em 95–100%. Sem capacidade: tempo total × 100 ÷ queda de carga</td>
+</tr>
+<tr>
 <td><code>Ociosa_Duracao_Medida</code> / <code>Escritorio_Duracao_Medida</code></td>
 <td>min</td>
-<td>Tempo entre os dois marcos da fase</td>
+<td>Tempo entre os dois marcos da fase (<code>Escritorio_Duracao_Medida_h</code> em horas)</td>
 </tr>
 <tr>
 <td><code>Ociosa_Energia_Consumida</code> / <code>Escritorio_Energia_Consumida</code></td>
@@ -1950,6 +1992,11 @@ li {
 <td><code>Ociosa_Taxa_Media_Descarga</code> / <code>Escritorio_Taxa_Media_Descarga</code></td>
 <td>W</td>
 <td>Energia consumida ÷ duração</td>
+</tr>
+<tr>
+<td><code>Escritorio_1h_Taxa_Media_Descarga</code></td>
+<td>W</td>
+<td>Taxa média da <strong>1ª hora</strong> da fase ativa (o mesmo intervalo do trace WPR). <code>N/A</code> se a bateria chegou a 10% antes de 60 min</td>
 </tr>
 <tr>
 <td><code>Ociosa_Queda_Carga</code> / <code>Escritorio_Queda_Carga</code></td>
@@ -1964,7 +2011,17 @@ li {
 <tr>
 <td><code>Ociosa_Autonomia_Projetada</code> / <code>Escritorio_Autonomia_Projetada</code></td>
 <td>h</td>
-<td>Capacidade de carga cheia ÷ taxa média de descarga</td>
+<td>Capacidade de carga cheia ÷ taxa média de descarga da fase (extrapolação)</td>
+</tr>
+<tr>
+<td><code>Tempo_Abertura_Writer</code> / <code>Tempo_Abertura_Calc</code></td>
+<td>s</td>
+<td>Do lançamento à janela visível (o Calc inclui o recálculo inicial da R2 até a janela)</td>
+</tr>
+<tr>
+<td><code>Paragrafos_Digitados_Writer</code>, <code>Linhas_Editadas_Calc</code>, <code>Recalculos_Calc_R2</code></td>
+<td>un</td>
+<td>Contadores da carga de escritório</td>
 </tr>
 <tr>
 <td><code>Energia_Estimada</code></td>
@@ -1994,7 +2051,7 @@ li {
 <tr>
 <td><code>Modo_Energia</code> / <code>Brilho</code></td>
 <td>texto / %</td>
-<td>Valor predominante nas amostras das fases medidas</td>
+<td>Valor predominante nas amostras das fases medidas (<code>Equilibrado</code>, 50%)</td>
 </tr>
 <tr>
 <td><code>Bluetooth</code></td>
@@ -2004,31 +2061,32 @@ li {
 <tr>
 <td><code>Desvios_Padronizacao</code></td>
 <td>un</td>
-<td>Amostras das fases medidas com brilho ≠ 50%, modo ≠ Melhor desempenho ou Economia ligada</td>
+<td>Amostras das fases medidas com brilho ≠ 50%, modo ≠ Equilibrado ou Economia ligada</td>
 </tr>
 <tr>
 <td><code>Versao_Teste</code>, <code>Coleta_Valida</code>, <code>Motivo_Encerramento</code></td>
 <td>texto</td>
-<td>Versão do teste, <code>sim</code>/<code>nao</code> e o motivo do fim da medição</td>
+<td>Versão do teste (<code>2.0</code>), <code>sim</code>/<code>nao</code> e o motivo do fim da medição</td>
 </tr>
 </tbody>
 </table>
-<p><code>Motivo_Encerramento</code>: <code>concluido</code>, <code>protecao_bateria</code>, <code>carregador_reconectado</code>, <code>parada_segura</code>, <code>sessao_bloqueada</code>, <code>login_exigido</code>, <code>padronizacao_na_bateria</code> ou <code>erro</code>. Fase sem dados = <code>N/A</code>. Formato: separador <code>,</code>, decimal com ponto e 2 casas.</p>
+<p><code>Motivo_Encerramento</code>: <code>protecao_bateria</code>, <code>carregador_reconectado</code>, <code>parada_segura</code>, <code>sessao_bloqueada</code>, <code>hibernacao_inesperada</code>, <code>padronizacao_na_bateria</code> ou <code>erro</code>. Fase sem dados = <code>N/A</code>. Formato: separador <code>,</code>, decimal com ponto e 2 casas.</p>
 <h3 id="96-evidências-geradas">9.6 Evidências Geradas</h3>
 <p>Na pasta <code>5_bateria/</code> do cenário:</p>
 <ul>
 <li><code>teste_bateria_&lt;data_hora&gt;.log</code> — log completo da execução</li>
 <li><code>bateria_preflight.csv</code> — uma linha por item do pré-voo (separador <code>;</code>): <code>Item;Esperado;Antes;Acao;Depois;Situacao;Observacao</code>. A coluna <code>Antes</code> permite restaurar a máquina à mão se o processo for encerrado à força</li>
 <li><code>bateria_relatorio_antes.html</code> / <code>bateria_relatorio_antes.xml</code> e <code>bateria_relatorio_depois.html</code> — relatório de bateria do Windows antes e depois da medição</li>
-<li><code>bateria_amostras.csv</code> — uma amostra a cada 60 s e os marcos de cada fase (separador <code>;</code>, decimal com vírgula): <code>Data_Hora;Fase;Tipo;Decorrido_Fase_s;Carga_Pct;Energia_Restante_mWh;Taxa_Descarga_mW;Tensao_mV;Fonte;Brilho_Pct;Modo_Energia;Economia_Energia;Desvio</code>. <code>Fase</code> = <code>estabilizacao</code>, <code>ociosa</code>, <code>transicao</code>, <code>escritorio</code> ou <code>encerramento</code>; <code>Tipo</code> = <code>periodica</code>, <code>inicio_fase</code> ou <code>fim_fase</code></li>
+<li><code>bateria_amostras.csv</code> — uma amostra a cada 60 s e os marcos de cada fase (separador <code>;</code>, decimal com vírgula): <code>Data_Hora;Fase;Tipo;Decorrido_Fase_s;Carga_Pct;Energia_Restante_mWh;Taxa_Descarga_mW;Tensao_mV;Fonte;Brilho_Pct;Modo_Energia;Economia_Energia;Desvio</code>. <code>Fase</code> = <code>estabilizacao</code>, <code>ociosa</code>, <code>transicao</code>, <code>escritorio</code> ou <code>encerramento</code>; <code>Tipo</code> = <code>periodica</code>, <code>inicio_fase</code>, <code>fim_wpr_escritorio</code> ou <code>fim_fase</code></li>
+<li><code>bateria_checkpoint.json</code> — estado da medição (fase, motivo, última amostra, marcos, contadores do LibreOffice, desvios), regravado de forma atômica a cada amostra e marco</li>
 <li><code>bateria_top_processos.csv</code> — top 10 processos por CPU a cada 5 min: <code>Data_Hora;Fase;Posicao;Processo;PID;CPU_Pct;Memoria_MB</code>. <code>CPU_Pct</code> é a média do processo na janela de 5 min, em % da máquina</li>
-<li><code>Trace_Bateria_Ociosa_&lt;data_hora&gt;.etl</code> e <code>Trace_Bateria_Escritorio_&lt;data_hora&gt;.etl</code> — um trace de energia por fase (parcial, se a medição encerrou antes)</li>
-<li><code>CSV_Ociosa_&lt;data_hora&gt;/</code> e <code>CSV_Escritorio_&lt;data_hora&gt;/</code> — exportação dos traces pelo perfil WPA de bateria</li>
+<li><code>Trace_Bateria_Ociosa_&lt;data_hora&gt;.etl</code> e <code>Trace_Bateria_Escritorio_&lt;data_hora&gt;.etl</code> — trace de energia da fase ociosa e da 1ª hora da fase ativa (parcial, se a fase encerrou antes)</li>
+<li><code>CSV_Ociosa_&lt;data_hora&gt;/</code> e <code>CSV_Escritorio_&lt;data_hora&gt;/</code> — exportação dos traces pelo perfil WPA de bateria (só se a exportação não foi pulada)</li>
 <li><code>bateria_srum.csv</code> — relatório SRUM (<code>powercfg /srumutil</code>)</li>
 <li><code>bateria_relatorio_energia.html</code> — relatório de energia (<code>powercfg /energy</code>, 60 s)</li>
-<li><code>bateria.csv</code> — CSV temático (<code>Metrica,Valor,Unidade</code>). É gravado sempre que a medição começou, inclusive em encerramento antecipado</li>
+<li><code>bateria.csv</code> — CSV temático (<code>Metrica,Valor,Unidade</code>). É gravado sempre que a medição começou, inclusive em encerramento antecipado, e <strong>antes</strong> da pós-medição pesada</li>
 </ul>
-<p>Nada é gravado em <code>C:\BATERIA</code>, em <code>C:\Traces</code> nem na raiz do projeto.</p>
+<p>Nada é gravado em <code>C:\BATERIA</code>, em <code>C:\Traces</code> nem na raiz do projeto. Os arquivos do LibreOffice ficam numa pasta temporária (<code>wintesthub_lo_bateria_*</code>), removida no encerramento.</p>
 <h3 id="97-critério-de-aprovação">9.7 Critério de Aprovação</h3>
 <p>O PASS/FAIL decide se a <strong>coleta é válida</strong>; não há limiar de autonomia ou consumo.</p>
 <table>
@@ -2040,11 +2098,11 @@ li {
 </thead>
 <tbody>
 <tr>
-<td>Pré-voo e conferência na bateria ok, fase ociosa completa, fase de escritório com pelo menos 30 min medidos (completa ou encerrada pela proteção de bateria depois desse mínimo), leitura de energia (medida ou estimada) nas duas fases, <code>bateria.csv</code> e <code>bateria_amostras.csv</code> gravados</td>
+<td>Pré-voo e conferência na bateria ok, fase ociosa completa, fase ativa iniciada e drenada até a proteção de bateria (<strong>10%</strong>, qualquer duração), leitura de energia (medida ou estimada) nas duas fases, <code>bateria.csv</code> e <code>bateria_amostras.csv</code> gravados</td>
 <td><span class="badge badge-pass">PASS</span> (exit code 0)</td>
 </tr>
 <tr>
-<td>Sem bateria, carga abaixo de 95%, ferramentas ausentes, item fora do padrão ou bloqueado por política, sem internet, monitor externo, Edge/Google não prontos — antes de pedir a desconexão</td>
+<td>Sem bateria, carga abaixo de 95%, ferramentas ou LibreOffice ausentes, item fora do padrão ou bloqueado por política, sem internet, monitor externo — antes de pedir a desconexão</td>
 <td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
 </tr>
 <tr>
@@ -2060,15 +2118,15 @@ li {
 <td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
 </tr>
 <tr>
-<td>Proteção de bateria (7%) na fase ociosa ou antes de 30 min da fase de escritório</td>
+<td>Proteção de bateria (10%) ainda na fase ociosa ou na transição</td>
 <td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
 </tr>
 <tr>
-<td>Sessão bloqueada no início da fase de escritório</td>
+<td>Sessão bloqueada no início da fase ativa</td>
 <td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
 </tr>
 <tr>
-<td>Login pedido ao abrir o Edge já na bateria (<code>login_exigido</code>)</td>
+<td>Suspensão ou hibernação no meio da medição (<code>hibernacao_inesperada</code>)</td>
 <td><span class="badge badge-fail">FAIL</span> (exit code 1)</td>
 </tr>
 <tr>
@@ -2081,20 +2139,20 @@ li {
 </tr>
 </tbody>
 </table>
-<div class="callout callout-info"><strong>Nota</strong>desvios de padronização durante a medição e falhas nas evidências complementares (exportação CSV, SRUM, relatório de energia) <b>não reprovam</b>: ficam como aviso no log e, no caso dos desvios, em <code>Desvios_Padronizacao</code>.</div>
+<div class="callout callout-info"><strong>Nota</strong>não há mínimo de duração para a fase ativa: um notebook com bateria degradada que chega a 10% com 12 min de fase ativa também produz uma medição real válida. Desvios de padronização durante a medição e falhas nas evidências complementares (exportação CSV, SRUM, relatório de energia — inclusive quando a exportação é pulada) <b>não reprovam</b>: ficam como aviso no log e, no caso dos desvios, em <code>Desvios_Padronizacao</code>.</div>
 <h3 id="98-como-interpretar-gestão">9.8 Como Interpretar <span class="tag tag-gestao">Gestão</span></h3>
 <ul>
-<li>Compare o <code>bateria.csv</code> do cenário <strong>baseline</strong> com o do cenário <strong>com agente</strong>, executados na <strong>mesma máquina</strong>, na <strong>mesma rede</strong> e com a <strong>mesma versão do teste</strong> (<code>Versao_Teste</code>).</li>
-<li>A <strong>fase ociosa</strong> mostra o custo de fundo do agente — é onde 1–2 W de diferença aparecem com mais clareza. A <strong>fase de escritório</strong> representa o uso real.</li>
-<li>Use a <strong>taxa média de descarga (W)</strong> e a <strong>energia consumida (mWh)</strong> como medidas principais; a queda em % tem resolução de 1 ponto e é complementar.</li>
+<li>Compare o <code>bateria.csv</code> do cenário <strong>baseline</strong> com o do cenário <strong>com agente</strong>, executados na <strong>mesma máquina</strong>, na <strong>mesma rede</strong> e com a <strong>mesma versão do teste</strong> (<code>Versao_Teste = 2.0</code>).</li>
+<li>A <strong>fase ociosa</strong> mostra o custo de fundo do agente — é onde 1–2 W de diferença aparecem com mais clareza. A <strong>fase ativa</strong> representa o uso real de escritório.</li>
+<li>Para o tempo de bateria, use <code>Autonomia_Real_Equivalente_100pct</code>: ela normaliza execuções que começaram em 95% ou 100%. <code>Tempo_Total_Bateria_Real_*</code> é o tempo bruto medido (de ~95–100% até 10%).</li>
+<li>Use a <strong>taxa média de descarga (W)</strong> e a <strong>energia consumida (mWh)</strong> como medidas de consumo; a queda em % tem resolução de 1 ponto e é complementar. <code>Escritorio_1h_Taxa_Media_Descarga</code> é o intervalo que tem trace WPR para atribuição por processo.</li>
 <li>Só compare execuções com <code>Coleta_Valida = sim</code> e <code>Desvios_Padronizacao = 0</code>. <code>Energia_Estimada = sim</code> indica menor precisão.</li>
-<li>A <strong>autonomia projetada</strong> é uma extrapolação linear do consumo da fase, não uma descarga completa.</li>
+<li>A <strong>autonomia projetada</strong> por fase continua sendo uma extrapolação linear; o tempo real vem das métricas <code>Tempo_Total_*</code> e <code>Autonomia_Real_*</code>.</li>
 <li>O <code>bateria_top_processos.csv</code> e os traces <code>.etl</code> (no WPA) ajudam a atribuir a diferença de consumo a processos específicos.</li>
-<li>Os resultados <strong>não são comparáveis</strong> com as medições antigas de 60% de CPU por 120 minutos.</li>
 </ul>
 <h3 id="99-interrupção-segura">9.9 Interrupção Segura</h3>
-<p>Assim como no Módulo 1, o teste pode ser interrompido com <strong>Ctrl+Q</strong>. Fechar a janela do monitor do teste (pela barra de tarefas ou Alt+F4) e um Ctrl+C recebido pelo teste têm o mesmo efeito. A parada segura salva o trace parcial, grava o que já foi medido (<code>bateria.csv</code> com <code>Coleta_Valida = nao</code>), restaura as configurações alteradas, fecha o Edge e sai com exit code 1.</p>
-<p>Se o processo for encerrado à força (por exemplo, fechando a janela do hub), a restauração automática não roda: use a coluna <code>Antes</code> do <code>bateria_preflight.csv</code> para voltar brilho, Bluetooth e configurações de energia aos valores anteriores.</p>
+<p>Assim como no Módulo 1, o teste pode ser interrompido com <strong>Ctrl+Q</strong>. Fechar a janela do monitor do teste (pela barra de tarefas ou Alt+F4) e um Ctrl+C recebido pelo teste têm o mesmo efeito. A parada segura salva o trace parcial, fecha o LibreOffice do teste, grava o que já foi medido (<code>bateria.csv</code> com <code>Coleta_Valida = nao</code>), restaura as configurações alteradas e sai com exit code 1, sem rodar a exportação pesada.</p>
+<p>Se o processo for encerrado à força (por exemplo, fechando a janela do hub), a restauração automática não roda: use a coluna <code>Antes</code> do <code>bateria_preflight.csv</code> para voltar brilho, Bluetooth e configurações de energia aos valores anteriores. O <code>bateria_checkpoint.json</code> e o <code>bateria_amostras.csv</code> preservam o que foi medido até ali.</p>
 </div>
 
 <div class="section">
@@ -2681,7 +2739,7 @@ Exportar/
 </tr>
 <tr>
 <td><strong>Autonomia projetada</strong></td>
-<td>Tempo que a bateria cheia duraria no ritmo de consumo medido numa fase: capacidade de carga cheia ÷ taxa média de descarga. É uma extrapolação linear, não uma descarga completa</td>
+<td>Tempo que a bateria cheia duraria no ritmo de consumo medido numa fase: capacidade de carga cheia ÷ taxa média de descarga. É uma extrapolação linear; o tempo real medido até 10% está em <code>Tempo_Total_Bateria_Real_*</code> e <code>Autonomia_Real_Equivalente_100pct</code></td>
 </tr>
 <tr>
 <td><strong>Bateria (teste de disco)</strong></td>
@@ -2717,7 +2775,7 @@ Exportar/
 </tr>
 <tr>
 <td><strong>Fase de escritório</strong></td>
-<td>Fase de 60 min do teste de bateria com simulação contínua de uso de escritório no Edge (Google Docs, Google Sheets e PDF)</td>
+<td>Fase ativa do teste de bateria (v2.0): uso de escritório contínuo no LibreOffice Writer e Calc (planilha R2) até a bateria chegar a 10%, com trace WPR só na 1ª hora</td>
 </tr>
 <tr>
 <td><strong>Fase ociosa</strong></td>

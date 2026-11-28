@@ -54,7 +54,7 @@ Os resultados ficam agrupados em **cenários** (por exemplo, `ImagemLimpa` × `C
 | 2.1 | Disco — DLP/USB | `2-1_teste_disco_dlp.py` | Cópia PC ↔ pendrive de um arquivo de 2 GB, 5 baterias | 5 baterias | as baterias terminam sem erro |
 | 3 | Rede | `3_teste_rede.py` | Download, upload, ping e jitter no speedtest interno **e** no fast.com (caminho real do tráfego, com proxy/zero trust), 10 rodadas intercaladas de cada + aquecimento. Mediana, quartis e CV por fonte, tráfego de fundo e cabo/Wi-Fi por rodada | ~20 min | pelo menos uma fonte com ≥ 8 rodadas válidas (a outra fora do ar vira aviso) |
 | 4 | Boot e Shutdown | `4_boot_shutdown_auto.py` | 5 reinícios automáticos e análise dos eventos 100/200 do `Diagnostics-Performance` | ~30–40 min | nenhum boot ou shutdown crítico (> 60 s) no dia |
-| 5 | Bateria | `5_teste_bateria.py` | 60 min ociosa + 60 min de escritório na bateria, com pré-voo de padronização, WPR, SRUM e relatório de energia | ~2h20–2h40 | a coleta é válida nas duas fases |
+| 5 | Bateria | `5_teste_bateria.py` | Tempo real de bateria (v2.0): 60 min ociosa + escritório no LibreOffice (Writer + Calc R2) até 10%, no modo Equilibrado, com pré-voo de padronização, WPR na 1ª hora, SRUM e relatório de energia | variável (~1h10 + descarga até 10%) | a coleta é válida: ociosa completa e fase ativa drenada até 10% |
 | 6 | Wi-Fi Fast Transition | `6_teste_fast_transition.py` | Roaming 802.11r durante uma caminhada de 5 min, com painel ao vivo e inventário de APs | ~7 min | ≥ 1 troca de AP com FT |
 | 7 | Dev .NET | `7_dev_dotnet.py` | Build limpo, build incremental e testes de unidade do `jasontaylordev/CleanArchitecture` v11.0.0 (.NET 10), 3 execuções | ~5–15 min | todas as cargas OK e ≤ 10x a referência |
 | 8 | Dev Go | `8_dev_go.py` | `go build` limpo e `go test` do Hugo v0.169.0, 3 execuções | ~10–30 min | todas as cargas OK e ≤ 10x a referência |
@@ -112,7 +112,7 @@ Antes de cada script, o hub injeta `HUB_EVIDENCE_DIR` (onde gravar as evidência
 | Módulo 1 | LibreOffice (`soffice.exe`, instalado pelo setup `3_softwares_msStore.ps1`); executa 100% offline, sem conta Google |
 | Módulo 3 | `config.local.json` com a URL do speedtest interno (veja [Configuração](#configuração)) |
 | Módulos 1.1 e 2.1 | Pendrive montado como `E:\` (configurável no topo de cada script) |
-| Módulo 5 | Notebook com bateria reconhecida e carregada a ≥ 95%; Microsoft Edge com a conta Google logada |
+| Módulo 5 | Notebook com bateria reconhecida e carregada a ≥ 95%; carga de escritório 100% local no LibreOffice (`soffice.exe`, sem conta Google); rede com internet |
 | Módulo 6 | Wi-Fi conectado à rede testada, com 2 ou mais APs do mesmo SSID no percurso |
 | Módulos 7 a 11 | Na tomada; ferramentas dos setups `7_install_devtools_dev` (Git, .NET SDK 10, Go, uv, docker-compose) e `10_preparar_podman` (WSL2 e Podman, módulo 10); virtualização na BIOS para o módulo 10 |
 
